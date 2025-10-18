@@ -209,16 +209,16 @@ We provide ready-to-use scripts for this:
 # First, ensure FIREBASE_SERVICE_ACCOUNT_JSON is set in .env.local
 
 # Set a user as admin
-npx dotenv -e .env.local -- tsx scripts/set-user-role.ts admin@ora.com admin
+npx tsx scripts/set-user-role.ts admin@ora.com admin
 
 # List all users with custom roles
-npx dotenv -e .env.local -- tsx scripts/list-admin-users.ts
+npx tsx scripts/list-admin-users.ts
 
 # Remove a user's role
-npx dotenv -e .env.local -- tsx scripts/remove-user-role.ts user@ora.com
+npx tsx scripts/remove-user-role.ts user@ora.com
 ```
 
-**Note:** Uses `dotenv-cli` to load env vars (Node.js 18+ compatible). Both tools auto-install via npx!
+**Note:** Scripts auto-load `.env.local` using dotenv. `npx tsx` auto-installs on first use!
 
 **Alternative: Use the Admin API** (after first admin is created):
 ```bash

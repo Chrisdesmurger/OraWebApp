@@ -1,11 +1,17 @@
 /**
  * Script to remove custom claims (role) from a user
  * This sets them back to a regular app user
- * Usage: npx dotenv -e .env.local -- tsx scripts/remove-user-role.ts <email>
+ * Usage: npx tsx scripts/remove-user-role.ts <email>
  *
  * Prerequisites:
  * - Set FIREBASE_SERVICE_ACCOUNT_JSON in .env.local
  */
+
+import * as dotenv from 'dotenv';
+import { resolve } from 'path';
+
+// Load .env.local
+dotenv.config({ path: resolve(__dirname, '../.env.local') });
 
 import { getAuth } from '../lib/firebase/admin';
 
@@ -48,8 +54,8 @@ async function removeUserRole(email: string) {
 const args = process.argv.slice(2);
 
 if (args.length < 1) {
-  console.error('❌ Usage: npx dotenv -e .env.local -- tsx scripts/remove-user-role.ts <email>');
-  console.error('   Example: npx dotenv -e .env.local -- tsx scripts/remove-user-role.ts user@ora.com');
+  console.error('❌ Usage: npx tsx scripts/remove-user-role.ts <email>');
+  console.error('   Example: npx tsx scripts/remove-user-role.ts user@ora.com');
   process.exit(1);
 }
 

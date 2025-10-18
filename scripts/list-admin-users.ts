@@ -1,10 +1,16 @@
 /**
  * Script to list all users with admin/teacher/viewer roles
- * Usage: npx dotenv -e .env.local -- tsx scripts/list-admin-users.ts
+ * Usage: npx tsx scripts/list-admin-users.ts
  *
  * Prerequisites:
  * - Set FIREBASE_SERVICE_ACCOUNT_JSON in .env.local
  */
+
+import * as dotenv from 'dotenv';
+import { resolve } from 'path';
+
+// Load .env.local
+dotenv.config({ path: resolve(__dirname, '../.env.local') });
 
 import { getAuth } from '../lib/firebase/admin';
 
@@ -22,7 +28,7 @@ async function listAdminUsers() {
     if (adminUsers.length === 0) {
       console.log('⚠️  No users with custom roles found.');
       console.log('💡 Create an admin user with:');
-      console.log('   npx dotenv -e .env.local -- tsx scripts/set-user-role.ts <email> admin');
+      console.log('   npx tsx scripts/set-user-role.ts <email> admin');
       return;
     }
 
