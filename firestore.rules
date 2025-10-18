@@ -1,0 +1,86 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isTeacher() {
+      return hasRole('teacher');
+    }
+
+    function isViewer() {
+      return hasRole('viewer');
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Users collection
+    match /users/{uid} {
+      allow read: if isAdmin() || isOwner(uid);
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (isOwner(uid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isFake']));
+      allow delete: if isAdmin();
+    }
+
+    // Programs collection
+    match /programs/{programId} {
+      allow read: if isAuthenticated();
+      allow create: if isTeacher() || isAdmin();
+      allow update: if isAdmin() || (isTeacher() && resource.data.authorId == request.auth.uid);
+      allow delete: if isAdmin() || (isTeacher() && resource.data.authorId == request.auth.uid);
+    }
+
+    // Lessons collection
+    match /lessons/{lessonId} {
+      allow read: if isAuthenticated();
+      allow create: if isTeacher() || isAdmin();
+      allow update: if isTeacher() || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Media collection
+    match /media/{mediaId} {
+      allow read: if isAuthenticated();
+      allow create: if isTeacher() || isAdmin();
+      allow update: if isAdmin() || (isTeacher() && resource.data.uploadedBy == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // Audit logs collection (read-only for admins)
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only server can write
+    }
+
+    // Stats collection
+    match /stats/{statType}/{statId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only server can write
+    }
+
+    // Commands collection (admin only)
+    match /commands/{commandId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Default deny all other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
