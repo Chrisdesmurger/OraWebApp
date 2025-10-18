@@ -51,22 +51,23 @@ FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 
 ### Method 1: Node.js Scripts (Recommended ✅)
 
-We've provided ready-to-use TypeScript scripts that run via `npx tsx` (auto-installs TypeScript executor):
+We've provided ready-to-use TypeScript scripts that use `dotenv-cli` + `tsx`:
 
 #### Set User Role
 
 ```bash
-npx tsx --env-file=.env.local scripts/set-user-role.ts <email> <role>
+npx dotenv -e .env.local -- tsx scripts/set-user-role.ts <email> <role>
 ```
 
 **Example:**
 ```bash
-npx tsx --env-file=.env.local scripts/set-user-role.ts admin@ora.com admin
+npx dotenv -e .env.local -- tsx scripts/set-user-role.ts admin@ora.com admin
 ```
 
 **Note:**
-- No need to run `npm install` first - `npx tsx` will automatically install the TypeScript executor if needed
-- The `--env-file=.env.local` flag loads your environment variables from `.env.local`
+- No need to run `npm install` first - `npx` auto-installs both `dotenv-cli` and `tsx` if needed
+- Works with Node.js 18+ (unlike `--env-file` flag which requires Node.js 20.6+)
+- `dotenv -e .env.local` loads environment variables from `.env.local`
 
 **Output:**
 ```
@@ -84,7 +85,7 @@ npx tsx --env-file=.env.local scripts/set-user-role.ts admin@ora.com admin
 #### List All Admin Users
 
 ```bash
-npx tsx --env-file=.env.local scripts/list-admin-users.ts
+npx dotenv -e .env.local -- tsx scripts/list-admin-users.ts
 ```
 
 **Output:**
@@ -114,12 +115,12 @@ npx tsx --env-file=.env.local scripts/list-admin-users.ts
 #### Remove User Role
 
 ```bash
-npx tsx --env-file=.env.local scripts/remove-user-role.ts <email>
+npx dotenv -e .env.local -- tsx scripts/remove-user-role.ts <email>
 ```
 
 **Example:**
 ```bash
-npx tsx --env-file=.env.local scripts/remove-user-role.ts user@ora.com
+npx dotenv -e .env.local -- tsx scripts/remove-user-role.ts user@ora.com
 ```
 
 ---
@@ -271,7 +272,7 @@ The client ID token automatically refreshes every hour. If you don't force a ref
 **Solution:**
 1. Verify custom claims are set:
    ```bash
-   npx tsx --env-file=.env.local scripts/list-admin-users.ts
+   npx dotenv -e .env.local -- tsx scripts/list-admin-users.ts
    ```
 2. Force client-side token refresh:
    ```javascript

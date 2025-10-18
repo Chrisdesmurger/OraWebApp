@@ -10,9 +10,9 @@
     "test": "vitest",
     "test:e2e": "playwright test",
     "type-check": "tsc --noEmit",
-    "set-role": "tsx --env-file=.env.local scripts/set-user-role.ts",
-    "list-admins": "tsx --env-file=.env.local scripts/list-admin-users.ts",
-    "remove-role": "tsx --env-file=.env.local scripts/remove-user-role.ts"
+    "set-role": "dotenv -e .env.local -- tsx scripts/set-user-role.ts",
+    "list-admins": "dotenv -e .env.local -- tsx scripts/list-admin-users.ts",
+    "remove-role": "dotenv -e .env.local -- tsx scripts/remove-user-role.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -48,6 +48,8 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "dotenv": "^16.4.5",
+    "dotenv-cli": "^7.4.2",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.0.0",
     "postcss": "^8.4.49",
