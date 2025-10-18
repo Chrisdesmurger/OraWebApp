@@ -51,18 +51,20 @@ FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 
 ### Method 1: Node.js Scripts (Recommended ✅)
 
-We've provided ready-to-use TypeScript scripts:
+We've provided ready-to-use TypeScript scripts that run via `npx tsx` (auto-installs TypeScript executor):
 
 #### Set User Role
 
 ```bash
-npx ts-node scripts/set-user-role.ts <email> <role>
+npx tsx scripts/set-user-role.ts <email> <role>
 ```
 
 **Example:**
 ```bash
-npx ts-node scripts/set-user-role.ts admin@ora.com admin
+npx tsx scripts/set-user-role.ts admin@ora.com admin
 ```
+
+**Note:** No need to run `npm install` first - `npx tsx` will automatically install the TypeScript executor if needed.
 
 **Output:**
 ```
@@ -80,7 +82,7 @@ npx ts-node scripts/set-user-role.ts admin@ora.com admin
 #### List All Admin Users
 
 ```bash
-npx ts-node scripts/list-admin-users.ts
+npx tsx scripts/list-admin-users.ts
 ```
 
 **Output:**
@@ -110,12 +112,12 @@ npx ts-node scripts/list-admin-users.ts
 #### Remove User Role
 
 ```bash
-npx ts-node scripts/remove-user-role.ts <email>
+npx tsx scripts/remove-user-role.ts <email>
 ```
 
 **Example:**
 ```bash
-npx ts-node scripts/remove-user-role.ts user@ora.com
+npx tsx scripts/remove-user-role.ts user@ora.com
 ```
 
 ---
@@ -267,7 +269,7 @@ The client ID token automatically refreshes every hour. If you don't force a ref
 **Solution:**
 1. Verify custom claims are set:
    ```bash
-   npx ts-node scripts/list-admin-users.ts
+   npx tsx scripts/list-admin-users.ts
    ```
 2. Force client-side token refresh:
    ```javascript

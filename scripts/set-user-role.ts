@@ -1,14 +1,13 @@
 /**
  * Script to set custom claims (role) for users
- * Usage: npx ts-node scripts/set-user-role.ts <email> <role>
- * Example: npx ts-node scripts/set-user-role.ts admin@ora.com admin
+ * Usage: npx tsx scripts/set-user-role.ts <email> <role>
+ * Example: npx tsx scripts/set-user-role.ts admin@ora.com admin
+ *
+ * Prerequisites:
+ * - Set FIREBASE_SERVICE_ACCOUNT_JSON in .env.local
  */
 
 import { getAuth } from '../lib/firebase/admin';
-import * as dotenv from 'dotenv';
-
-// Load environment variables
-dotenv.config({ path: '.env.local' });
 
 type UserRole = 'admin' | 'teacher' | 'viewer' | 'user';
 
@@ -44,9 +43,9 @@ async function setUserRole(email: string, role: UserRole) {
 const args = process.argv.slice(2);
 
 if (args.length < 2) {
-  console.error('❌ Usage: npx ts-node scripts/set-user-role.ts <email> <role>');
+  console.error('❌ Usage: npx tsx scripts/set-user-role.ts <email> <role>');
   console.error('   Roles: admin | teacher | viewer | user');
-  console.error('   Example: npx ts-node scripts/set-user-role.ts admin@ora.com admin');
+  console.error('   Example: npx tsx scripts/set-user-role.ts admin@ora.com admin');
   process.exit(1);
 }
 

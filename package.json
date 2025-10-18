@@ -9,7 +9,10 @@
     "lint": "next lint",
     "test": "vitest",
     "test:e2e": "playwright test",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "set-role": "tsx scripts/set-user-role.ts",
+    "list-admins": "tsx scripts/list-admin-users.ts",
+    "remove-role": "tsx scripts/remove-user-role.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
