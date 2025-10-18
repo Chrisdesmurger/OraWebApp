@@ -136,6 +136,9 @@ ora-admin/
 │   ├── dashboard/                  # Dashboard components
 │   └── kpi-card.tsx                # KPI card component
 ├── scripts/
+│   ├── set-user-role.ts            # Set user custom claims (RBAC)
+│   ├── list-admin-users.ts         # List users with roles
+│   ├── remove-user-role.ts         # Remove user roles
 │   ├── seed-fake-users.ts          # Seed test users
 │   ├── purge-fake-users.ts         # Remove test users
 │   ├── seed-sample-content.ts      # Seed content
@@ -197,16 +200,33 @@ firebase deploy --only firestore:rules,storage:rules,firestore:indexes
 ```
 
 ### 4. Set Custom Claims
-The first user must be promoted to admin manually:
+
+**IMPORTANT:** Firebase custom claims **cannot** be set via the Firebase Console UI. You must use the Firebase Admin SDK.
+
+We provide ready-to-use scripts for this:
 
 ```bash
-# Using Firebase CLI
-firebase auth:export users.json
-firebase functions:shell
-# Then run: admin.auth().setCustomUserClaims('USER_UID', { role: 'admin' })
+# First, ensure FIREBASE_SERVICE_ACCOUNT_JSON is set in .env.local
+
+# Set a user as admin
+npx ts-node scripts/set-user-role.ts admin@ora.com admin
+
+# List all users with custom roles
+npx ts-node scripts/list-admin-users.ts
+
+# Remove a user's role
+npx ts-node scripts/remove-user-role.ts user@ora.com
 ```
 
-Or create an admin via the app's signup and use Firebase Console to set custom claims.
+**Alternative: Use the Admin API** (after first admin is created):
+```bash
+curl -X POST http://localhost:3000/api/admin/set-role \
+  -H "Authorization: Bearer YOUR_ADMIN_ID_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"uid":"USER_UID","role":"admin"}'
+```
+
+📖 **Full guide:** [docs/CUSTOM_CLAIMS_SETUP.md](docs/CUSTOM_CLAIMS_SETUP.md)
 
 ## 📊 API Endpoints
 
@@ -285,6 +305,8 @@ firebase deploy --only hosting
 ## 📚 Documentation
 
 - [Firebase Setup Guide](docs/SETUP_FIREBASE.md)
+- [Custom Claims Setup](docs/CUSTOM_CLAIMS_SETUP.md) - **RBAC role assignment**
+- [Android Compatibility Guide](ANDROID_COMPATIBILITY_GUIDE.md) - **Firebase dual-app setup**
 - [Admin Commands](docs/ADMIN_COMMANDS.md)
 - [Analytics Components](docs/ANALYTICS_COMPONENTS_SUMMARY.md)
 - [Deployment Guide](docs/DEPLOY_VERCEL.md)
