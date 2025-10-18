@@ -209,14 +209,16 @@ We provide ready-to-use scripts for this:
 # First, ensure FIREBASE_SERVICE_ACCOUNT_JSON is set in .env.local
 
 # Set a user as admin
-npx ts-node scripts/set-user-role.ts admin@ora.com admin
+npx tsx --env-file=.env.local scripts/set-user-role.ts admin@ora.com admin
 
 # List all users with custom roles
-npx ts-node scripts/list-admin-users.ts
+npx tsx --env-file=.env.local scripts/list-admin-users.ts
 
 # Remove a user's role
-npx ts-node scripts/remove-user-role.ts user@ora.com
+npx tsx --env-file=.env.local scripts/remove-user-role.ts user@ora.com
 ```
+
+**Note:** `npx tsx` auto-installs the TypeScript executor on first use - no `npm install` needed!
 
 **Alternative: Use the Admin API** (after first admin is created):
 ```bash

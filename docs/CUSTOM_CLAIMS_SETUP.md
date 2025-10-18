@@ -56,15 +56,17 @@ We've provided ready-to-use TypeScript scripts that run via `npx tsx` (auto-inst
 #### Set User Role
 
 ```bash
-npx tsx scripts/set-user-role.ts <email> <role>
+npx tsx --env-file=.env.local scripts/set-user-role.ts <email> <role>
 ```
 
 **Example:**
 ```bash
-npx tsx scripts/set-user-role.ts admin@ora.com admin
+npx tsx --env-file=.env.local scripts/set-user-role.ts admin@ora.com admin
 ```
 
-**Note:** No need to run `npm install` first - `npx tsx` will automatically install the TypeScript executor if needed.
+**Note:**
+- No need to run `npm install` first - `npx tsx` will automatically install the TypeScript executor if needed
+- The `--env-file=.env.local` flag loads your environment variables from `.env.local`
 
 **Output:**
 ```
@@ -82,7 +84,7 @@ npx tsx scripts/set-user-role.ts admin@ora.com admin
 #### List All Admin Users
 
 ```bash
-npx tsx scripts/list-admin-users.ts
+npx tsx --env-file=.env.local scripts/list-admin-users.ts
 ```
 
 **Output:**
@@ -112,12 +114,12 @@ npx tsx scripts/list-admin-users.ts
 #### Remove User Role
 
 ```bash
-npx tsx scripts/remove-user-role.ts <email>
+npx tsx --env-file=.env.local scripts/remove-user-role.ts <email>
 ```
 
 **Example:**
 ```bash
-npx tsx scripts/remove-user-role.ts user@ora.com
+npx tsx --env-file=.env.local scripts/remove-user-role.ts user@ora.com
 ```
 
 ---
@@ -269,7 +271,7 @@ The client ID token automatically refreshes every hour. If you don't force a ref
 **Solution:**
 1. Verify custom claims are set:
    ```bash
-   npx tsx scripts/list-admin-users.ts
+   npx tsx --env-file=.env.local scripts/list-admin-users.ts
    ```
 2. Force client-side token refresh:
    ```javascript
