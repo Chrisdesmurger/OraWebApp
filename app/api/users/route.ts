@@ -14,13 +14,46 @@ export async function GET(request: NextRequest) {
     }
 
     const firestore = getFirestore();
-    const usersSnapshot = await firestore.collection('users').orderBy('createdAt', 'desc').get();
 
-    const users = usersSnapshot.docs.map((doc) => ({
-      uid: doc.id,
-      ...doc.data(),
-    }));
+    console.log('[GET /api/users] Fetching users from Firestore...');
 
+    // Use snake_case field names (created_at instead of createdAt)
+    let usersSnapshot;
+    try {
+      usersSnapshot = await firestore.collection('users').orderBy('created_at', 'desc').get();
+      console.log('[GET /api/users] Found', usersSnapshot.size, 'users');
+    } catch (orderError: any) {
+      console.warn('[GET /api/users] orderBy failed, trying without:', orderError.message);
+      // Fallback: fetch without ordering
+      usersSnapshot = await firestore.collection('users').get();
+      console.log('[GET /api/users] Without orderBy - Found', usersSnapshot.size, 'users');
+    }
+
+    const users = usersSnapshot.docs.map((doc) => {
+      const data = doc.data();
+      console.log('[GET /api/users] User doc:', doc.id, 'has fields:', Object.keys(data));
+
+      // Map snake_case Firestore fields to camelCase for frontend
+      return {
+        id: doc.id,
+        uid: doc.id,
+        email: data.email || null,
+        displayName: data.first_name && data.last_name
+          ? `${data.first_name} ${data.last_name}`.trim()
+          : data.first_name || data.last_name || data.email?.split('@')[0] || 'Unknown',
+        firstName: data.first_name,
+        lastName: data.last_name,
+        photoURL: data.photo_url,
+        role: data.role || 'viewer',
+        planTier: data.plan_tier || 'free',
+        createdAt: data.created_at,
+        lastLoginAt: data.last_login_at,
+        updatedAt: data.updated_at,
+        disabled: data.disabled || false,
+      };
+    });
+
+    console.log('[GET /api/users] Returning', users.length, 'users');
     return apiSuccess({ users });
   } catch (error: any) {
     console.error('GET /api/users error:', error);

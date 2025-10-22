@@ -36,14 +36,15 @@ async function listAdminUsers() {
 
     adminUsers.forEach((user, index) => {
       const role = user.customClaims?.role || 'unknown';
-      const roleEmoji = {
+      const roleEmoji: Record<string, string> = {
         admin: '👑',
         teacher: '👨‍🏫',
         viewer: '👁️',
         user: '👤',
-      }[role] || '❓';
+      };
+      const emoji = roleEmoji[role as string] || '❓';
 
-      console.log(`${index + 1}. ${roleEmoji} ${user.email || 'No email'}`);
+      console.log(`${index + 1}. ${emoji} ${user.email || 'No email'}`);
       console.log(`   UID: ${user.uid}`);
       console.log(`   Role: ${role}`);
       console.log(`   Created: ${user.metadata.creationTime}`);

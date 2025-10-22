@@ -3,34 +3,21 @@
 import * as React from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { hasPermission } from '@/lib/rbac';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { KpiCard } from '@/components/kpi-card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle, Users, BookOpen, TrendingUp, Clock } from 'lucide-react';
 
 interface StatsData {
-  users: {
-    total: number;
-    active: number;
-    newThisMonth: number;
-    growth: number;
-  };
-  content: {
-    total: number;
-    published: number;
-    drafts: number;
-    growth: number;
-  };
-  engagement: {
-    totalSessions: number;
-    avgDuration: number;
-    completionRate: number;
-  };
-  programs: {
-    total: number;
-    active: number;
-    enrollments: number;
-  };
+  totalUsers: number;
+  activeUsers7d: number;
+  activeUsers30d: number;
+  totalPrograms: number;
+  totalLessons: number;
+  totalMedia: number;
+  totalMediaSizeMB: number;
+  lastUpdated: string;
 }
 
 export default function StatsPage() {
@@ -44,13 +31,17 @@ export default function StatsPage() {
   React.useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/stats');
+        const response = await fetchWithAuth('/api/stats');
+
         if (response.ok) {
           const data = await response.json();
           setStats(data);
+        } else {
+          const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('[admin/stats] Failed to fetch stats:', error);
         }
       } catch (error) {
-        console.error('Error fetching stats:', error);
+        console.error('[admin/stats] Error fetching stats:', error);
       } finally {
         setLoading(false);
       }
@@ -90,33 +81,24 @@ export default function StatsPage() {
       {/* User Statistics */}
       <div>
         <h2 className="text-lg font-semibold mb-4">User Metrics</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <KpiCard
             title="Total Users"
-            value={stats?.users.total ?? 0}
-            change={stats?.users.growth}
-            changeLabel="vs last month"
+            value={stats?.totalUsers ?? 0}
             icon={<Users className="h-4 w-4" />}
             isLoading={loading}
           />
           <KpiCard
-            title="Active Users"
-            value={stats?.users.active ?? 0}
-            changeLabel="this month"
+            title="Active (7d)"
+            value={stats?.activeUsers7d ?? 0}
+            changeLabel="last 7 days"
             icon={<TrendingUp className="h-4 w-4" />}
             isLoading={loading}
           />
           <KpiCard
-            title="New Users"
-            value={stats?.users.newThisMonth ?? 0}
-            changeLabel="this month"
-            icon={<Users className="h-4 w-4" />}
-            isLoading={loading}
-          />
-          <KpiCard
-            title="Avg Session"
-            value={stats?.engagement.avgDuration ? `${stats.engagement.avgDuration}m` : '0m'}
-            changeLabel="average duration"
+            title="Active (30d)"
+            value={stats?.activeUsers30d ?? 0}
+            changeLabel="last 30 days"
             icon={<Clock className="h-4 w-4" />}
             isLoading={loading}
           />
@@ -128,73 +110,55 @@ export default function StatsPage() {
         <h2 className="text-lg font-semibold mb-4">Content Metrics</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <KpiCard
-            title="Total Content"
-            value={stats?.content.total ?? 0}
-            change={stats?.content.growth}
-            changeLabel="vs last month"
+            title="Total Programs"
+            value={stats?.totalPrograms ?? 0}
             icon={<BookOpen className="h-4 w-4" />}
             isLoading={loading}
           />
           <KpiCard
-            title="Published"
-            value={stats?.content.published ?? 0}
-            changeLabel="available to users"
+            title="Total Lessons"
+            value={stats?.totalLessons ?? 0}
             icon={<BookOpen className="h-4 w-4" />}
             isLoading={loading}
           />
           <KpiCard
-            title="Drafts"
-            value={stats?.content.drafts ?? 0}
-            changeLabel="in progress"
+            title="Media Files"
+            value={stats?.totalMedia ?? 0}
             icon={<BookOpen className="h-4 w-4" />}
             isLoading={loading}
           />
         </div>
       </div>
 
-      {/* Engagement Statistics */}
+      {/* Storage Statistics */}
       {canViewAdvanced && (
         <div>
-          <h2 className="text-lg font-semibold mb-4">Engagement Metrics</h2>
+          <h2 className="text-lg font-semibold mb-4">Storage Metrics</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
+                <CardTitle className="text-sm font-medium">Total Storage</CardTitle>
               </CardHeader>
               <CardContent>
                 {loading ? (
                   <div className="h-8 w-24 animate-pulse rounded bg-muted" />
                 ) : (
                   <div className="text-2xl font-bold">
-                    {stats?.engagement.totalSessions.toLocaleString() ?? 0}
+                    {((stats?.totalMediaSizeMB ?? 0) / 1024).toFixed(2)} GB
                   </div>
                 )}
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+                <CardTitle className="text-sm font-medium">Last Updated</CardTitle>
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="h-8 w-24 animate-pulse rounded bg-muted" />
+                  <div className="h-8 w-32 animate-pulse rounded bg-muted" />
                 ) : (
-                  <div className="text-2xl font-bold">
-                    {stats?.engagement.completionRate ?? 0}%
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Program Enrollments</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="h-8 w-24 animate-pulse rounded bg-muted" />
-                ) : (
-                  <div className="text-2xl font-bold">
-                    {stats?.programs.enrollments ?? 0}
+                  <div className="text-sm text-muted-foreground">
+                    {stats?.lastUpdated ? new Date(stats.lastUpdated).toLocaleString() : 'Never'}
                   </div>
                 )}
               </CardContent>

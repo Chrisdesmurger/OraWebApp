@@ -5,14 +5,17 @@ import { KpiCard } from '@/components/kpi-card';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, BookOpen, GraduationCap, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 
 interface DashboardStats {
   totalUsers: number;
-  activeUsers: number;
-  totalContent: number;
+  activeUsers7d: number;
+  activeUsers30d: number;
   totalPrograms: number;
-  userGrowth: number;
-  contentGrowth: number;
+  totalLessons: number;
+  totalMedia: number;
+  totalMediaSizeMB: number;
+  lastUpdated: string;
 }
 
 export default function AdminDashboard() {
@@ -23,7 +26,7 @@ export default function AdminDashboard() {
   React.useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/stats');
+        const response = await fetchWithAuth('/api/stats');
         if (response.ok) {
           const data = await response.json();
           setStats(data);
@@ -49,23 +52,19 @@ export default function AdminDashboard() {
         <KpiCard
           title="Total Users"
           value={stats?.totalUsers ?? 0}
-          change={stats?.userGrowth}
-          changeLabel="vs last month"
           icon={<Users className="h-4 w-4" />}
           isLoading={loading}
         />
         <KpiCard
-          title="Active Users"
-          value={stats?.activeUsers ?? 0}
-          changeLabel="this month"
+          title="Active Users (7d)"
+          value={stats?.activeUsers7d ?? 0}
+          changeLabel="last 7 days"
           icon={<TrendingUp className="h-4 w-4" />}
           isLoading={loading}
         />
         <KpiCard
-          title="Content Items"
-          value={stats?.totalContent ?? 0}
-          change={stats?.contentGrowth}
-          changeLabel="vs last month"
+          title="Total Lessons"
+          value={stats?.totalLessons ?? 0}
           icon={<BookOpen className="h-4 w-4" />}
           isLoading={loading}
         />

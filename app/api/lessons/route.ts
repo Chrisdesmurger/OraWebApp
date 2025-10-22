@@ -13,21 +13,44 @@ export async function GET(request: NextRequest) {
     const programId = searchParams.get('programId');
 
     const firestore = getFirestore();
-    let query = firestore.collection('lessons');
 
-    if (programId) {
-      query = query.where('programId', '==', programId) as any;
+    console.log('[GET /api/lessons] Fetching content, programId:', programId || 'all');
+
+    let snapshot;
+    try {
+      // Use 'content' collection (not 'lessons')
+      let query = firestore.collection('content');
+
+      if (programId) {
+        query = query.where('programId', '==', programId) as any;
+      }
+
+      // Try ordering by createdAt instead of order
+      query = query.orderBy('createdAt', 'desc') as any;
+
+      snapshot = await query.get();
+      console.log('[GET /api/lessons] With orderBy - Found', snapshot.size, 'content items');
+    } catch (orderError: any) {
+      console.warn('[GET /api/lessons] orderBy failed, trying without:', orderError.message);
+      // Fallback: fetch without ordering
+      let query = firestore.collection('content');
+      if (programId) {
+        query = query.where('programId', '==', programId) as any;
+      }
+      snapshot = await query.get();
+      console.log('[GET /api/lessons] Without orderBy - Found', snapshot.size, 'content items');
     }
 
-    query = query.orderBy('order', 'asc') as any;
+    const lessons = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      console.log('[GET /api/lessons] Lesson doc:', doc.id, 'has fields:', Object.keys(data));
+      return {
+        id: doc.id,
+        ...doc.data(),
+      };
+    });
 
-    const snapshot = await query.get();
-
-    const lessons = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
+    console.log('[GET /api/lessons] Returning', lessons.length, 'lessons');
     return apiSuccess({ lessons });
   } catch (error: any) {
     console.error('GET /api/lessons error:', error);

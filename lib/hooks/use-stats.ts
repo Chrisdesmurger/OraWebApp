@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getCurrentUserIdToken } from '@/lib/firebase/client';
+import { useAuth } from '@/lib/auth/auth-context';
 
 export interface DashboardStats {
   totalUsers: number;
@@ -22,16 +24,27 @@ interface CachedStats {
 }
 
 export function useStats() {
+  const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  console.log('[useStats] Hook initialized - User:', user ? `${user.email} (${user.uid})` : 'NULL');
 
   const fetchStats = async (useCache = true) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Check cache first
+      // Get Firebase ID token first
+      const idToken = await getCurrentUserIdToken();
+      console.log('[useStats] ID Token:', idToken ? 'Present' : 'Missing');
+
+      if (!idToken) {
+        throw new Error('User not authenticated');
+      }
+
+      // Check cache first (but only if we have a token)
       if (useCache && typeof window !== 'undefined') {
         const cached = localStorage.getItem(CACHE_KEY);
         if (cached) {
@@ -39,6 +52,7 @@ export function useStats() {
           const isExpired = Date.now() - cachedStats.timestamp > CACHE_DURATION;
 
           if (!isExpired) {
+            console.log('[useStats] Using cached data');
             setStats(cachedStats.data);
             setIsLoading(false);
             return;
@@ -46,16 +60,19 @@ export function useStats() {
         }
       }
 
-      // Fetch fresh data
+      // Fetch fresh data with auth token
+      console.log('[useStats] Fetching fresh data from API with token');
       const response = await fetch('/api/stats', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
         },
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch stats: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(errorData.error || `Failed to fetch stats: ${response.statusText}`);
       }
 
       const data: DashboardStats = await response.json();
@@ -79,8 +96,11 @@ export function useStats() {
   };
 
   useEffect(() => {
-    fetchStats();
-  }, []);
+    // Only fetch if user is authenticated
+    if (user) {
+      fetchStats();
+    }
+  }, [user]);
 
   const refresh = () => {
     fetchStats(false);
