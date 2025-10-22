@@ -77,7 +77,8 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
 
     return navItems.filter((item) => {
       if (!item.permission) return true;
-      return hasPermission(user.role, item.permission as any);
+      // user.role is guaranteed to exist here because of the guard above
+      return hasPermission(user.role!, item.permission as any);
     });
   }, [user?.role]);
 

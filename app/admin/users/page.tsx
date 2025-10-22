@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { hasPermission, getRoleDisplayName, getRoleBadgeColor } from '@/lib/rbac';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,7 +56,7 @@ export default function UsersPage() {
   React.useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch('/api/users');
+        const response = await fetchWithAuth('/api/users');
         if (response.ok) {
           const data = await response.json();
           setUsers(data.users || []);
@@ -73,7 +74,7 @@ export default function UsersPage() {
   const filteredUsers = React.useMemo(() => {
     return users.filter((user) => {
       const matchesSearch =
-        user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         user.displayName?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesRole = roleFilter === 'all' || user.role === roleFilter;
       return matchesSearch && matchesRole;

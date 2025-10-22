@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
@@ -55,7 +56,7 @@ export default function AdminCommandsPage() {
   const loadCommandHistory = async () => {
     try {
       setIsLoadingHistory(true);
-      const response = await fetch('/api/admin/commands/logs?limit=10');
+      const response = await fetchWithAuth('/api/admin/commands/logs?limit=10');
       const data = await response.json();
 
       if (data.success) {
@@ -95,11 +96,8 @@ export default function AdminCommandsPage() {
     setConfirmDialog({ open: false, commandName: null });
 
     try {
-      const response = await fetch('/api/admin/commands/execute', {
+      const response = await fetchWithAuth('/api/admin/commands/execute', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ commandName }),
       });
 

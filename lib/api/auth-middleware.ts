@@ -14,7 +14,10 @@ export interface AuthenticatedRequest {
 export async function authenticateRequest(request: NextRequest): Promise<AuthenticatedRequest> {
   const authHeader = request.headers.get('authorization');
 
+  console.log('[auth-middleware] Authorization header:', authHeader ? `Bearer ${authHeader.substring(7, 20)}...` : 'MISSING');
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error('[auth-middleware] Auth header invalid or missing');
     throw new Error('Missing or invalid authorization header');
   }
 

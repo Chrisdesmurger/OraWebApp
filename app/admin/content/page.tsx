@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { hasPermission } from '@/lib/rbac';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,7 +64,7 @@ export default function ContentPage() {
   React.useEffect(() => {
     const fetchContent = async () => {
       try {
-        const response = await fetch('/api/lessons');
+        const response = await fetchWithAuth('/api/lessons');
         if (response.ok) {
           const data = await response.json();
           setContent(data.lessons || []);
@@ -90,9 +91,8 @@ export default function ContentPage() {
     if (!canEdit) return;
 
     try {
-      const response = await fetch(`/api/lessons/${id}`, {
+      const response = await fetchWithAuth(`/api/lessons/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ published }),
       });
 

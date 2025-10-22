@@ -10,20 +10,37 @@ export async function GET(request: NextRequest) {
     const user = await authenticateRequest(request);
 
     const firestore = getFirestore();
-    let query = firestore.collection('programs').orderBy('createdAt', 'desc');
 
-    // Teachers only see their own programs
-    if (user.role === 'teacher') {
-      query = query.where('authorId', '==', user.uid) as any;
+    console.log('[GET /api/programs] Fetching programs for user role:', user.role);
+
+    let snapshot;
+    try {
+      let query = firestore.collection('programs').orderBy('createdAt', 'desc');
+
+      // Teachers only see their own programs
+      if (user.role === 'teacher') {
+        query = query.where('authorId', '==', user.uid) as any;
+      }
+
+      snapshot = await query.get();
+      console.log('[GET /api/programs] With orderBy - Found', snapshot.size, 'programs');
+    } catch (orderError: any) {
+      console.warn('[GET /api/programs] orderBy failed, trying without:', orderError.message);
+      // Fallback: fetch without ordering
+      snapshot = await firestore.collection('programs').get();
+      console.log('[GET /api/programs] Without orderBy - Found', snapshot.size, 'programs');
     }
 
-    const snapshot = await query.get();
+    const programs = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      console.log('[GET /api/programs] Program doc:', doc.id, 'has fields:', Object.keys(data));
+      return {
+        id: doc.id,
+        ...data,
+      };
+    });
 
-    const programs = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
+    console.log('[GET /api/programs] Returning', programs.length, 'programs');
     return apiSuccess({ programs });
   } catch (error: any) {
     console.error('GET /api/programs error:', error);

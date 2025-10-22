@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { hasPermission } from '@/lib/rbac';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,7 +50,7 @@ export default function ProgramsPage() {
   React.useEffect(() => {
     const fetchPrograms = async () => {
       try {
-        const response = await fetch('/api/programs');
+        const response = await fetchWithAuth('/api/programs');
         if (response.ok) {
           const data = await response.json();
           setPrograms(data.programs || []);
@@ -74,9 +75,8 @@ export default function ProgramsPage() {
     if (!canEdit) return;
 
     try {
-      const response = await fetch(`/api/programs/${id}`, {
+      const response = await fetchWithAuth(`/api/programs/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ published }),
       });
 

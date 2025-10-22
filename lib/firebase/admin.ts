@@ -5,9 +5,15 @@ import * as admin from 'firebase-admin';
  * Singleton pattern to avoid multiple initializations
  */
 
-let app: admin.app.App;
+let app: admin.app.App | undefined;
 
 export function getFirebaseAdmin(): admin.app.App {
+  // Check if already initialized globally
+  if (admin.apps.length > 0) {
+    return admin.apps[0] as admin.app.App;
+  }
+
+  // Check local cache
   if (app) {
     return app;
   }
@@ -86,10 +92,16 @@ export async function getUserWithClaims(uid: string): Promise<admin.auth.UserRec
  */
 export async function verifyIdToken(idToken: string): Promise<admin.auth.DecodedIdToken> {
   try {
+    console.log('[verifyIdToken] Verifying token (length:', idToken.length, ')');
     const decodedToken = await getAuth().verifyIdToken(idToken);
+    console.log('[verifyIdToken] ✅ Token verified for user:', decodedToken.uid);
     return decodedToken;
-  } catch (error) {
-    console.error('❌ Token verification failed:', error);
+  } catch (error: any) {
+    console.error('❌ Token verification failed:', {
+      code: error.code,
+      message: error.message,
+      tokenPreview: idToken.substring(0, 20) + '...'
+    });
     throw error;
   }
 }

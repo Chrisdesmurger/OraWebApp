@@ -8,6 +8,8 @@ import { useStats } from '@/lib/hooks/use-stats';
 export function StatsOverview() {
   const { stats, isLoading, error } = useStats();
 
+  console.log('[StatsOverview] Rendered - Loading:', isLoading, 'Error:', error, 'Stats:', stats);
+
   if (error) {
     return (
       <div className="rounded-lg border border-destructive bg-destructive/10 p-4 text-sm text-destructive">
