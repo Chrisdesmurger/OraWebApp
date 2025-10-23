@@ -1,65 +1,116 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
 import { getFirestore } from '@/lib/firebase/admin';
+import {
+  validateCreateLesson,
+  validateLessonFilters,
+  type CreateLessonInput,
+  type LessonFiltersInput
+} from '@/lib/validators/lesson';
+import { mapLessonFromFirestore } from '@/types/lesson';
+import type { LessonDocument } from '@/types/lesson';
 
 /**
- * GET /api/lessons - List lessons (optionally filter by programId)
+ * GET /api/lessons - List lessons with filters
+ *
+ * Query params:
+ * - programId: string (optional) - Filter by program
+ * - status: 'draft'|'uploading'|'processing'|'ready'|'failed' (optional)
+ * - type: 'video'|'audio' (optional)
+ * - search: string (optional) - Search in title
+ * - limit: number (default 20, max 100)
+ * - offset: number (default 0)
  */
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request);
 
     const { searchParams } = new URL(request.url);
-    const programId = searchParams.get('programId');
 
-    const firestore = getFirestore();
-
-    console.log('[GET /api/lessons] Fetching content, programId:', programId || 'all');
-
-    let snapshot;
-    try {
-      // Use 'content' collection (not 'lessons')
-      let query = firestore.collection('content');
-
-      if (programId) {
-        query = query.where('programId', '==', programId) as any;
-      }
-
-      // Try ordering by createdAt instead of order
-      query = query.orderBy('createdAt', 'desc') as any;
-
-      snapshot = await query.get();
-      console.log('[GET /api/lessons] With orderBy - Found', snapshot.size, 'content items');
-    } catch (orderError: any) {
-      console.warn('[GET /api/lessons] orderBy failed, trying without:', orderError.message);
-      // Fallback: fetch without ordering
-      let query = firestore.collection('content');
-      if (programId) {
-        query = query.where('programId', '==', programId) as any;
-      }
-      snapshot = await query.get();
-      console.log('[GET /api/lessons] Without orderBy - Found', snapshot.size, 'content items');
-    }
-
-    const lessons = snapshot.docs.map((doc) => {
-      const data = doc.data();
-      console.log('[GET /api/lessons] Lesson doc:', doc.id, 'has fields:', Object.keys(data));
-      return {
-        id: doc.id,
-        ...doc.data(),
-      };
+    // Parse and validate filters
+    const filters: LessonFiltersInput = validateLessonFilters({
+      programId: searchParams.get('programId') || undefined,
+      status: searchParams.get('status') || undefined,
+      type: searchParams.get('type') || undefined,
+      search: searchParams.get('search') || undefined,
+      limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 20,
+      offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0,
     });
 
-    console.log('[GET /api/lessons] Returning', lessons.length, 'lessons');
-    return apiSuccess({ lessons });
+    console.log('[GET /api/lessons] Filters:', filters);
+
+    const firestore = getFirestore();
+    let query = firestore.collection('lessons');
+
+    // Apply filters
+    if (filters.programId) {
+      query = query.where('program_id', '==', filters.programId) as any;
+    }
+
+    if (filters.status) {
+      query = query.where('status', '==', filters.status) as any;
+    }
+
+    if (filters.type) {
+      query = query.where('type', '==', filters.type) as any;
+    }
+
+    // For teachers, only show their own lessons unless admin
+    if (user.role === 'teacher') {
+      query = query.where('author_id', '==', user.uid) as any;
+    }
+
+    // Order by updated_at descending
+    try {
+      query = query.orderBy('updated_at', 'desc') as any;
+    } catch (orderError) {
+      console.warn('[GET /api/lessons] orderBy failed, trying without ordering');
+    }
+
+    // Apply limit and offset
+    if (filters.offset && filters.offset > 0) {
+      query = query.offset(filters.offset) as any;
+    }
+    query = query.limit(filters.limit) as any;
+
+    const snapshot = await query.get();
+    console.log('[GET /api/lessons] Found', snapshot.size, 'lessons');
+
+    let lessons = snapshot.docs.map((doc) => {
+      const data = doc.data() as LessonDocument;
+      return mapLessonFromFirestore(doc.id, data);
+    });
+
+    // Client-side search filter (if needed)
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      lessons = lessons.filter(lesson =>
+        lesson.title.toLowerCase().includes(searchLower)
+      );
+    }
+
+    return apiSuccess({
+      lessons,
+      total: lessons.length,
+      limit: filters.limit,
+      offset: filters.offset,
+    });
   } catch (error: any) {
     console.error('GET /api/lessons error:', error);
-    return apiError(error.message || 'Failed to fetch lessons', 401);
+    return apiError(error.message || 'Failed to fetch lessons', 500);
   }
 }
 
 /**
  * POST /api/lessons - Create a new lesson
+ *
+ * Body:
+ * - title: string (required)
+ * - type: 'video'|'audio' (required)
+ * - programId: string (required)
+ * - order: number (optional, default 0)
+ * - tags: string[] (optional)
+ * - transcript: string (optional)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -70,159 +121,80 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { programId, title, type = 'video', storagePath, durationSec = 0, order = 0, transcript = '' } = body;
 
-    if (!title || !programId) {
-      return apiError('Title and programId are required', 400);
-    }
+    // Validate request body
+    const validatedData: CreateLessonInput = validateCreateLesson(body);
 
     // Verify program exists and user has permission
     const firestore = getFirestore();
-    const programDoc = await firestore.collection('programs').doc(programId).get();
+    const programDoc = await firestore.collection('programs').doc(validatedData.programId).get();
 
     if (!programDoc.exists) {
       return apiError('Program not found', 404);
     }
 
     const programData = programDoc.data();
-    if (user.role === 'teacher' && programData?.authorId !== user.uid) {
+
+    // Teachers can only add lessons to their own programs
+    if (user.role === 'teacher' && programData?.author_id !== user.uid) {
       return apiError('You can only add lessons to your own programs', 403);
     }
 
+    // Create new lesson document
     const lessonRef = firestore.collection('lessons').doc();
+    const now = new Date().toISOString();
 
-    const lessonData = {
-      programId,
-      title,
-      type,
-      storagePath: storagePath || null,
-      durationSec,
-      order,
-      transcript,
-      createdAt: new Date().toISOString(),
+    const lessonData: LessonDocument = {
+      title: validatedData.title,
+      type: validatedData.type,
+      program_id: validatedData.programId,
+      order: validatedData.order || 0,
+      duration_sec: null,
+      tags: validatedData.tags || [],
+      transcript: validatedData.transcript || null,
+
+      // Upload & processing status
+      status: 'draft', // Will become 'uploading' when file upload starts
+      storage_path_original: null,
+      renditions: undefined,
+      audio_variants: undefined,
+
+      // Metadata
+      codec: null,
+      size_bytes: null,
+      mime_type: null,
+      thumbnail_url: null,
+
+      // Ownership & timestamps
+      author_id: user.uid,
+      created_at: now,
+      updated_at: now,
     };
 
     await lessonRef.set(lessonData);
+    console.log(`✅ Created lesson ${lessonRef.id} in program ${validatedData.programId}`);
 
-    // Update program mediaCount
+    // Update program media_count (snake_case for Firestore)
     await firestore
       .collection('programs')
-      .doc(programId)
+      .doc(validatedData.programId)
       .update({
-        mediaCount: (programData?.mediaCount || 0) + 1,
-        updatedAt: new Date().toISOString(),
+        media_count: (programData?.media_count || 0) + 1,
+        updated_at: now,
       });
 
-    return apiSuccess({ id: lessonRef.id, ...lessonData }, 201);
+    // Return mapped lesson
+    const lesson = mapLessonFromFirestore(lessonRef.id, lessonData);
+
+    return apiSuccess({ lesson }, 201);
   } catch (error: any) {
     console.error('POST /api/lessons error:', error);
+
+    // Return validation errors with details
+    if (error.name === 'ZodError') {
+      return apiError(`Validation failed: ${error.errors.map((e: any) => e.message).join(', ')}`, 400);
+    }
+
     return apiError(error.message || 'Failed to create lesson', 500);
-  }
-}
-
-/**
- * PATCH /api/lessons/:id - Update lesson
- */
-export async function PATCH(request: NextRequest) {
-  try {
-    const user = await authenticateRequest(request);
-
-    if (!requireRole(user, ['admin', 'teacher'])) {
-      return apiError('Insufficient permissions', 403);
-    }
-
-    const body = await request.json();
-    const { id, title, type, storagePath, durationSec, order, transcript } = body;
-
-    if (!id) {
-      return apiError('Lesson ID is required', 400);
-    }
-
-    const firestore = getFirestore();
-    const lessonRef = firestore.collection('lessons').doc(id);
-    const lessonDoc = await lessonRef.get();
-
-    if (!lessonDoc.exists) {
-      return apiError('Lesson not found', 404);
-    }
-
-    const lessonData = lessonDoc.data();
-
-    // Verify program ownership for teachers
-    if (user.role === 'teacher' && lessonData?.programId) {
-      const programDoc = await firestore.collection('programs').doc(lessonData.programId).get();
-      const programData = programDoc.data();
-      if (programData?.authorId !== user.uid) {
-        return apiError('You can only edit lessons in your own programs', 403);
-      }
-    }
-
-    const updateData: any = {};
-
-    if (title) updateData.title = title;
-    if (type) updateData.type = type;
-    if (storagePath !== undefined) updateData.storagePath = storagePath;
-    if (durationSec !== undefined) updateData.durationSec = durationSec;
-    if (order !== undefined) updateData.order = order;
-    if (transcript !== undefined) updateData.transcript = transcript;
-
-    await lessonRef.update(updateData);
-
-    return apiSuccess({ success: true, id });
-  } catch (error: any) {
-    console.error('PATCH /api/lessons error:', error);
-    return apiError(error.message || 'Failed to update lesson', 500);
-  }
-}
-
-/**
- * DELETE /api/lessons/:id - Delete lesson
- */
-export async function DELETE(request: NextRequest) {
-  try {
-    const user = await authenticateRequest(request);
-
-    if (!requireRole(user, ['admin'])) {
-      return apiError('Only admins can delete lessons', 403);
-    }
-
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-
-    if (!id) {
-      return apiError('Lesson ID is required', 400);
-    }
-
-    const firestore = getFirestore();
-    const lessonRef = firestore.collection('lessons').doc(id);
-    const lessonDoc = await lessonRef.get();
-
-    if (!lessonDoc.exists) {
-      return apiError('Lesson not found', 404);
-    }
-
-    const lessonData = lessonDoc.data();
-
-    // Decrement program mediaCount
-    if (lessonData?.programId) {
-      const programDoc = await firestore.collection('programs').doc(lessonData.programId).get();
-      if (programDoc.exists) {
-        const programData = programDoc.data();
-        await firestore
-          .collection('programs')
-          .doc(lessonData.programId)
-          .update({
-            mediaCount: Math.max(0, (programData?.mediaCount || 0) - 1),
-            updatedAt: new Date().toISOString(),
-          });
-      }
-    }
-
-    await lessonRef.delete();
-
-    return apiSuccess({ success: true, id });
-  } catch (error: any) {
-    console.error('DELETE /api/lessons error:', error);
-    return apiError(error.message || 'Failed to delete lesson', 500);
   }
 }

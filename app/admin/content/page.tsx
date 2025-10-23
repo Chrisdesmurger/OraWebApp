@@ -6,116 +6,218 @@ import { hasPermission } from '@/lib/rbac';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Search, Plus, MoreHorizontal, Filter, Play, BookOpen } from 'lucide-react';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { LessonFilters } from './_components/LessonFilters';
+import { LessonTable } from './_components/LessonTable';
+import { CreateLessonDialog } from './_components/CreateLessonDialog';
+import { EditLessonDialog } from './_components/EditLessonDialog';
+import { Plus, RefreshCw } from 'lucide-react';
+import { toast } from '@/lib/hooks/use-toast';
+import type { Lesson, LessonStatus, LessonType } from '@/types/lesson';
 
-interface ContentItem {
+interface Program {
   id: string;
   title: string;
-  type: 'meditation' | 'yoga' | 'lesson';
-  category: string;
-  duration: number;
-  difficulty: 'beginner' | 'intermediate' | 'advanced';
-  createdBy: string;
-  createdAt: string;
-  published: boolean;
 }
-
-const contentTypeIcons = {
-  meditation: '🧘',
-  yoga: '🧘‍♀️',
-  lesson: '📚',
-};
 
 export default function ContentPage() {
   const { user: currentUser } = useAuth();
-  const [content, setContent] = React.useState<ContentItem[]>([]);
+  const [lessons, setLessons] = React.useState<Lesson[]>([]);
+  const [programs, setPrograms] = React.useState<Program[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [typeFilter, setTypeFilter] = React.useState<string>('all');
+
+  // Filter state
+  const [search, setSearch] = React.useState('');
+  const [statusFilter, setStatusFilter] = React.useState<LessonStatus | 'all'>('all');
+  const [typeFilter, setTypeFilter] = React.useState<LessonType | 'all'>('all');
+  const [programFilter, setProgramFilter] = React.useState<string>('all');
+
+  // Dialog state
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [selectedLesson, setSelectedLesson] = React.useState<Lesson | null>(null);
+  const [lessonToDelete, setLessonToDelete] = React.useState<string | null>(null);
+
+  // Auto-refresh state
+  const [autoRefresh, setAutoRefresh] = React.useState(false);
 
   const canCreate = currentUser?.role && hasPermission(currentUser.role, 'canCreateContent');
-  const canEdit = currentUser?.role && hasPermission(currentUser.role, 'canEditAllContent');
 
-  React.useEffect(() => {
-    const fetchContent = async () => {
-      try {
-        const response = await fetchWithAuth('/api/lessons');
-        if (response.ok) {
-          const data = await response.json();
-          setContent(data.lessons || []);
-        }
-      } catch (error) {
-        console.error('Error fetching content:', error);
-      } finally {
-        setLoading(false);
+  // Fetch lessons
+  const fetchLessons = React.useCallback(async () => {
+    try {
+      const response = await fetchWithAuth('/api/lessons');
+      if (response.ok) {
+        const data = await response.json();
+        setLessons(data.lessons || []);
+
+        // Check if any lessons are uploading or processing
+        const hasActiveUploads = data.lessons?.some(
+          (lesson: Lesson) =>
+            lesson.status === 'uploading' || lesson.status === 'processing'
+        );
+        setAutoRefresh(hasActiveUploads);
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch lessons',
+          variant: 'destructive',
+        });
       }
-    };
-
-    fetchContent();
+    } catch (error) {
+      console.error('Error fetching lessons:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch lessons',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const filteredContent = React.useMemo(() => {
-    return content.filter((item) => {
-      const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesType = typeFilter === 'all' || item.type === typeFilter;
-      return matchesSearch && matchesType;
-    });
-  }, [content, searchQuery, typeFilter]);
+  // Fetch programs (mock data for now)
+  const fetchPrograms = React.useCallback(async () => {
+    // TODO: Replace with actual API call when programs endpoint is ready
+    setPrograms([
+      { id: 'program-1', title: 'Mindfulness Basics' },
+      { id: 'program-2', title: 'Stress Relief' },
+      { id: 'program-3', title: 'Sleep Better' },
+      { id: 'program-4', title: 'Daily Meditation' },
+    ]);
+  }, []);
 
-  const handlePublishToggle = async (id: string, published: boolean) => {
-    if (!canEdit) return;
+  // Initial fetch
+  React.useEffect(() => {
+    fetchLessons();
+    fetchPrograms();
+  }, [fetchLessons, fetchPrograms]);
+
+  // Auto-refresh every 30 seconds if there are active uploads/processing
+  React.useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      fetchLessons();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, fetchLessons]);
+
+  // Filter lessons
+  const filteredLessons = React.useMemo(() => {
+    return lessons.filter((lesson) => {
+      const matchesSearch = lesson.title.toLowerCase().includes(search.toLowerCase()) ||
+        lesson.tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase()));
+      const matchesStatus = statusFilter === 'all' || lesson.status === statusFilter;
+      const matchesType = typeFilter === 'all' || lesson.type === typeFilter;
+      const matchesProgram = programFilter === 'all' || lesson.programId === programFilter;
+
+      return matchesSearch && matchesStatus && matchesType && matchesProgram;
+    });
+  }, [lessons, search, statusFilter, typeFilter, programFilter]);
+
+  // Reset filters
+  const handleResetFilters = () => {
+    setSearch('');
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setProgramFilter('all');
+  };
+
+  // Handle edit
+  const handleEdit = (lesson: Lesson) => {
+    setSelectedLesson(lesson);
+    setEditDialogOpen(true);
+  };
+
+  // Handle delete
+  const handleDelete = (lessonId: string) => {
+    setLessonToDelete(lessonId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!lessonToDelete) return;
 
     try {
-      const response = await fetchWithAuth(`/api/lessons/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ published }),
+      const response = await fetchWithAuth(`/api/lessons/${lessonToDelete}`, {
+        method: 'DELETE',
       });
 
       if (response.ok) {
-        setContent((prev) =>
-          prev.map((item) => (item.id === id ? { ...item, published } : item))
-        );
+        toast({
+          title: 'Success',
+          description: 'Lesson deleted successfully',
+        });
+        fetchLessons();
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: 'Error',
+          description: errorData.error || 'Failed to delete lesson',
+          variant: 'destructive',
+        });
       }
     } catch (error) {
-      console.error('Error updating content:', error);
+      console.error('Error deleting lesson:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete lesson',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setLessonToDelete(null);
     }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'beginner':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'intermediate':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'advanced':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+  // Handle duplicate
+  const handleDuplicate = async (lesson: Lesson) => {
+    try {
+      const response = await fetchWithAuth('/api/lessons', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: `${lesson.title} (Copy)`,
+          type: lesson.type,
+          programId: lesson.programId,
+          order: lesson.order,
+          tags: lesson.tags,
+          transcript: lesson.transcript,
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: 'Success',
+          description: 'Lesson duplicated successfully (metadata only). Upload a file to complete.',
+        });
+        fetchLessons();
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: 'Error',
+          description: errorData.error || 'Failed to duplicate lesson',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error duplicating lesson:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to duplicate lesson',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -123,152 +225,126 @@ export default function ContentPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Content</h1>
-          <p className="text-muted-foreground">Manage meditation, yoga, and lesson content</p>
+          <h1 className="text-3xl font-bold tracking-tight">Content Management</h1>
+          <p className="text-muted-foreground">
+            Manage meditation, yoga, and lesson content
+          </p>
         </div>
-        <Button disabled={!canCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Content
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={fetchLessons}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+          <Button onClick={() => setCreateDialogOpen(true)} disabled={!canCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Lesson
+          </Button>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>All Content</CardTitle>
-          <CardDescription>View and manage content library</CardDescription>
+          <CardTitle>All Lessons</CardTitle>
+          <CardDescription>
+            View and manage your lesson library
+            {autoRefresh && (
+              <span className="ml-2 text-orange-600">
+                (Auto-refreshing - uploads in progress)
+              </span>
+            )}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search content..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[180px]">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="meditation">Meditation</SelectItem>
-                <SelectItem value="yoga">Yoga</SelectItem>
-                <SelectItem value="lesson">Lesson</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <CardContent className="space-y-4">
+          {/* Filters */}
+          <LessonFilters
+            search={search}
+            status={statusFilter}
+            type={typeFilter}
+            programId={programFilter}
+            programs={programs}
+            onSearchChange={setSearch}
+            onStatusChange={setStatusFilter}
+            onTypeChange={setTypeFilter}
+            onProgramChange={setProgramFilter}
+            onReset={handleResetFilters}
+          />
 
+          {/* Loading skeleton */}
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex items-center space-x-4">
-                  <div className="h-12 flex-1 animate-pulse rounded bg-muted" />
-                </div>
+                <div key={i} className="h-12 animate-pulse rounded bg-muted" />
               ))}
             </div>
+          ) : currentUser ? (
+            /* Lesson table */
+            <LessonTable
+              lessons={filteredLessons}
+              programs={programs}
+              currentUser={currentUser}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onDuplicate={handleDuplicate}
+            />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Content</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Difficulty</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredContent.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No content found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredContent.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 text-xl">
-                            {contentTypeIcons[item.type]}
-                          </div>
-                          <div>
-                            <div className="font-medium">{item.title}</div>
-                            <div className="text-sm text-muted-foreground">
-                              by {item.createdBy}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {item.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">{item.category}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getDifficultyColor(item.difficulty)}>
-                          {item.difficulty}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {item.duration} min
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={item.published ? 'success' : 'warning'}>
-                          {item.published ? 'Published' : 'Draft'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Actions</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>
-                              <Play className="mr-2 h-4 w-4" />
-                              Preview
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled={!canEdit}>
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={!canEdit}
-                              onClick={() =>
-                                handlePublishToggle(item.id, !item.published)
-                              }
-                            >
-                              {item.published ? 'Unpublish' : 'Publish'}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              disabled={!canEdit}
-                              className="text-red-600 focus:text-red-600"
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Loading user information...</p>
+            </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Create Dialog */}
+      <CreateLessonDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        programs={programs}
+        onSuccess={() => {
+          toast({
+            title: 'Success',
+            description: 'Lesson created successfully',
+          });
+          fetchLessons();
+        }}
+      />
+
+      {/* Edit Dialog */}
+      <EditLessonDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        lesson={selectedLesson}
+        programs={programs}
+        onSuccess={() => {
+          toast({
+            title: 'Success',
+            description: 'Lesson updated successfully',
+          });
+          fetchLessons();
+        }}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the lesson and
+              all associated files from storage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

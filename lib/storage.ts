@@ -102,9 +102,134 @@ export function getFileExtension(mimeType: string): string {
     'video/mp4': 'mp4',
     'video/webm': 'webm',
     'audio/mpeg': 'mp3',
+    'audio/mp3': 'mp3',
+    'audio/mp4': 'm4a',
+    'audio/m4a': 'm4a',
     'audio/wav': 'wav',
     'application/pdf': 'pdf',
   };
 
   return extensions[mimeType] || 'bin';
+}
+
+/**
+ * Lesson Storage Helpers
+ */
+
+/**
+ * Get storage path for lesson original file
+ */
+export function getLessonOriginalPath(lessonId: string, fileName: string): string {
+  return `media/lessons/${lessonId}/original/${fileName}`;
+}
+
+/**
+ * Get storage path for video rendition
+ */
+export function getVideoRenditionPath(lessonId: string, quality: 'high' | 'medium' | 'low'): string {
+  return `media/lessons/${lessonId}/video/${quality}.mp4`;
+}
+
+/**
+ * Get storage path for audio variant
+ */
+export function getAudioVariantPath(lessonId: string, quality: 'high' | 'medium' | 'low'): string {
+  return `media/lessons/${lessonId}/audio/${quality}.m4a`;
+}
+
+/**
+ * Get storage path for lesson thumbnail
+ */
+export function getLessonThumbnailPath(lessonId: string): string {
+  return `media/lessons/${lessonId}/thumb.jpg`;
+}
+
+/**
+ * Get resumable upload URL for lesson
+ */
+export async function getResumableUploadUrl(
+  lessonId: string,
+  fileName: string,
+  mimeType: string
+): Promise<string> {
+  try {
+    const storage = getStorage();
+    const bucket = storage.bucket();
+    const path = getLessonOriginalPath(lessonId, fileName);
+    const file = bucket.file(path);
+
+    const [url] = await file.createResumableUpload({
+      metadata: {
+        contentType: mimeType,
+        metadata: {
+          lessonId,
+          uploadedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    console.log(`✅ Generated resumable upload URL for lesson ${lessonId}`);
+    return url;
+  } catch (error) {
+    console.error('❌ Failed to create resumable upload URL:', error);
+    throw new Error('Failed to create upload URL');
+  }
+}
+
+/**
+ * Delete all lesson media files
+ */
+export async function deleteLessonMedia(lessonId: string): Promise<void> {
+  try {
+    const storage = getStorage();
+    const bucket = storage.bucket();
+    const prefix = `media/lessons/${lessonId}/`;
+
+    await bucket.deleteFiles({ prefix });
+    console.log(`✅ Deleted all media for lesson ${lessonId}`);
+  } catch (error) {
+    console.error('❌ Failed to delete lesson media:', error);
+    throw new Error('Failed to delete lesson media');
+  }
+}
+
+/**
+ * Check if file exists in storage
+ */
+export async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    const storage = getStorage();
+    const bucket = storage.bucket();
+    const file = bucket.file(filePath);
+    const [exists] = await file.exists();
+    return exists;
+  } catch (error) {
+    console.error('❌ Failed to check file existence:', error);
+    return false;
+  }
+}
+
+/**
+ * Get file metadata from storage
+ */
+export async function getFileMetadata(filePath: string): Promise<{
+  size: number;
+  contentType: string;
+  updated: string;
+} | null> {
+  try {
+    const storage = getStorage();
+    const bucket = storage.bucket();
+    const file = bucket.file(filePath);
+    const [metadata] = await file.getMetadata();
+
+    return {
+      size: typeof metadata.size === 'string' ? parseInt(metadata.size, 10) : (metadata.size || 0),
+      contentType: metadata.contentType || 'application/octet-stream',
+      updated: metadata.updated || new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error('❌ Failed to get file metadata:', error);
+    return null;
+  }
 }
