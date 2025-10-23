@@ -17,11 +17,10 @@ export async function GET(request: NextRequest) {
     const firestore = getFirestore();
 
     // Fetch counts in parallel
-    const [usersSnapshot, programsSnapshot, lessonsSnapshot, mediaSnapshot] = await Promise.all([
+    const [usersSnapshot, programsSnapshot, contentSnapshot] = await Promise.all([
       firestore.collection('users').count().get(),
       firestore.collection('programs').count().get(),
-      firestore.collection('lessons').count().get(),
-      firestore.collection('media').count().get(),
+      firestore.collection('content').count().get(), // Changed from 'lessons' to 'content'
     ]);
 
     // Calculate active users (last 7 days)
@@ -30,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     const activeUsersSnapshot = await firestore
       .collection('users')
-      .where('lastLoginAt', '>=', sevenDaysAgo.toISOString())
+      .where('last_login_at', '>=', sevenDaysAgo.getTime()) // Use snake_case and timestamp
       .count()
       .get();
 
@@ -40,21 +39,18 @@ export async function GET(request: NextRequest) {
 
     const activeUsers30dSnapshot = await firestore
       .collection('users')
-      .where('lastLoginAt', '>=', thirtyDaysAgo.toISOString())
+      .where('last_login_at', '>=', thirtyDaysAgo.getTime()) // Use snake_case and timestamp
       .count()
       .get();
-
-    // Calculate total media size (this is a placeholder - would need actual implementation)
-    const mediaSize = mediaSnapshot.data().count * 50; // Mock: 50MB average per media
 
     const stats = {
       totalUsers: usersSnapshot.data().count,
       activeUsers7d: activeUsersSnapshot.data().count,
       activeUsers30d: activeUsers30dSnapshot.data().count,
       totalPrograms: programsSnapshot.data().count,
-      totalLessons: lessonsSnapshot.data().count,
-      totalMedia: mediaSnapshot.data().count,
-      totalMediaSizeMB: mediaSize,
+      totalLessons: contentSnapshot.data().count, // Now counts content collection
+      totalMedia: contentSnapshot.data().count, // Same as lessons (content items)
+      totalMediaSizeMB: contentSnapshot.data().count * 50, // Mock: 50MB average per content
       lastUpdated: new Date().toISOString(),
     };
 
