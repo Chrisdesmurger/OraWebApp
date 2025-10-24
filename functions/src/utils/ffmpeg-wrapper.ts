@@ -4,10 +4,9 @@
  * Provides helpers for video/audio transcoding using ffmpeg.
  */
 
-import * as ffmpeg from 'fluent-ffmpeg';
-import * as ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
-import * as ffprobeInstaller from '@ffprobe-installer/ffprobe';
-import * as fs from 'fs';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import ffprobeInstaller from '@ffprobe-installer/ffprobe';
 import * as path from 'path';
 
 // Set ffmpeg and ffprobe paths
@@ -57,7 +56,7 @@ export async function probeMedia(filePath: string): Promise<MediaMetadata> {
       const result: MediaMetadata = {
         duration: metadata.format.duration || 0,
         codec: stream.codec_name || 'unknown',
-        bitrate: metadata.format.bit_rate ? parseInt(metadata.format.bit_rate, 10) : undefined,
+        bitrate: metadata.format.bit_rate ? parseInt(String(metadata.format.bit_rate), 10) : undefined,
         fileSize: metadata.format.size || 0,
       };
 
@@ -95,10 +94,10 @@ export async function transcodeVideo(
         '-crf 23',
         '-movflags +faststart', // Enable streaming
       ])
-      .on('start', (commandLine) => {
+      .on('start', (commandLine: string) => {
         console.log('▶️  FFmpeg command:', commandLine);
       })
-      .on('progress', (progress) => {
+      .on('progress', (progress: any) => {
         if (progress.percent) {
           console.log(`⏳ Progress: ${Math.round(progress.percent)}%`);
         }
@@ -107,7 +106,7 @@ export async function transcodeVideo(
         console.log(`✅ Video transcoded: ${config.quality}`);
         resolve();
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         console.error(`❌ Transcode error (${config.quality}):`, err.message);
         reject(err);
       })
@@ -135,10 +134,10 @@ export async function transcodeAudio(
       .outputOptions([
         '-movflags +faststart',
       ])
-      .on('start', (commandLine) => {
+      .on('start', (commandLine: string) => {
         console.log('▶️  FFmpeg command:', commandLine);
       })
-      .on('progress', (progress) => {
+      .on('progress', (progress: any) => {
         if (progress.percent) {
           console.log(`⏳ Progress: ${Math.round(progress.percent)}%`);
         }
@@ -147,7 +146,7 @@ export async function transcodeAudio(
         console.log(`✅ Audio transcoded: ${config.quality}`);
         resolve();
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         console.error(`❌ Transcode error (${config.quality}):`, err.message);
         reject(err);
       })
@@ -177,7 +176,7 @@ export async function generateThumbnail(
         console.log('✅ Thumbnail generated');
         resolve();
       })
-      .on('error', (err) => {
+      .on('error', (err: Error) => {
         console.error('❌ Thumbnail generation error:', err.message);
         reject(err);
       });
