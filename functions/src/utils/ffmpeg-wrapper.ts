@@ -57,7 +57,7 @@ export async function probeMedia(filePath: string): Promise<MediaMetadata> {
         duration: metadata.format.duration || 0,
         codec: stream.codec_name || 'unknown',
         bitrate: metadata.format.bit_rate ? parseInt(String(metadata.format.bit_rate), 10) : undefined,
-        fileSize: metadata.format.size || 0,
+        fileSize: typeof metadata.format.size === 'number' ? metadata.format.size : 0,
       };
 
       if (videoStream) {
