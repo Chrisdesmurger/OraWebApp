@@ -156,8 +156,8 @@ export async function POST(request: NextRequest) {
       // Upload & processing status
       status: 'draft', // Will become 'uploading' when file upload starts
       storage_path_original: null,
-      renditions: undefined,
-      audio_variants: undefined,
+      renditions: null,
+      audio_variants: null,
 
       // Metadata
       codec: null,
