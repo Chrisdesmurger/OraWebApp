@@ -147,7 +147,12 @@ export function CreateLessonDialog({
         });
 
         xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
+          // Firebase Storage resumable uploads return:
+          // - 308 Resume Incomplete for successful chunk uploads (not an error!)
+          // - 200 OK when the entire upload is complete
+          // - 201 Created in some cases
+          if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 308) {
+            console.log('✅ Upload successful with status:', xhr.status);
             resolve();
           } else {
             console.error('Upload failed with status:', xhr.status, xhr.statusText, xhr.responseText);
