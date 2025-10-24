@@ -86,15 +86,29 @@ export default function ContentPage() {
     }
   }, []);
 
-  // Fetch programs (mock data for now)
+  // Fetch programs from API
   const fetchPrograms = React.useCallback(async () => {
-    // TODO: Replace with actual API call when programs endpoint is ready
-    setPrograms([
-      { id: 'program-1', title: 'Mindfulness Basics' },
-      { id: 'program-2', title: 'Stress Relief' },
-      { id: 'program-3', title: 'Sleep Better' },
-      { id: 'program-4', title: 'Daily Meditation' },
-    ]);
+    try {
+      const response = await fetchWithAuth('/api/programs');
+      if (response.ok) {
+        const data = await response.json();
+        setPrograms(data.programs || []);
+      } else {
+        console.error('Failed to fetch programs');
+        toast({
+          title: 'Warning',
+          description: 'Failed to fetch programs. Some features may be limited.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching programs:', error);
+      toast({
+        title: 'Warning',
+        description: 'Failed to fetch programs. Some features may be limited.',
+        variant: 'destructive',
+      });
+    }
   }, []);
 
   // Initial fetch

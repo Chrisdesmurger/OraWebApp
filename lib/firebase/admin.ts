@@ -27,10 +27,15 @@ export function getFirebaseAdmin(): admin.app.App {
 
     const serviceAccount = JSON.parse(serviceAccountJson);
 
+    // Use the actual bucket name (without gs:// prefix)
+    const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || 'ora-wellbeing.firebasestorage.app';
+
     app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
-      storageBucket: `${serviceAccount.project_id}.appspot.com`,
+      storageBucket: storageBucket,
     });
+
+    console.log('✅ Firebase Admin SDK initialized with bucket:', storageBucket);
 
     console.log('✅ Firebase Admin SDK initialized');
     return app;

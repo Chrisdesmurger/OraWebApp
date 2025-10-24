@@ -115,7 +115,7 @@ export function CreateLessonDialog({
     }
   };
 
-  const uploadFile = async (lessonId: string, file: File) => {
+  const uploadFile = async (lessonId: string, file: File, lessonType: LessonType) => {
     try {
       // Get upload URL
       const initResponse = await fetchWithAuth(`/api/uploads/lessons/${lessonId}/init`, {
@@ -124,6 +124,7 @@ export function CreateLessonDialog({
           fileName: file.name,
           fileSize: file.size,
           mimeType: file.type,
+          lessonType: lessonType,
         }),
       });
 
@@ -146,17 +147,30 @@ export function CreateLessonDialog({
         });
 
         xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
+          // Firebase Storage resumable uploads return:
+          // - 308 Resume Incomplete for successful chunk uploads (not an error!)
+          // - 200 OK when the entire upload is complete
+          // - 201 Created in some cases
+          if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 308) {
+            console.log('✅ Upload successful with status:', xhr.status);
             resolve();
           } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
+            console.error('Upload failed with status:', xhr.status, xhr.statusText, xhr.responseText);
+            reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
           }
         });
 
-        xhr.addEventListener('error', () => {
-          reject(new Error('Upload failed'));
+        xhr.addEventListener('error', (e) => {
+          console.error('XHR error event:', e, 'Status:', xhr.status, 'ReadyState:', xhr.readyState);
+          reject(new Error(`Upload failed - Network error (status: ${xhr.status})`));
         });
 
+        xhr.addEventListener('abort', () => {
+          console.error('Upload aborted');
+          reject(new Error('Upload aborted'));
+        });
+
+        console.log('Starting upload to:', uploadUrl.substring(0, 100) + '...');
         xhr.open('PUT', uploadUrl);
         xhr.setRequestHeader('Content-Type', file.type);
         xhr.send(file);
@@ -209,7 +223,7 @@ export function CreateLessonDialog({
       const { lesson } = await createResponse.json();
 
       // Upload file
-      await uploadFile(lesson.id, file);
+      await uploadFile(lesson.id, file, lesson.type);
 
       // Success
       setUploadProgress(100);
