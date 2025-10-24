@@ -170,9 +170,14 @@ export async function getResumableUploadUrl(
 
     console.log(`✅ Generated resumable upload URL for lesson ${lessonId}`);
     return url;
-  } catch (error) {
-    console.error('❌ Failed to create resumable upload URL:', error);
-    throw new Error('Failed to create upload URL');
+  } catch (error: any) {
+    console.error('❌ Failed to create resumable upload URL:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      stack: error.stack,
+    });
+    throw new Error(`Failed to create upload URL: ${error.message || 'Unknown error'}`);
   }
 }
 
