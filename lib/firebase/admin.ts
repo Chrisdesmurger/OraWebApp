@@ -29,7 +29,7 @@ export function getFirebaseAdmin(): admin.app.App {
 
     app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
-      storageBucket: `${serviceAccount.project_id}.appspot.com`,
+      storageBucket: `${serviceAccount.project_id}.firebasestorage.app`,
     });
 
     console.log('✅ Firebase Admin SDK initialized');
