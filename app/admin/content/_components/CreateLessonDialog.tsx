@@ -150,14 +150,22 @@ export function CreateLessonDialog({
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
           } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
+            console.error('Upload failed with status:', xhr.status, xhr.statusText, xhr.responseText);
+            reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
           }
         });
 
-        xhr.addEventListener('error', () => {
-          reject(new Error('Upload failed'));
+        xhr.addEventListener('error', (e) => {
+          console.error('XHR error event:', e, 'Status:', xhr.status, 'ReadyState:', xhr.readyState);
+          reject(new Error(`Upload failed - Network error (status: ${xhr.status})`));
         });
 
+        xhr.addEventListener('abort', () => {
+          console.error('Upload aborted');
+          reject(new Error('Upload aborted'));
+        });
+
+        console.log('Starting upload to:', uploadUrl.substring(0, 100) + '...');
         xhr.open('PUT', uploadUrl);
         xhr.setRequestHeader('Content-Type', file.type);
         xhr.send(file);
