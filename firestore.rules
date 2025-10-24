@@ -134,12 +134,26 @@ service cloud.firestore {
 
     // ==========================================
     // COLLECTION: lessons/{lessonId}
-    // Admin Web: Lesson content management
+    // Admin Web: Lesson content management with media transcoding
     // Android App: Read access for all authenticated users
+    // Teachers: Can create/update own lessons, Admin: Can manage all
     // ==========================================
     match /lessons/{lessonId} {
+      // Read: All authenticated users can read lessons
       allow read: if isAuthenticated();
-      allow create, update: if isAdmin() || isTeacher();
+
+      // Create: Admin and teachers can create (author_id must match creator)
+      allow create: if (isAdmin() || isTeacher()) &&
+                      request.resource.data.keys().hasAny(['author_id']) &&
+                      request.resource.data.author_id == request.auth.uid;
+
+      // Update: Admin can update all, teachers can update only their own
+      allow update: if isAdmin() ||
+                      (isTeacher() &&
+                       resource.data.keys().hasAny(['author_id']) &&
+                       resource.data.author_id == request.auth.uid);
+
+      // Delete: Admin only
       allow delete: if isAdmin();
     }
 
