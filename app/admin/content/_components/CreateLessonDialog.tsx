@@ -115,7 +115,7 @@ export function CreateLessonDialog({
     }
   };
 
-  const uploadFile = async (lessonId: string, file: File) => {
+  const uploadFile = async (lessonId: string, file: File, lessonType: LessonType) => {
     try {
       // Get upload URL
       const initResponse = await fetchWithAuth(`/api/uploads/lessons/${lessonId}/init`, {
@@ -124,6 +124,7 @@ export function CreateLessonDialog({
           fileName: file.name,
           fileSize: file.size,
           mimeType: file.type,
+          lessonType: lessonType,
         }),
       });
 
@@ -209,7 +210,7 @@ export function CreateLessonDialog({
       const { lesson } = await createResponse.json();
 
       // Upload file
-      await uploadFile(lesson.id, file);
+      await uploadFile(lesson.id, file, lesson.type);
 
       // Success
       setUploadProgress(100);
