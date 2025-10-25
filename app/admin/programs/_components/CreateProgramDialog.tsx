@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createProgramSchema, type CreateProgramInput } from '@/lib/validators/program';
 import { CATEGORIES, DIFFICULTIES, type Category, type Difficulty } from '@/types/program';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import {
   Dialog,
   DialogContent,
@@ -84,9 +85,8 @@ export function CreateProgramDialog({
   const onSubmit = async (data: CreateProgramInput) => {
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/programs', {
+      const response = await fetchWithAuth('/api/programs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 

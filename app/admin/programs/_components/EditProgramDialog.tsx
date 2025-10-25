@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { updateProgramSchema, type UpdateProgramInput } from '@/lib/validators/program';
 import { CATEGORIES, DIFFICULTIES, PROGRAM_STATUSES, type Program } from '@/types/program';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import {
   Dialog,
   DialogContent,
@@ -104,9 +105,8 @@ export function EditProgramDialog({
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/programs/${program.id}`, {
+      const response = await fetchWithAuth(`/api/programs/${program.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
