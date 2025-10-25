@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import {
   Dialog,
   DialogContent,
@@ -53,7 +54,7 @@ export function LessonPickerDialog({
   const fetchLessons = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/lessons');
+      const response = await fetchWithAuth('/api/lessons');
       if (response.ok) {
         const data = await response.json();
         setLessons(data.lessons || []);
