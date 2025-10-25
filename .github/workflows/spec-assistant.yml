@@ -1,0 +1,140 @@
+name: 📋 Spec Assistant
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  generate-spec:
+    name: 🤖 Generate Technical Specification
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'spec-needed')
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📂 Summarize codebase structure
+        run: |
+          echo "# Codebase Structure" > codebase-summary.md
+          echo "" >> codebase-summary.md
+          echo "## File Tree" >> codebase-summary.md
+          git ls-files | grep -E '\.(ts|tsx|js|jsx)$' | head -100 >> codebase-summary.md
+          echo "" >> codebase-summary.md
+          echo "## Key Documentation" >> codebase-summary.md
+          find . -maxdepth 3 -name "README*.md" -type f -print -exec echo "---" \; -exec head -50 {} \; >> codebase-summary.md
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install Python dependencies
+        run: pip install anthropic requests
+
+      - name: 🤖 Generate spec with Claude
+        if: env.CLAUDE_API_KEY != ''
+        env:
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          import json
+          import requests
+          from anthropic import Anthropic
+
+          # Read issue details
+          issue_title = os.environ['ISSUE_TITLE']
+          issue_body = os.environ['ISSUE_BODY']
+
+          # Read codebase summary
+          with open('codebase-summary.md', 'r') as f:
+              codebase = f.read()
+
+          # Ask Claude to generate spec
+          client = Anthropic(api_key=os.environ['CLAUDE_API_KEY'])
+
+          prompt = f"""You are a technical architect for Ora Admin Portal (Next.js 15 + TypeScript + Firebase).
+
+          A feature request has been filed:
+
+          **Title**: {issue_title}
+
+          **Details**:
+          {issue_body}
+
+          **Codebase Context**:
+          {codebase[:4000]}
+
+          Generate a detailed technical specification including:
+
+          1. **Architecture & Design**: Components, data flow, patterns
+          2. **API Contracts**: Endpoints, request/response schemas
+          3. **Data Models**: Firestore collections/documents, TypeScript interfaces
+          4. **Security**: Rules, permissions, validation
+          5. **Performance**: Optimizations, caching, scaling
+          6. **Testing Strategy**: Unit, integration, E2E tests
+          7. **Implementation Tasks**: Checklist of concrete tasks
+
+          Format in Markdown with code blocks for schemas.
+          """
+
+          response = client.messages.create(
+              model="claude-3-5-sonnet-20241022",
+              max_tokens=4096,
+              messages=[{"role": "user", "content": prompt}]
+          )
+
+          spec = response.content[0].text
+
+          # Post as issue comment
+          issue_number = os.environ['ISSUE_NUMBER']
+          github_token = os.environ['GITHUB_TOKEN']
+          repo = os.environ.get('GITHUB_REPOSITORY', '')
+
+          url = f"https://api.github.com/repos/{repo}/issues/{issue_number}/comments"
+
+          headers = {
+              'Authorization': f'token {github_token}',
+              'Accept': 'application/vnd.github.v3+json'
+          }
+
+          body = f"""## 🤖 AI-Generated Technical Specification
+
+          {spec}
+
+          ---
+
+          <sub>💡 **Next Steps**:
+          1. Review and refine this spec
+          2. Add label `spec-approved` when ready
+          3. Claude Code will assist with implementation
+          </sub>
+
+          <sub>Powered by Claude Code</sub>"""
+
+          response = requests.post(url, headers=headers, json={'body': body})
+
+          if response.status_code == 201:
+              print(f"✅ Posted spec to issue #{issue_number}")
+          else:
+              print(f"❌ Failed to post comment: {response.status_code}")
+              print(response.text)
+          PYTHON
+
+      - name: 🏷️ Update labels
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh issue edit ${{ env.ISSUE_NUMBER }} \
+            --remove-label "spec-needed" \
+            --add-label "spec-generated"

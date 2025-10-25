@@ -1,0 +1,118 @@
+name: 🚀 Feature Request (Spec-Driven)
+description: Propose a new feature for Ora Admin Portal
+title: "[FEATURE] "
+labels: ["feature", "spec-needed"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📝 Feature Specification
+        Please provide detailed information about the feature. This template is designed to be **AI-readable** for automated spec generation.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 🎯 Context & Motivation
+      description: Why is this feature needed? What problem does it solve? Who benefits from it?
+      placeholder: |
+        Example: Currently, teachers cannot bulk upload lessons. This creates friction when onboarding new content...
+    validations:
+      required: true
+
+  - type: textarea
+    id: user_story
+    attributes:
+      label: 📖 User Story
+      description: Describe the feature from the user's perspective
+      placeholder: |
+        As a [role]
+        I want [capability]
+        So that [benefit]
+
+        Example:
+        As a teacher
+        I want to upload multiple lesson videos at once
+        So that I can save time when creating programs
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: ✅ Acceptance Criteria (Gherkin)
+      description: Define testable criteria using Given/When/Then format
+      placeholder: |
+        Scenario: Bulk upload lessons
+          Given I am logged in as a teacher
+          And I have 5 video files selected
+          When I click "Upload All"
+          Then all 5 videos should upload with progress indicators
+          And I should see a success message
+          And all lessons should appear in my content list
+      value: |
+        Scenario: [Scenario name]
+          Given [precondition]
+          When [action]
+          Then [expected outcome]
+    validations:
+      required: true
+
+  - type: textarea
+    id: impacts
+    attributes:
+      label: 🔍 Technical Impacts
+      description: What systems/components will be affected?
+      placeholder: |
+        - Database: New `bulk_upload_jobs` collection in Firestore
+        - Security: Update storage rules for batch uploads
+        - Performance: May need queue system for large batches
+        - UI: New bulk upload dialog component
+        - API: New `/api/lessons/bulk-upload` endpoint
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 📊 Priority
+      description: How urgent is this feature?
+      options:
+        - 🔴 Critical (P0)
+        - 🟠 High (P1)
+        - 🟡 Medium (P2)
+        - 🟢 Low (P3)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: 🧩 Estimated Complexity
+      description: Initial complexity estimate
+      options:
+        - 🐭 XS (1-2 hours)
+        - 🐱 S (2-4 hours)
+        - 🐕 M (1-2 days)
+        - 🐘 L (3-5 days)
+        - 🦕 XL (1+ week)
+    validations:
+      required: false
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: 🎨 UI Mockups / Wireframes (optional)
+      description: Attach images or link to Figma/design files
+      placeholder: Drag and drop images here or paste URLs
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 💡 Additional Notes
+      description: Any other context, dependencies, or considerations
+      placeholder: |
+        - Related to issue #123
+        - Depends on Firebase Functions update
+        - Should be compatible with mobile app

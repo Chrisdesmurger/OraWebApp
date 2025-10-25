@@ -1,0 +1,141 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🐛 Bug Report
+        Please provide detailed information to help us reproduce and fix the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 📝 Bug Description
+      description: A clear and concise description of the bug
+      placeholder: When I try to upload a lesson video, the upload fails with a CORS error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 🔄 Steps to Reproduce
+      description: Step-by-step instructions to reproduce the bug
+      placeholder: |
+        1. Log in as teacher
+        2. Navigate to Content > Create Lesson
+        3. Fill in lesson details
+        4. Select a video file (>100MB)
+        5. Click "Upload"
+        6. Observe error
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: ✅ Expected Behavior
+      description: What should happen?
+      placeholder: The video should upload successfully with a progress bar
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: ❌ Actual Behavior
+      description: What actually happens?
+      placeholder: Upload fails with "XHR error event: {} Status: 0 ReadyState: 4"
+    validations:
+      required: true
+
+  - type: textarea
+    id: error_message
+    attributes:
+      label: 🔴 Error Message / Console Output
+      description: Copy the full error message or console output
+      placeholder: |
+        Error: Upload failed - Network error (status: 0)
+        at uploadFile/</< (CreateLessonDialog.tsx:165:18)
+      render: shell
+    validations:
+      required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 🚨 Severity
+      description: How severe is this bug?
+      options:
+        - 🔴 Critical (app broken, data loss)
+        - 🟠 High (major feature broken)
+        - 🟡 Medium (minor feature impacted)
+        - 🟢 Low (cosmetic, workaround exists)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: 🔁 Frequency
+      description: How often does this occur?
+      options:
+        - Always (100%)
+        - Often (>50%)
+        - Sometimes (25-50%)
+        - Rarely (<25%)
+        - Once
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: 🌐 Browser & Version
+      description: Which browser are you using?
+      placeholder: Chrome 120.0.6099.109
+    validations:
+      required: false
+
+  - type: input
+    id: os
+    attributes:
+      label: 💻 Operating System
+      description: Which OS are you using?
+      placeholder: Windows 11, macOS 14, Ubuntu 22.04
+    validations:
+      required: false
+
+  - type: input
+    id: user_role
+    attributes:
+      label: 👤 User Role
+      description: What role were you logged in as?
+      placeholder: Admin, Teacher, Viewer
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 📸 Screenshots / Screen Recording
+      description: Attach screenshots or videos showing the bug
+      placeholder: Drag and drop files here
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 💡 Additional Context
+      description: Any other relevant information
+      placeholder: |
+        - Started happening after deployment on 2025-10-24
+        - Only occurs with files >100MB
+        - Works fine in development, fails in production

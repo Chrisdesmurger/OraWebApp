@@ -175,15 +175,48 @@ firebase deploy --only hosting
 - **Test Suites**: 3
 - **Documentation Pages**: 6
 
+## 🤖 AI-Assisted Development
+
+This project uses **GitHub + Claude Code** for AI-assisted development:
+
+- **📋 Spec Generation**: AI generates technical specs from feature requests
+- **🧪 Test Analysis**: AI diagnoses test failures and suggests fixes
+- **🔒 Security Audits**: Automated CodeQL + dependency scanning
+- **📝 Release Automation**: Auto-generated changelog from commits
+
+**Quick Start**:
+1. Create a feature request → AI generates spec
+2. Implement following the spec
+3. Open PR → CI runs automatically
+4. If tests fail → AI suggests fixes
+5. Merge → Auto-release notes
+
+📖 **Complete workflow guide**: [docs/GITHUB_WORKFLOW_SETUP.md](../docs/GITHUB_WORKFLOW_SETUP.md)
+
 ## 🤝 Contributing
 
-Contributions are welcome! Please read the [contributing guidelines](CONTRIBUTING.md) first.
+Contributions are welcome! **We use an AI-assisted workflow** for faster, higher-quality development.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+**Please read**:
+- [🚀 Contributing Guide](CONTRIBUTING.md) - Full workflow documentation
+- [📋 GitHub Setup Summary](../docs/GITHUB_SETUP_SUMMARY.md) - Quick reference
+
+**Quick workflow**:
+1. Create issue using templates (🚀 Feature / 🐛 Bug / 📋 Spec)
+2. Wait for AI-generated spec (for features)
+3. Get assigned
+4. Create branch (`feat/feature-name` or `fix/bug-name`)
+5. Implement with tests
+6. Open PR (fill template)
+7. CI validates automatically
+8. Review + merge
+
+**Conventional Commits** required:
+```bash
+feat(scope): Add new feature
+fix(scope): Fix bug
+docs(scope): Update documentation
+```
 
 ## 📝 License
 

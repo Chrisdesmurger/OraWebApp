@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
 import { getFirestore } from '@/lib/firebase/admin';
+import * as admin from 'firebase-admin';
 import {
   validateCreateLesson,
   validateLessonFilters,
@@ -156,8 +157,7 @@ export async function POST(request: NextRequest) {
       // Upload & processing status
       status: 'draft', // Will become 'uploading' when file upload starts
       storage_path_original: null,
-      renditions: undefined,
-      audio_variants: undefined,
+      // Omit optional fields instead of setting to null/undefined
 
       // Metadata
       codec: null,
