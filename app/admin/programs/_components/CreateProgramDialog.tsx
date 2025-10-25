@@ -33,6 +33,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
 import { Loader2, X } from 'lucide-react';
 
 interface CreateProgramDialogProps {
@@ -46,6 +47,7 @@ export function CreateProgramDialog({
   onOpenChange,
   onSuccess,
 }: CreateProgramDialogProps) {
+  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [tagInput, setTagInput] = React.useState('');
 
@@ -97,10 +99,18 @@ export function CreateProgramDialog({
       form.reset();
       onOpenChange(false);
       onSuccess();
+
+      toast({
+        title: "Program created",
+        description: "The program has been successfully created.",
+      });
     } catch (error: any) {
       console.error('Error creating program:', error);
-      // You can add toast notification here
-      alert(error.message || 'Failed to create program');
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to create program',
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }

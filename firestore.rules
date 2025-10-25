@@ -109,27 +109,31 @@ service cloud.firestore {
 
     // ==========================================
     // COLLECTION: programs/{programId}
-    // Android App: Read catalog (public for authenticated users)
+    // Android App: Read catalog (published programs for authenticated users)
     // Admin Web: Full CRUD for admin/teachers
     // ==========================================
     match /programs/{programId} {
-      // Read: All authenticated users can read
-      allow read: if isAuthenticated();
+      // Read: Published programs for all authenticated users
+      //       Draft/Archived programs only for admin or author
+      allow read: if isAuthenticated() && (
+        resource.data.status == 'published' ||
+        isAdmin() ||
+        (isTeacher() && resource.data.author_id == request.auth.uid)
+      );
 
-      // Create: Admin and teachers can create
-      allow create: if isAdmin() || isTeacher();
+      // Create: Admin and teachers can create (must set author_id to self)
+      allow create: if (isAdmin() || isTeacher()) &&
+                      request.resource.data.author_id == request.auth.uid &&
+                      validateProgramData(request.resource.data);
 
       // Update: Admin can update all, teachers can update their own
-      allow update: if isAdmin() ||
-                      (isTeacher() &&
-                       resource.data.keys().hasAny(['author_id']) &&
-                       resource.data.author_id == request.auth.uid);
+      allow update: if (isAdmin() ||
+                       (isTeacher() && resource.data.author_id == request.auth.uid)) &&
+                      validateProgramData(request.resource.data);
 
-      // Delete: Admin only (teachers can delete their own)
+      // Delete: Admin can delete all, teachers can delete their own
       allow delete: if isAdmin() ||
-                      (isTeacher() &&
-                       resource.data.keys().hasAny(['author_id']) &&
-                       resource.data.author_id == request.auth.uid);
+                      (isTeacher() && resource.data.author_id == request.auth.uid);
     }
 
     // ==========================================
@@ -217,6 +221,27 @@ service cloud.firestore {
           && (data.keys().hasAny(['photo_url']) ? (data.photo_url == null || data.photo_url is string) : true)
           && (data.keys().hasAny(['plan_tier']) ? data.plan_tier in ['free', 'FREE', 'premium', 'PREMIUM', 'lifetime', 'LIFETIME'] : true)
           && data.created_at is timestamp;
+    }
+
+    // Validate program data (snake_case fields)
+    function validateProgramData(data) {
+      return data.title is string
+          && data.title.size() >= 3
+          && data.title.size() <= 100
+          && data.description is string
+          && data.description.size() >= 10
+          && data.description.size() <= 1000
+          && data.category in ['meditation', 'yoga', 'mindfulness', 'wellness']
+          && data.difficulty in ['beginner', 'intermediate', 'advanced']
+          && data.duration_days is int
+          && data.duration_days >= 1
+          && data.duration_days <= 365
+          && data.status in ['draft', 'published', 'archived']
+          && data.author_id is string
+          && data.lessons is list
+          && data.lessons.size() <= 100
+          && data.tags is list
+          && data.tags.size() <= 10;
     }
 
     // ==========================================

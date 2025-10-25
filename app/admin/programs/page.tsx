@@ -8,6 +8,7 @@ import { type Program } from '@/types/program';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/components/ui/use-toast';
 import { Search, Plus } from 'lucide-react';
 import { ProgramTable } from './_components/ProgramTable';
 import { CreateProgramDialog } from './_components/CreateProgramDialog';
@@ -25,6 +26,7 @@ import {
 
 export default function ProgramsPage() {
   const { user: currentUser } = useAuth();
+  const { toast } = useToast();
   const [programs, setPrograms] = React.useState<Program[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -91,13 +93,25 @@ export default function ProgramsPage() {
         setPrograms((prev) => prev.filter((p) => p.id !== deletingProgramId));
         setDeleteDialogOpen(false);
         setDeletingProgramId(null);
+        toast({
+          title: "Program deleted",
+          description: "The program has been successfully deleted.",
+        });
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to delete program');
+        toast({
+          title: "Error",
+          description: error.message || 'Failed to delete program',
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error deleting program:', error);
-      alert('Failed to delete program');
+      toast({
+        title: "Error",
+        description: 'Failed to delete program',
+        variant: "destructive",
+      });
     }
   };
 
@@ -120,13 +134,25 @@ export default function ProgramsPage() {
             program.id === programId ? data.program : program
           )
         );
+        toast({
+          title: "Status updated",
+          description: `Program status changed to ${newStatus}.`,
+        });
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to update program status');
+        toast({
+          title: "Error",
+          description: error.message || 'Failed to update program status',
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error updating program status:', error);
-      alert('Failed to update program status');
+      toast({
+        title: "Error",
+        description: 'Failed to update program status',
+        variant: "destructive",
+      });
     }
   };
 
@@ -134,7 +160,10 @@ export default function ProgramsPage() {
     // Navigate to lesson management view
     // TODO: Implement lesson management dialog or page
     console.log('Manage lessons for program:', program.id);
-    alert('Lesson management will be implemented in the next phase');
+    toast({
+      title: "Coming soon",
+      description: "Lesson management will be available in the next update.",
+    });
   };
 
   return (

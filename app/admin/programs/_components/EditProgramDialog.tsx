@@ -33,6 +33,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
 import { Loader2, X } from 'lucide-react';
 
 interface EditProgramDialogProps {
@@ -48,6 +49,7 @@ export function EditProgramDialog({
   program,
   onSuccess,
 }: EditProgramDialogProps) {
+  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [tagInput, setTagInput] = React.useState('');
 
@@ -115,9 +117,18 @@ export function EditProgramDialog({
 
       onOpenChange(false);
       onSuccess();
+
+      toast({
+        title: "Program updated",
+        description: "The program has been successfully updated.",
+      });
     } catch (error: any) {
       console.error('Error updating program:', error);
-      alert(error.message || 'Failed to update program');
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to update program',
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }

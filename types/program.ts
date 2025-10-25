@@ -165,9 +165,16 @@ export interface UpdateProgramLessonsResponse {
 /**
  * Converts a Firestore document to a client-side Program object
  *
+ * Maps snake_case Firestore fields to camelCase frontend fields.
+ * Use this when reading programs from Firestore API.
+ *
  * @param id - Document ID from Firestore
  * @param doc - Firestore document data (snake_case)
  * @returns Program object with camelCase fields
+ *
+ * @example
+ * const snapshot = await firestore.collection('programs').doc('prog-123').get();
+ * const program = mapProgramFromFirestore(snapshot.id, snapshot.data());
  */
 export function mapProgramFromFirestore(id: string, doc: ProgramDocument): Program {
   return {
@@ -190,8 +197,19 @@ export function mapProgramFromFirestore(id: string, doc: ProgramDocument): Progr
 /**
  * Converts a client-side Program object to Firestore document format
  *
- * @param program - Program object (camelCase)
+ * Maps camelCase frontend fields to snake_case Firestore fields.
+ * Use this when writing programs to Firestore API.
+ *
+ * @param program - Program object (camelCase, without id)
  * @returns Firestore document data (snake_case)
+ *
+ * @example
+ * const programData = mapProgramToFirestore({
+ *   title: '7-Day Meditation',
+ *   durationDays: 7,
+ *   // ... other fields
+ * });
+ * await firestore.collection('programs').add(programData);
  */
 export function mapProgramToFirestore(program: Omit<Program, 'id'>): ProgramDocument {
   return {
@@ -212,6 +230,9 @@ export function mapProgramToFirestore(program: Omit<Program, 'id'>): ProgramDocu
 
 /**
  * Type guard to check if a value is a valid Category
+ *
+ * @param value - String to check
+ * @returns True if value is a valid Category enum value
  */
 export function isCategory(value: string): value is Category {
   return CATEGORIES.includes(value as Category);
@@ -219,6 +240,9 @@ export function isCategory(value: string): value is Category {
 
 /**
  * Type guard to check if a value is a valid Difficulty
+ *
+ * @param value - String to check
+ * @returns True if value is a valid Difficulty enum value
  */
 export function isDifficulty(value: string): value is Difficulty {
   return DIFFICULTIES.includes(value as Difficulty);
@@ -226,6 +250,9 @@ export function isDifficulty(value: string): value is Difficulty {
 
 /**
  * Type guard to check if a value is a valid ProgramStatus
+ *
+ * @param value - String to check
+ * @returns True if value is a valid ProgramStatus enum value
  */
 export function isProgramStatus(value: string): value is ProgramStatus {
   return PROGRAM_STATUSES.includes(value as ProgramStatus);

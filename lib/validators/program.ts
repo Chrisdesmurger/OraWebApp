@@ -176,7 +176,13 @@ export type GetProgramsQueryInput = z.infer<typeof getProgramsQuerySchema>;
 
 /**
  * Validates and parses create program data
- * Throws ZodError if validation fails
+ *
+ * Throws ZodError if validation fails. Use this for strict validation
+ * where you want to catch and handle validation errors explicitly.
+ *
+ * @param data - Unvalidated input data
+ * @returns Validated and typed CreateProgramInput
+ * @throws {ZodError} If validation fails
  */
 export function validateCreateProgram(data: unknown): CreateProgramInput {
   return createProgramSchema.parse(data);
@@ -208,6 +214,19 @@ export function validateGetProgramsQuery(data: unknown): GetProgramsQueryInput {
 
 /**
  * Safe validation that returns success/error object instead of throwing
+ *
+ * Use this when you want to handle validation errors without try/catch.
+ * Returns { success: true, data } on success or { success: false, error } on failure.
+ *
+ * @param data - Unvalidated input data
+ * @returns SafeParseReturnType with success boolean and data or error
+ *
+ * @example
+ * const result = safeValidateCreateProgram(req.body);
+ * if (!result.success) {
+ *   return res.status(400).json({ errors: result.error.errors });
+ * }
+ * const programData = result.data;
  */
 export function safeValidateCreateProgram(data: unknown) {
   return createProgramSchema.safeParse(data);
