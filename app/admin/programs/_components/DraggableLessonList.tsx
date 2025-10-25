@@ -20,7 +20,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { GripVertical, X, Video } from 'lucide-react';
+import { GripVertical, X, Video, Music, FileText } from 'lucide-react';
 
 interface Lesson {
   id: string;
@@ -28,6 +28,10 @@ interface Lesson {
   description?: string;
   durationSec?: number;
   category?: string;
+  type?: 'video' | 'audio' | 'article';
+  thumbnailUrl?: string;
+  renditions?: { url: string; quality: string }[];
+  audioVariants?: { url: string; quality: string }[];
 }
 
 interface DraggableLessonListProps {
@@ -61,7 +65,64 @@ function SortableItem({ lesson, index, onRemove }: SortableItemProps) {
   const formatDuration = (seconds?: number) => {
     if (!seconds) return 'N/A';
     const minutes = Math.floor(seconds / 60);
-    return `${minutes} min`;
+    const remainingSeconds = seconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+  };
+
+  const renderMediaPreview = () => {
+    // Video lesson - show thumbnail or video preview
+    if (lesson.type === 'video') {
+      if (lesson.thumbnailUrl) {
+        return (
+          <img
+            src={lesson.thumbnailUrl}
+            alt={lesson.title}
+            className="h-10 w-10 rounded-lg object-cover"
+          />
+        );
+      }
+      // Fallback: Try to use first rendition as preview
+      if (lesson.renditions && lesson.renditions.length > 0) {
+        return (
+          <video
+            src={lesson.renditions[0].url}
+            className="h-10 w-10 rounded-lg object-cover"
+            muted
+          />
+        );
+      }
+      // Default video icon
+      return (
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 text-white">
+          <Video className="h-5 w-5" />
+        </div>
+      );
+    }
+
+    // Audio lesson - show audio icon
+    if (lesson.type === 'audio') {
+      return (
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-purple-400 to-purple-600 text-white">
+          <Music className="h-5 w-5" />
+        </div>
+      );
+    }
+
+    // Article - show article icon
+    if (lesson.type === 'article') {
+      return (
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-green-400 to-green-600 text-white">
+          <FileText className="h-5 w-5" />
+        </div>
+      );
+    }
+
+    // Default fallback
+    return (
+      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-gray-400 to-gray-600 text-white">
+        <Video className="h-5 w-5" />
+      </div>
+    );
   };
 
   return (
@@ -84,19 +145,25 @@ function SortableItem({ lesson, index, onRemove }: SortableItemProps) {
         {index + 1}
       </div>
 
-      {/* Lesson Icon */}
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 text-white">
-        <Video className="h-5 w-5" />
-      </div>
+      {/* Media Preview */}
+      {renderMediaPreview()}
 
       {/* Lesson Info */}
       <div className="flex-1 min-w-0">
-        <div className="font-medium">{lesson.title}</div>
-        {lesson.description && (
-          <div className="text-sm text-muted-foreground line-clamp-1">
-            {lesson.description}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <div className="font-medium">{lesson.title}</div>
+          {lesson.type && (
+            <Badge variant="secondary" className="text-xs capitalize">
+              {lesson.type === 'video' && <Video className="h-3 w-3 mr-1" />}
+              {lesson.type === 'audio' && <Music className="h-3 w-3 mr-1" />}
+              {lesson.type === 'article' && <FileText className="h-3 w-3 mr-1" />}
+              {lesson.type}
+            </Badge>
+          )}
+        </div>
+        <div className="text-sm text-muted-foreground line-clamp-1">
+          {lesson.description || 'No description available'}
+        </div>
         <div className="flex gap-2 mt-1">
           {lesson.category && (
             <Badge variant="outline" className="text-xs capitalize">

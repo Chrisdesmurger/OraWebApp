@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, Video, Music, FileText } from 'lucide-react';
 
 interface Lesson {
   id: string;
@@ -22,6 +23,10 @@ interface Lesson {
   description?: string;
   durationSec?: number;
   category?: string;
+  type?: 'video' | 'audio' | 'article';
+  thumbnailUrl?: string;
+  renditions?: { url: string; quality: string }[];
+  audioVariants?: { url: string; quality: string }[];
 }
 
 interface LessonPickerDialogProps {
@@ -53,7 +58,7 @@ export function LessonPickerDialog({
   const fetchLessons = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/lessons');
+      const response = await fetchWithAuth('/api/lessons');
       if (response.ok) {
         const data = await response.json();
         setLessons(data.lessons || []);
@@ -99,7 +104,64 @@ export function LessonPickerDialog({
   const formatDuration = (seconds?: number) => {
     if (!seconds) return 'N/A';
     const minutes = Math.floor(seconds / 60);
-    return `${minutes} min`;
+    const remainingSeconds = seconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+  };
+
+  const renderMediaPreview = (lesson: Lesson) => {
+    // Video lesson - show thumbnail or video preview
+    if (lesson.type === 'video') {
+      if (lesson.thumbnailUrl) {
+        return (
+          <img
+            src={lesson.thumbnailUrl}
+            alt={lesson.title}
+            className="h-12 w-12 rounded-lg object-cover"
+          />
+        );
+      }
+      // Fallback: Try to use first rendition as preview
+      if (lesson.renditions && lesson.renditions.length > 0) {
+        return (
+          <video
+            src={lesson.renditions[0].url}
+            className="h-12 w-12 rounded-lg object-cover"
+            muted
+          />
+        );
+      }
+      // Default video icon
+      return (
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 text-white">
+          <Video className="h-6 w-6" />
+        </div>
+      );
+    }
+
+    // Audio lesson - show audio icon
+    if (lesson.type === 'audio') {
+      return (
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-purple-400 to-purple-600 text-white">
+          <Music className="h-6 w-6" />
+        </div>
+      );
+    }
+
+    // Article - show article icon
+    if (lesson.type === 'article') {
+      return (
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-green-400 to-green-600 text-white">
+          <FileText className="h-6 w-6" />
+        </div>
+      );
+    }
+
+    // Default fallback
+    return (
+      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-gray-400 to-gray-600 text-white">
+        <Video className="h-6 w-6" />
+      </div>
+    );
   };
 
   return (
@@ -168,13 +230,25 @@ export function LessonPickerDialog({
                         onCheckedChange={() => handleToggle(lesson.id)}
                         className="mt-1"
                       />
+
+                      {/* Media Preview */}
+                      {renderMediaPreview(lesson)}
+
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium">{lesson.title}</div>
-                        {lesson.description && (
-                          <div className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                            {lesson.description}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <div className="font-medium">{lesson.title}</div>
+                          {lesson.type && (
+                            <Badge variant="secondary" className="text-xs capitalize">
+                              {lesson.type === 'video' && <Video className="h-3 w-3 mr-1" />}
+                              {lesson.type === 'audio' && <Music className="h-3 w-3 mr-1" />}
+                              {lesson.type === 'article' && <FileText className="h-3 w-3 mr-1" />}
+                              {lesson.type}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                          {lesson.description || 'No description available'}
+                        </div>
                         <div className="flex gap-2 mt-2">
                           {lesson.category && (
                             <Badge variant="outline" className="text-xs capitalize">

@@ -13,6 +13,7 @@ import { Search, Plus } from 'lucide-react';
 import { ProgramTable } from './_components/ProgramTable';
 import { CreateProgramDialog } from './_components/CreateProgramDialog';
 import { EditProgramDialog } from './_components/EditProgramDialog';
+import { ManageLessonsDialog } from './_components/ManageLessonsDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,8 @@ export default function ProgramsPage() {
   const [editingProgram, setEditingProgram] = React.useState<Program | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [deletingProgramId, setDeletingProgramId] = React.useState<string | null>(null);
+  const [manageLessonsOpen, setManageLessonsOpen] = React.useState(false);
+  const [managingProgram, setManagingProgram] = React.useState<Program | null>(null);
 
   const canCreate = currentUser?.role && hasPermission(currentUser.role, 'canCreatePrograms');
   const canEdit = currentUser?.role && hasPermission(currentUser.role, 'canEditAllPrograms');
@@ -157,13 +160,8 @@ export default function ProgramsPage() {
   };
 
   const handleManageLessons = (program: Program) => {
-    // Navigate to lesson management view
-    // TODO: Implement lesson management dialog or page
-    console.log('Manage lessons for program:', program.id);
-    toast({
-      title: "Coming soon",
-      description: "Lesson management will be available in the next update.",
-    });
+    setManagingProgram(program);
+    setManageLessonsOpen(true);
   };
 
   return (
@@ -225,6 +223,14 @@ export default function ProgramsPage() {
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         program={editingProgram}
+        onSuccess={fetchPrograms}
+      />
+
+      {/* Manage Lessons Dialog */}
+      <ManageLessonsDialog
+        open={manageLessonsOpen}
+        onOpenChange={setManageLessonsOpen}
+        program={managingProgram}
         onSuccess={fetchPrograms}
       />
 
