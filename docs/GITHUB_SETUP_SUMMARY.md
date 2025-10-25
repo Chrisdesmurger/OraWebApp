@@ -45,13 +45,19 @@
 
 ## 🚀 Prochaines Étapes (Actions Manuelles Requises)
 
-### 1. Ajouter les Secrets GitHub ⚠️ REQUIS
+### 1. Choisir votre Mode d'Intégration IA
 
-**Settings → Secrets and variables → Actions → New repository secret**
+**Option A: Claude Code Pro (Recommandé pour vous)** ✅
+- ✅ Pas de clé API requise
+- ✅ Utilise votre abonnement existant
+- ✅ Manuel mais plus de contrôle
+- 📖 [Guide Claude Code Integration](./CLAUDE_CODE_INTEGRATION.md)
 
-| Secret | Valeur | Obligatoire |
-|--------|--------|-------------|
-| `CLAUDE_API_KEY` | Clé API Anthropic (console.anthropic.com) | ✅ Oui |
+**Option B: API Anthropic (Automatisation complète)**
+- Créer clé API sur console.anthropic.com
+- Ajouter `CLAUDE_API_KEY` aux secrets GitHub
+- Coût: ~$5-10/mois
+- Automatique (spec générée en 30s)
 
 ### 2. Configurer Branch Protection ⚠️ REQUIS
 
