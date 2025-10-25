@@ -23,6 +23,10 @@ interface Lesson {
   description?: string;
   durationSec?: number;
   category?: string;
+  type?: 'video' | 'audio' | 'article';
+  thumbnailUrl?: string;
+  renditions?: { url: string; quality: string }[];
+  audioVariants?: { url: string; quality: string }[];
 }
 
 interface LessonPickerDialogProps {
