@@ -27,11 +27,11 @@ import { safeValidateUpdateProgramLessons } from '@/lib/validators/program';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await authenticateRequest(request);
-    const { id } = params;
+    const { id } = await params;
 
     if (!requireRole(user, ['admin', 'teacher'])) {
       return apiError('Insufficient permissions', 403);

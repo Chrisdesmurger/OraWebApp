@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, GraduationCap } from 'lucide-react';
+import { MoreHorizontal, Brain, Activity, Sparkles, Heart } from 'lucide-react';
 
 interface ProgramTableProps {
   programs: Program[];
@@ -81,6 +81,22 @@ export function ProgramTable({
     }
   };
 
+  const getCategoryIcon = (category: string) => {
+    const iconClass = "h-6 w-6";
+    switch (category) {
+      case 'meditation':
+        return <Brain className={iconClass} />;
+      case 'yoga':
+        return <Activity className={iconClass} />;
+      case 'mindfulness':
+        return <Sparkles className={iconClass} />;
+      case 'wellness':
+        return <Heart className={iconClass} />;
+      default:
+        return <Brain className={iconClass} />;
+    }
+  };
+
   const getDifficultyBadge = (difficulty: string) => {
     const variants: Record<string, { label: string; className: string }> = {
       beginner: { label: 'Beginner', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' },
@@ -122,7 +138,7 @@ export function ProgramTable({
               <TableCell>
                 <div className="flex items-center gap-3">
                   <div className={`flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br ${getCategoryColor(program.category)} text-white`}>
-                    <GraduationCap className="h-6 w-6" />
+                    {getCategoryIcon(program.category)}
                   </div>
                   <div className="max-w-md">
                     <div className="font-medium">{program.title}</div>
