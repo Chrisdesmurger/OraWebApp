@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Brain, Activity, Sparkles, Heart } from 'lucide-react';
+import { MoreHorizontal, Brain, User, Sparkles, Heart } from 'lucide-react';
 
 interface ProgramTableProps {
   programs: Program[];
@@ -87,7 +87,7 @@ export function ProgramTable({
       case 'meditation':
         return <Brain className={iconClass} />;
       case 'yoga':
-        return <Activity className={iconClass} />;
+        return <User className={iconClass} />;
       case 'mindfulness':
         return <Sparkles className={iconClass} />;
       case 'wellness':
