@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/Chrisdesmurger/OraWebApp/tree/main/docs
+    about: Check the documentation for setup guides and troubleshooting
+  - name: 💬 Discussions
+    url: https://github.com/Chrisdesmurger/OraWebApp/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: 🚨 Security Issues
+    url: https://github.com/Chrisdesmurger/OraWebApp/security/advisories/new
+    about: Report security vulnerabilities privately

@@ -1,0 +1,210 @@
+name: 📋 Technical Specification
+description: Create a detailed technical specification for a feature
+title: "[SPEC] "
+labels: ["spec", "documentation"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📋 Technical Specification
+        This template is used to create detailed technical specifications before implementation.
+        **AI-assisted**: Claude Code can help generate implementation plans from this spec.
+
+  - type: input
+    id: feature_issue
+    attributes:
+      label: 🔗 Related Feature Issue
+      description: Link to the feature request this spec is for
+      placeholder: "#123"
+    validations:
+      required: false
+
+  - type: textarea
+    id: overview
+    attributes:
+      label: 📖 Overview
+      description: High-level summary of what will be built
+      placeholder: |
+        This spec covers the implementation of bulk lesson upload functionality,
+        allowing teachers to upload multiple video files simultaneously with
+        progress tracking and automatic transcoding.
+    validations:
+      required: true
+
+  - type: textarea
+    id: architecture
+    attributes:
+      label: 🏗️ Architecture & Design
+      description: Architectural decisions and design patterns
+      placeholder: |
+        ## Components
+        - Frontend: BulkUploadDialog.tsx (React component)
+        - Backend: /api/lessons/bulk-upload endpoint
+        - Functions: batchTranscode (Cloud Function)
+
+        ## Data Flow
+        1. User selects files → validation
+        2. Create batch job in Firestore
+        3. Generate signed URLs per file
+        4. Parallel uploads with progress tracking
+        5. Cloud Function triggers on completion
+        6. Status updates via Firestore listeners
+
+        ## Design Patterns
+        - Repository pattern for data access
+        - Observer pattern for progress updates
+        - Queue pattern for transcode jobs
+    validations:
+      required: true
+
+  - type: textarea
+    id: api_contracts
+    attributes:
+      label: 🔌 API Contracts
+      description: API endpoints, request/response schemas
+      placeholder: |
+        ```typescript
+        POST /api/lessons/bulk-upload
+        Body: {
+          programId: string;
+          files: { name: string; size: number; type: string }[];
+        }
+        Response: {
+          batchId: string;
+          uploadUrls: { fileId: string; url: string }[];
+        }
+        ```
+      render: markdown
+    validations:
+      required: false
+
+  - type: textarea
+    id: data_models
+    attributes:
+      label: 🗄️ Data Models
+      description: Database schema changes, new collections/documents
+      placeholder: |
+        ```typescript
+        // Firestore: batch_upload_jobs/{batchId}
+        interface BatchUploadJob {
+          id: string;
+          created_by: string;
+          created_at: Timestamp;
+          program_id: string;
+          total_files: number;
+          completed_files: number;
+          failed_files: number;
+          status: 'pending' | 'uploading' | 'completed' | 'failed';
+          files: {
+            file_id: string;
+            lesson_id: string;
+            status: 'pending' | 'uploading' | 'transcoding' | 'ready' | 'failed';
+            progress: number;
+          }[];
+        }
+        ```
+      render: markdown
+    validations:
+      required: false
+
+  - type: textarea
+    id: security
+    attributes:
+      label: 🔒 Security Considerations
+      description: Security rules, permissions, validation
+      placeholder: |
+        - Only teachers/admins can create bulk uploads
+        - File size limit: 2GB per file, 10GB per batch
+        - MIME type validation: video/*, audio/*
+        - Storage rules: only lesson owners can read/write
+        - Rate limiting: max 3 concurrent batches per user
+    validations:
+      required: false
+
+  - type: textarea
+    id: performance
+    attributes:
+      label: ⚡ Performance Considerations
+      description: Performance optimizations, scaling concerns
+      placeholder: |
+        - Parallel uploads: max 3 concurrent per user
+        - Chunk size: 5MB for resumable uploads
+        - Transcode queue: FIFO with priority
+        - Cache: lesson metadata in client for 5 min
+        - Monitoring: track upload duration, failure rate
+    validations:
+      required: false
+
+  - type: textarea
+    id: testing
+    attributes:
+      label: 🧪 Testing Strategy
+      description: Unit tests, integration tests, E2E scenarios
+      placeholder: |
+        ## Unit Tests
+        - BulkUploadDialog component (Vitest)
+        - Validation logic
+        - Progress calculation
+
+        ## Integration Tests
+        - /api/lessons/bulk-upload endpoint
+        - Firestore batch job creation
+        - Cloud Function trigger
+
+        ## E2E Tests (Playwright)
+        - Upload 3 files, verify all succeed
+        - Upload with 1 invalid file, verify partial success
+        - Cancel mid-upload, verify cleanup
+    validations:
+      required: false
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 📦 Dependencies & Prerequisites
+      description: Required libraries, external services, feature flags
+      placeholder: |
+        - Firebase Storage CORS configuration
+        - Cloud Functions Gen2 quota increase
+        - FFmpeg binary in Functions runtime
+        - Feature flag: `enable_bulk_upload` (Firestore config)
+    validations:
+      required: false
+
+  - type: textarea
+    id: rollout
+    attributes:
+      label: 🚀 Rollout Plan
+      description: Deployment strategy, feature flags, rollback plan
+      placeholder: |
+        Phase 1: Deploy backend API + Functions (week 1)
+        Phase 2: Deploy UI behind feature flag (week 2)
+        Phase 3: Enable for beta testers (5 teachers, week 3)
+        Phase 4: Full rollout to all teachers (week 4)
+
+        Rollback: disable feature flag, revert Firestore rules
+    validations:
+      required: false
+
+  - type: textarea
+    id: implementation_tasks
+    attributes:
+      label: ✅ Implementation Tasks (Claude Code will assist)
+      description: Checklist of tasks to implement this spec
+      placeholder: |
+        - [ ] Create BatchUploadJob Firestore schema
+        - [ ] Implement /api/lessons/bulk-upload endpoint
+        - [ ] Create BulkUploadDialog component
+        - [ ] Add progress tracking with Firestore listeners
+        - [ ] Write unit tests for validation logic
+        - [ ] Write E2E test for bulk upload flow
+        - [ ] Update Firestore security rules
+        - [ ] Update Storage CORS configuration
+        - [ ] Deploy Cloud Function for batch transcoding
+        - [ ] Document usage in admin guide
+      value: |
+        - [ ]
+    validations:
+      required: false
