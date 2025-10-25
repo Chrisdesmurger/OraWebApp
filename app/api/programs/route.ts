@@ -1,25 +1,57 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
 import { getFirestore } from '@/lib/firebase/admin';
+import { mapProgramFromFirestore, type ProgramDocument } from '@/types/program';
+import { safeValidateGetProgramsQuery } from '@/lib/validators/program';
 
 /**
  * GET /api/programs - List all programs
+ *
+ * Query parameters:
+ * - category?: 'meditation' | 'yoga' | 'mindfulness' | 'wellness'
+ * - status?: 'draft' | 'published' | 'archived'
+ * - search?: string (searches in title and description)
  */
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request);
 
+    // Parse and validate query parameters
+    const { searchParams } = new URL(request.url);
+    const queryParams = {
+      category: searchParams.get('category') || undefined,
+      status: searchParams.get('status') || undefined,
+      search: searchParams.get('search') || undefined,
+    };
+
+    const validation = safeValidateGetProgramsQuery(queryParams);
+    if (!validation.success) {
+      return apiError(`Invalid query parameters: ${validation.error.message}`, 400);
+    }
+
+    const { category, status, search } = validation.data;
+
     const firestore = getFirestore();
 
-    console.log('[GET /api/programs] Fetching programs for user role:', user.role);
+    console.log('[GET /api/programs] Fetching programs for user role:', user.role, 'with filters:', { category, status, search });
 
     let snapshot;
     try {
-      let query = firestore.collection('programs').orderBy('createdAt', 'desc');
+      let query = firestore.collection('programs').orderBy('created_at', 'desc');
 
       // Teachers only see their own programs
       if (user.role === 'teacher') {
-        query = query.where('authorId', '==', user.uid) as any;
+        query = query.where('author_id', '==', user.uid) as any;
+      }
+
+      // Apply category filter
+      if (category) {
+        query = query.where('category', '==', category) as any;
+      }
+
+      // Apply status filter
+      if (status) {
+        query = query.where('status', '==', status) as any;
       }
 
       snapshot = await query.get();
@@ -27,29 +59,58 @@ export async function GET(request: NextRequest) {
     } catch (orderError: any) {
       console.warn('[GET /api/programs] orderBy failed, trying without:', orderError.message);
       // Fallback: fetch without ordering
-      snapshot = await firestore.collection('programs').get();
+      let query = firestore.collection('programs');
+
+      if (user.role === 'teacher') {
+        query = query.where('author_id', '==', user.uid) as any;
+      }
+
+      if (category) {
+        query = query.where('category', '==', category) as any;
+      }
+
+      if (status) {
+        query = query.where('status', '==', status) as any;
+      }
+
+      snapshot = await query.get();
       console.log('[GET /api/programs] Without orderBy - Found', snapshot.size, 'programs');
     }
 
-    const programs = snapshot.docs.map((doc) => {
-      const data = doc.data();
-      console.log('[GET /api/programs] Program doc:', doc.id, 'has fields:', Object.keys(data));
-      return {
-        id: doc.id,
-        ...data,
-      };
+    // Map Firestore documents to client-side Program objects
+    let programs = snapshot.docs.map((doc) => {
+      const data = doc.data() as ProgramDocument;
+      return mapProgramFromFirestore(doc.id, data);
     });
+
+    // Apply search filter (client-side for now)
+    if (search) {
+      const searchLower = search.toLowerCase();
+      programs = programs.filter((p) =>
+        p.title.toLowerCase().includes(searchLower) ||
+        p.description.toLowerCase().includes(searchLower)
+      );
+    }
 
     console.log('[GET /api/programs] Returning', programs.length, 'programs');
     return apiSuccess({ programs });
   } catch (error: any) {
     console.error('GET /api/programs error:', error);
-    return apiError(error.message || 'Failed to fetch programs', 401);
+    return apiError(error.message || 'Failed to fetch programs', 500);
   }
 }
 
 /**
  * POST /api/programs - Create a new program
+ *
+ * Request body:
+ * - title: string (3-100 chars)
+ * - description: string (10-1000 chars)
+ * - category: 'meditation' | 'yoga' | 'mindfulness' | 'wellness'
+ * - difficulty: 'beginner' | 'intermediate' | 'advanced'
+ * - durationDays: number (1-365)
+ * - lessons?: string[] (optional, lesson IDs)
+ * - tags?: string[] (optional, max 10)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -60,128 +121,49 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, description, level, tags = [], coverUrl = null } = body;
 
-    if (!title) {
-      return apiError('Title is required', 400);
+    // Validate request body
+    const { safeValidateCreateProgram } = await import('@/lib/validators/program');
+    const validation = safeValidateCreateProgram(body);
+
+    if (!validation.success) {
+      const errors = validation.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+      return apiError(`Validation failed: ${errors}`, 400);
     }
+
+    const { title, description, category, difficulty, durationDays, lessons = [], tags = [], coverImageUrl = null } = validation.data;
 
     const firestore = getFirestore();
     const programRef = firestore.collection('programs').doc();
 
-    const programData = {
+    const now = new Date().toISOString();
+
+    // Create Firestore document with snake_case fields
+    const programDocument: ProgramDocument = {
       title,
-      description: description || '',
-      level: level || 'beginner',
-      tags,
+      description,
+      category,
+      difficulty,
+      duration_days: durationDays,
+      lessons,
+      cover_image_url: coverImageUrl,
       status: 'draft',
-      authorId: user.uid,
-      coverUrl,
-      mediaCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      author_id: user.uid,
+      tags,
+      created_at: now,
+      updated_at: now,
     };
 
-    await programRef.set(programData);
+    await programRef.set(programDocument);
 
-    return apiSuccess({ id: programRef.id, ...programData }, 201);
+    // Return camelCase response
+    const program = mapProgramFromFirestore(programRef.id, programDocument);
+
+    console.log('[POST /api/programs] Created program:', program.id);
+    return apiSuccess(program, 201);
   } catch (error: any) {
     console.error('POST /api/programs error:', error);
     return apiError(error.message || 'Failed to create program', 500);
   }
 }
 
-/**
- * PATCH /api/programs/:id - Update program
- */
-export async function PATCH(request: NextRequest) {
-  try {
-    const user = await authenticateRequest(request);
-
-    const body = await request.json();
-    const { id, title, description, level, tags, status, coverUrl } = body;
-
-    if (!id) {
-      return apiError('Program ID is required', 400);
-    }
-
-    const firestore = getFirestore();
-    const programRef = firestore.collection('programs').doc(id);
-    const programDoc = await programRef.get();
-
-    if (!programDoc.exists) {
-      return apiError('Program not found', 404);
-    }
-
-    const programData = programDoc.data();
-
-    // Check permissions: admin can edit all, teacher can edit own
-    if (user.role === 'teacher' && programData?.authorId !== user.uid) {
-      return apiError('You can only edit your own programs', 403);
-    }
-
-    if (!requireRole(user, ['admin', 'teacher'])) {
-      return apiError('Insufficient permissions', 403);
-    }
-
-    const updateData: any = {
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (title) updateData.title = title;
-    if (description !== undefined) updateData.description = description;
-    if (level) updateData.level = level;
-    if (tags) updateData.tags = tags;
-    if (status) updateData.status = status;
-    if (coverUrl !== undefined) updateData.coverUrl = coverUrl;
-
-    await programRef.update(updateData);
-
-    return apiSuccess({ success: true, id });
-  } catch (error: any) {
-    console.error('PATCH /api/programs error:', error);
-    return apiError(error.message || 'Failed to update program', 500);
-  }
-}
-
-/**
- * DELETE /api/programs/:id - Delete program
- */
-export async function DELETE(request: NextRequest) {
-  try {
-    const user = await authenticateRequest(request);
-
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-
-    if (!id) {
-      return apiError('Program ID is required', 400);
-    }
-
-    const firestore = getFirestore();
-    const programRef = firestore.collection('programs').doc(id);
-    const programDoc = await programRef.get();
-
-    if (!programDoc.exists) {
-      return apiError('Program not found', 404);
-    }
-
-    const programData = programDoc.data();
-
-    // Check permissions
-    if (user.role === 'teacher' && programData?.authorId !== user.uid) {
-      return apiError('You can only delete your own programs', 403);
-    }
-
-    if (!requireRole(user, ['admin', 'teacher'])) {
-      return apiError('Insufficient permissions', 403);
-    }
-
-    await programRef.delete();
-
-    return apiSuccess({ success: true, id });
-  } catch (error: any) {
-    console.error('DELETE /api/programs error:', error);
-    return apiError(error.message || 'Failed to delete program', 500);
-  }
-}
