@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Loader2, Video, Music, FileText, Eye } from 'lucide-react';
+import { Search, Loader2, Video, Music, Eye } from 'lucide-react';
 import { MediaPlayer } from '@/components/media/media-player';
 
 interface LessonPickerDialogProps {
