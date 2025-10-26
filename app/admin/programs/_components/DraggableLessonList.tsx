@@ -72,16 +72,6 @@ function SortableItem({ lesson, index, onRemove, onPreview }: SortableItemProps)
           />
         );
       }
-      // Fallback: Try to use first rendition as preview
-      if (lesson.renditions && lesson.renditions.length > 0) {
-        return (
-          <video
-            src={lesson.renditions[0].url}
-            className="h-10 w-10 rounded-lg object-cover"
-            muted
-          />
-        );
-      }
       // Default video icon
       return (
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 text-white">
