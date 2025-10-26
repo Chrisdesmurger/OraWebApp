@@ -12,9 +12,10 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Loader2, BookOpen } from 'lucide-react';
+import { Loader2, BookOpen, Eye } from 'lucide-react';
 import { DraggableLessonList } from './DraggableLessonList';
 import { LessonPickerDialog } from './LessonPickerDialog';
+import { MediaPlayer } from '@/components/media/media-player';
 import type { Program } from '@/types/program';
 
 interface Lesson {

@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Table,
   TableBody,
@@ -48,6 +49,8 @@ export function LessonTable({
   onDelete,
   onDuplicate,
 }: LessonTableProps) {
+  const router = useRouter();
+
   const getProgramTitle = (programId: string) => {
     const program = programs.find((p) => p.id === programId);
     return program?.title || 'Unknown Program';
@@ -62,6 +65,10 @@ export function LessonTable({
     if (!currentUser.role) return false;
     // Only admins can delete
     return currentUser.role === 'admin';
+  };
+
+  const handleViewDetails = (lessonId: string) => {
+    router.push(`/admin/content/${lessonId}`);
   };
 
   if (lessons.length === 0) {
@@ -136,7 +143,7 @@ export function LessonTable({
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleViewDetails(lesson.id)}>
                     <Eye className="mr-2 h-4 w-4" />
                     View Details
                   </DropdownMenuItem>

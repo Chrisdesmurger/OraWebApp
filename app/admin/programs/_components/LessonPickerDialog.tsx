@@ -15,7 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Loader2, Video, Music, FileText } from 'lucide-react';
+import { Search, Loader2, Video, Music, FileText, Eye } from 'lucide-react';
+import { MediaPlayer } from '@/components/media/media-player';
 
 interface Lesson {
   id: string;
@@ -46,6 +47,7 @@ export function LessonPickerDialog({
   const [loading, setLoading] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selected, setSelected] = React.useState<string[]>(selectedLessonIds);
+  const [previewLesson, setPreviewLesson] = React.useState<Lesson | null>(null);
 
   // Fetch lessons when dialog opens
   React.useEffect(() => {
@@ -108,6 +110,24 @@ export function LessonPickerDialog({
     return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
   };
 
+  const getMediaUrl = (lesson: Lesson): string => {
+    if (lesson.type === 'video' && lesson.renditions) {
+      return lesson.renditions.find(r => r.quality === 'high')?.url ||
+             lesson.renditions.find(r => r.quality === 'medium')?.url ||
+             lesson.renditions.find(r => r.quality === 'low')?.url ||
+             '';
+    }
+
+    if (lesson.type === 'audio' && lesson.audioVariants) {
+      return lesson.audioVariants.find(v => v.quality === 'high')?.url ||
+             lesson.audioVariants.find(v => v.quality === 'medium')?.url ||
+             lesson.audioVariants.find(v => v.quality === 'low')?.url ||
+             '';
+    }
+
+    return '';
+  };
+
   const renderMediaPreview = (lesson: Lesson) => {
     // Video lesson - show thumbnail or video preview
     if (lesson.type === 'video') {
@@ -165,6 +185,7 @@ export function LessonPickerDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh]">
         <DialogHeader>
@@ -260,6 +281,21 @@ export function LessonPickerDialog({
                           </Badge>
                         </div>
                       </div>
+
+                      {/* Preview Button */}
+                      {(lesson.type === 'video' || lesson.type === 'audio') && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewLesson(lesson);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   );
                 })}
@@ -281,5 +317,28 @@ export function LessonPickerDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Preview Dialog */}
+    <Dialog open={!!previewLesson} onOpenChange={() => setPreviewLesson(null)}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>{previewLesson?.title}</DialogTitle>
+          <DialogDescription>
+            {previewLesson?.type === 'video' ? 'Video' : 'Audio'} Preview
+          </DialogDescription>
+        </DialogHeader>
+
+        {previewLesson && (previewLesson.type === 'video' || previewLesson.type === 'audio') && (
+          <MediaPlayer
+            type={previewLesson.type}
+            src={getMediaUrl(previewLesson)}
+            thumbnailUrl={previewLesson.thumbnailUrl}
+            title={previewLesson.title}
+            controls={true}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
