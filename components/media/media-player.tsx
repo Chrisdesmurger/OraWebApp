@@ -75,8 +75,18 @@ export function MediaPlayer({
   };
 
   const handleError = (e: React.SyntheticEvent<HTMLVideoElement | HTMLAudioElement, Event>) => {
-    console.error('Media error:', e);
-    setError('Failed to load media file');
+    const target = e.currentTarget as HTMLVideoElement | HTMLAudioElement;
+    const errorCode = target.error?.code;
+    const errorMessages: Record<number, string> = {
+      1: 'Media loading was aborted',
+      2: 'A network error occurred while loading the media',
+      3: 'The media file format is not supported',
+      4: 'Media source not found or not accessible',
+    };
+
+    const errorMessage = errorCode ? errorMessages[errorCode] || 'Unknown media error' : 'Failed to load media file';
+    console.error('Media error:', errorMessage, 'Error code:', errorCode);
+    setError(errorMessage);
     setLoading(false);
   };
 
@@ -152,6 +162,18 @@ export function MediaPlayer({
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [playing, duration]);
+
+  // Check if media source is available
+  if (!src || src.trim() === '') {
+    return (
+      <div className={cn('rounded-lg border border-muted bg-muted/10 p-6 text-center', className)}>
+        <p className="text-muted-foreground font-medium">No media source available</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          {type === 'video' ? 'Video' : 'Audio'} file has not been uploaded or processed yet.
+        </p>
+      </div>
+    );
+  }
 
   if (error) {
     return (
