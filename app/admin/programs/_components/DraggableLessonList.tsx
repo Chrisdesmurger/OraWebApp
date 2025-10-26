@@ -20,7 +20,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { GripVertical, X, Video, Music, FileText } from 'lucide-react';
+import { GripVertical, X, Video, Music, FileText, Eye } from 'lucide-react';
 
 interface Lesson {
   id: string;
@@ -38,15 +38,17 @@ interface DraggableLessonListProps {
   lessons: Lesson[];
   onReorder: (lessons: Lesson[]) => void;
   onRemove: (lessonId: string) => void;
+  onPreview?: (lesson: Lesson) => void;
 }
 
 interface SortableItemProps {
   lesson: Lesson;
   index: number;
   onRemove: (lessonId: string) => void;
+  onPreview?: (lesson: Lesson) => void;
 }
 
-function SortableItem({ lesson, index, onRemove }: SortableItemProps) {
+function SortableItem({ lesson, index, onRemove, onPreview }: SortableItemProps) {
   const {
     attributes,
     listeners,
@@ -176,6 +178,21 @@ function SortableItem({ lesson, index, onRemove }: SortableItemProps) {
         </div>
       </div>
 
+      {/* Preview Button */}
+      {onPreview && (lesson.type === 'video' || lesson.type === 'audio') && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPreview(lesson);
+          }}
+          className="text-muted-foreground hover:text-primary"
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+      )}
+
       {/* Remove Button */}
       <Button
         variant="ghost"
@@ -193,6 +210,7 @@ export function DraggableLessonList({
   lessons,
   onReorder,
   onRemove,
+  onPreview,
 }: DraggableLessonListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -238,6 +256,7 @@ export function DraggableLessonList({
               lesson={lesson}
               index={index}
               onRemove={onRemove}
+              onPreview={onPreview}
             />
           ))}
         </div>
