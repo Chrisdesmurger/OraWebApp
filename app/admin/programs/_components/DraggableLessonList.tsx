@@ -21,18 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { GripVertical, X, Video, Music, FileText, Eye } from 'lucide-react';
-
-interface Lesson {
-  id: string;
-  title: string;
-  description?: string;
-  durationSec?: number;
-  category?: string;
-  type?: 'video' | 'audio' | 'article';
-  thumbnailUrl?: string;
-  renditions?: { url: string; quality: string }[];
-  audioVariants?: { url: string; quality: string }[];
-}
+import type { Lesson } from '@/types/lesson';
 
 interface DraggableLessonListProps {
   lessons: Lesson[];
@@ -64,7 +53,7 @@ function SortableItem({ lesson, index, onRemove, onPreview }: SortableItemProps)
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const formatDuration = (seconds?: number) => {
+  const formatDuration = (seconds?: number | null) => {
     if (!seconds) return 'N/A';
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
@@ -158,18 +147,17 @@ function SortableItem({ lesson, index, onRemove, onPreview }: SortableItemProps)
             <Badge variant="secondary" className="text-xs capitalize">
               {lesson.type === 'video' && <Video className="h-3 w-3 mr-1" />}
               {lesson.type === 'audio' && <Music className="h-3 w-3 mr-1" />}
-              {lesson.type === 'article' && <FileText className="h-3 w-3 mr-1" />}
               {lesson.type}
             </Badge>
           )}
         </div>
         <div className="text-sm text-muted-foreground line-clamp-1">
-          {lesson.description || 'No description available'}
+          {lesson.transcript ? lesson.transcript.substring(0, 80) + '...' : 'No transcript available'}
         </div>
         <div className="flex gap-2 mt-1">
-          {lesson.category && (
+          {lesson.tags && lesson.tags.length > 0 && (
             <Badge variant="outline" className="text-xs capitalize">
-              {lesson.category}
+              {lesson.tags[0]}
             </Badge>
           )}
           <Badge variant="secondary" className="text-xs">
