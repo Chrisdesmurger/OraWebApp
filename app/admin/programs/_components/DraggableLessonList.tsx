@@ -20,33 +20,24 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { GripVertical, X, Video, Music, FileText } from 'lucide-react';
-
-interface Lesson {
-  id: string;
-  title: string;
-  description?: string;
-  durationSec?: number;
-  category?: string;
-  type?: 'video' | 'audio' | 'article';
-  thumbnailUrl?: string;
-  renditions?: { url: string; quality: string }[];
-  audioVariants?: { url: string; quality: string }[];
-}
+import { GripVertical, X, Video, Music, FileText, Eye } from 'lucide-react';
+import type { Lesson } from '@/types/lesson';
 
 interface DraggableLessonListProps {
   lessons: Lesson[];
   onReorder: (lessons: Lesson[]) => void;
   onRemove: (lessonId: string) => void;
+  onPreview?: (lesson: Lesson) => void;
 }
 
 interface SortableItemProps {
   lesson: Lesson;
   index: number;
   onRemove: (lessonId: string) => void;
+  onPreview?: (lesson: Lesson) => void;
 }
 
-function SortableItem({ lesson, index, onRemove }: SortableItemProps) {
+function SortableItem({ lesson, index, onRemove, onPreview }: SortableItemProps) {
   const {
     attributes,
     listeners,
@@ -62,7 +53,7 @@ function SortableItem({ lesson, index, onRemove }: SortableItemProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const formatDuration = (seconds?: number) => {
+  const formatDuration = (seconds?: number | null) => {
     if (!seconds) return 'N/A';
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
@@ -78,16 +69,6 @@ function SortableItem({ lesson, index, onRemove }: SortableItemProps) {
             src={lesson.thumbnailUrl}
             alt={lesson.title}
             className="h-10 w-10 rounded-lg object-cover"
-          />
-        );
-      }
-      // Fallback: Try to use first rendition as preview
-      if (lesson.renditions && lesson.renditions.length > 0) {
-        return (
-          <video
-            src={lesson.renditions[0].url}
-            className="h-10 w-10 rounded-lg object-cover"
-            muted
           />
         );
       }
@@ -156,18 +137,17 @@ function SortableItem({ lesson, index, onRemove }: SortableItemProps) {
             <Badge variant="secondary" className="text-xs capitalize">
               {lesson.type === 'video' && <Video className="h-3 w-3 mr-1" />}
               {lesson.type === 'audio' && <Music className="h-3 w-3 mr-1" />}
-              {lesson.type === 'article' && <FileText className="h-3 w-3 mr-1" />}
               {lesson.type}
             </Badge>
           )}
         </div>
         <div className="text-sm text-muted-foreground line-clamp-1">
-          {lesson.description || 'No description available'}
+          {lesson.transcript ? lesson.transcript.substring(0, 80) + '...' : 'No transcript available'}
         </div>
         <div className="flex gap-2 mt-1">
-          {lesson.category && (
+          {lesson.tags && lesson.tags.length > 0 && (
             <Badge variant="outline" className="text-xs capitalize">
-              {lesson.category}
+              {lesson.tags[0]}
             </Badge>
           )}
           <Badge variant="secondary" className="text-xs">
@@ -175,6 +155,21 @@ function SortableItem({ lesson, index, onRemove }: SortableItemProps) {
           </Badge>
         </div>
       </div>
+
+      {/* Preview Button */}
+      {onPreview && (lesson.type === 'video' || lesson.type === 'audio') && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPreview(lesson);
+          }}
+          className="text-muted-foreground hover:text-primary"
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+      )}
 
       {/* Remove Button */}
       <Button
@@ -193,6 +188,7 @@ export function DraggableLessonList({
   lessons,
   onReorder,
   onRemove,
+  onPreview,
 }: DraggableLessonListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -238,6 +234,7 @@ export function DraggableLessonList({
               lesson={lesson}
               index={index}
               onRemove={onRemove}
+              onPreview={onPreview}
             />
           ))}
         </div>

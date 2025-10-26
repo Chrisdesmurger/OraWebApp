@@ -11,7 +11,7 @@ import {
   sendPasswordResetEmail as firebaseSendPasswordResetEmail
 } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
-import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getStorage, FirebaseStorage, ref, getDownloadURL } from 'firebase/storage';
 
 /**
  * Firebase Client SDK configuration
@@ -123,4 +123,54 @@ export async function refreshUserToken(): Promise<void> {
   if (user) {
     await user.getIdToken(true); // Force refresh
   }
+}
+
+/**
+ * Convert Firebase Storage path to download URL
+ * Handles both gs:// URLs and relative paths
+ *
+ * @param storagePath - Firebase Storage path (e.g., "gs://bucket/path/file.mp4" or "path/file.mp4")
+ * @returns Download URL or null if invalid
+ */
+export async function getStorageDownloadURL(storagePath: string): Promise<string | null> {
+  if (!storagePath || storagePath.trim() === '') {
+    return null;
+  }
+
+  try {
+    const storage = getFirebaseStorage();
+
+    // If it's already a full HTTP(S) URL, return as-is
+    if (storagePath.startsWith('http://') || storagePath.startsWith('https://')) {
+      return storagePath;
+    }
+
+    // Remove gs:// prefix if present
+    let cleanPath = storagePath;
+    if (storagePath.startsWith('gs://')) {
+      // Extract path after bucket name
+      const match = storagePath.match(/gs:\/\/[^\/]+\/(.*)/);
+      if (match) {
+        cleanPath = match[1];
+      }
+    }
+
+    // Get reference and download URL
+    const storageRef = ref(storage, cleanPath);
+    const downloadURL = await getDownloadURL(storageRef);
+    return downloadURL;
+  } catch (error) {
+    console.error('Error getting storage download URL:', error);
+    return null;
+  }
+}
+
+/**
+ * Convert multiple storage paths to download URLs in parallel
+ *
+ * @param storagePaths - Array of Firebase Storage paths
+ * @returns Array of download URLs (null for failed conversions)
+ */
+export async function getStorageDownloadURLs(storagePaths: string[]): Promise<(string | null)[]> {
+  return Promise.all(storagePaths.map(path => getStorageDownloadURL(path)));
 }

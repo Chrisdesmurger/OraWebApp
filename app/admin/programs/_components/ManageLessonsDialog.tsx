@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
+import { getStorageDownloadURL } from '@/lib/firebase/client';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Dialog,
@@ -15,19 +16,9 @@ import { Button } from '@/components/ui/button';
 import { Loader2, BookOpen } from 'lucide-react';
 import { DraggableLessonList } from './DraggableLessonList';
 import { LessonPickerDialog } from './LessonPickerDialog';
+import { MediaPlayer } from '@/components/media/media-player';
 import type { Program } from '@/types/program';
-
-interface Lesson {
-  id: string;
-  title: string;
-  description?: string;
-  durationSec?: number;
-  category?: string;
-  type?: 'video' | 'audio' | 'article';
-  thumbnailUrl?: string;
-  renditions?: { url: string; quality: string }[];
-  audioVariants?: { url: string; quality: string }[];
-}
+import type { Lesson } from '@/types/lesson';
 
 interface ManageLessonsDialogProps {
   open: boolean;
@@ -57,6 +48,9 @@ export function ManageLessonsDialog({
   const [lessonDetails, setLessonDetails] = React.useState<Lesson[]>([]);
   const [showPicker, setShowPicker] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('current');
+  const [previewLesson, setPreviewLesson] = React.useState<Lesson | null>(null);
+  const [previewMediaUrl, setPreviewMediaUrl] = React.useState<string>('');
+  const [loadingMediaUrl, setLoadingMediaUrl] = React.useState(false);
 
   // Fetch lesson details when dialog opens
   React.useEffect(() => {
@@ -236,6 +230,73 @@ export function ManageLessonsDialog({
     }
   };
 
+  /**
+   * Handle preview button click
+   */
+  const handlePreview = (lesson: Lesson) => {
+    setPreviewLesson(lesson);
+  };
+
+  /**
+   * Convert Firebase Storage path to download URL when preview lesson changes
+   */
+  React.useEffect(() => {
+    if (previewLesson && (previewLesson.type === 'video' || previewLesson.type === 'audio')) {
+      convertPreviewMediaUrl();
+    }
+  }, [previewLesson]);
+
+  /**
+   * Get low quality media path for preview (Firebase Storage path)
+   */
+  const getMediaPath = (lesson: Lesson): string => {
+    if (lesson.type === 'video' && lesson.renditions) {
+      return lesson.renditions.low?.path ||
+             lesson.renditions.medium?.path ||
+             lesson.renditions.high?.path ||
+             lesson.storagePathOriginal ||
+             '';
+    }
+
+    if (lesson.type === 'audio' && lesson.audioVariants) {
+      return lesson.audioVariants.low?.path ||
+             lesson.audioVariants.medium?.path ||
+             lesson.audioVariants.high?.path ||
+             lesson.storagePathOriginal ||
+             '';
+    }
+
+    return lesson.storagePathOriginal || '';
+  };
+
+  /**
+   * Convert Firebase Storage path to download URL
+   */
+  const convertPreviewMediaUrl = async () => {
+    if (!previewLesson) return;
+
+    setLoadingMediaUrl(true);
+    try {
+      const storagePath = getMediaPath(previewLesson);
+      if (storagePath) {
+        const downloadUrl = await getStorageDownloadURL(storagePath);
+        if (downloadUrl) {
+          setPreviewMediaUrl(downloadUrl);
+        } else {
+          console.warn('Failed to get download URL for:', storagePath);
+          setPreviewMediaUrl('');
+        }
+      } else {
+        setPreviewMediaUrl('');
+      }
+    } catch (error) {
+      console.error('Error converting media URL:', error);
+      setPreviewMediaUrl('');
+    } finally {
+      setLoadingMediaUrl(false);
+    }
+  };
+
   if (!program) return null;
 
   return (
@@ -281,6 +342,7 @@ export function ManageLessonsDialog({
                     lessons={lessonDetails}
                     onReorder={handleReorder}
                     onRemove={handleRemove}
+                    onPreview={handlePreview}
                   />
                 )}
               </TabsContent>
@@ -308,6 +370,35 @@ export function ManageLessonsDialog({
         selectedLessonIds={lessonDetails.map((l) => l.id)}
         onConfirm={handleAddLessons}
       />
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewLesson} onOpenChange={() => setPreviewLesson(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{previewLesson?.title}</DialogTitle>
+            <DialogDescription>
+              {previewLesson?.type === 'video' ? 'Video' : 'Audio'} Preview
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingMediaUrl ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">Loading media...</span>
+            </div>
+          ) : (
+            previewLesson && (previewLesson.type === 'video' || previewLesson.type === 'audio') && (
+              <MediaPlayer
+                type={previewLesson.type}
+                src={previewMediaUrl}
+                thumbnailUrl={previewLesson.thumbnailUrl || undefined}
+                title={previewLesson.title}
+                controls={true}
+              />
+            )
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

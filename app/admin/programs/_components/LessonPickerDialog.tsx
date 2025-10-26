@@ -2,6 +2,8 @@
 
 import * as React from 'react';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
+import { getStorageDownloadURL } from '@/lib/firebase/client';
+import type { Lesson } from '@/types/lesson';
 import {
   Dialog,
   DialogContent,
@@ -15,19 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Loader2, Video, Music, FileText } from 'lucide-react';
-
-interface Lesson {
-  id: string;
-  title: string;
-  description?: string;
-  durationSec?: number;
-  category?: string;
-  type?: 'video' | 'audio' | 'article';
-  thumbnailUrl?: string;
-  renditions?: { url: string; quality: string }[];
-  audioVariants?: { url: string; quality: string }[];
-}
+import { Search, Loader2, Video, Music, Eye } from 'lucide-react';
+import { MediaPlayer } from '@/components/media/media-player';
 
 interface LessonPickerDialogProps {
   open: boolean;
@@ -46,6 +37,9 @@ export function LessonPickerDialog({
   const [loading, setLoading] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selected, setSelected] = React.useState<string[]>(selectedLessonIds);
+  const [previewLesson, setPreviewLesson] = React.useState<Lesson | null>(null);
+  const [previewMediaUrl, setPreviewMediaUrl] = React.useState<string>('');
+  const [loadingMediaUrl, setLoadingMediaUrl] = React.useState(false);
 
   // Fetch lessons when dialog opens
   React.useEffect(() => {
@@ -76,7 +70,7 @@ export function LessonPickerDialog({
     return lessons.filter(
       (lesson) =>
         lesson.title.toLowerCase().includes(query) ||
-        lesson.description?.toLowerCase().includes(query)
+        lesson.transcript?.toLowerCase().includes(query)
     );
   }, [lessons, searchQuery]);
 
@@ -101,15 +95,70 @@ export function LessonPickerDialog({
     onOpenChange(false);
   };
 
-  const formatDuration = (seconds?: number) => {
+  // Convert Firebase Storage path to download URL when preview lesson changes
+  React.useEffect(() => {
+    if (previewLesson && (previewLesson.type === 'video' || previewLesson.type === 'audio')) {
+      convertPreviewMediaUrl();
+    }
+  }, [previewLesson]);
+
+  const formatDuration = (seconds?: number | null) => {
     if (!seconds) return 'N/A';
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
   };
 
+  // Get low quality media path for preview (Firebase Storage path)
+  // Using low quality to reduce bandwidth and improve loading speed
+  const getMediaPath = (lesson: Lesson): string => {
+    if (lesson.type === 'video' && lesson.renditions) {
+      return lesson.renditions.low?.path ||
+             lesson.renditions.medium?.path ||
+             lesson.renditions.high?.path ||
+             lesson.storagePathOriginal ||
+             '';
+    }
+
+    if (lesson.type === 'audio' && lesson.audioVariants) {
+      return lesson.audioVariants.low?.path ||
+             lesson.audioVariants.medium?.path ||
+             lesson.audioVariants.high?.path ||
+             lesson.storagePathOriginal ||
+             '';
+    }
+
+    return lesson.storagePathOriginal || '';
+  };
+
+  // Convert Firebase Storage path to download URL
+  const convertPreviewMediaUrl = async () => {
+    if (!previewLesson) return;
+
+    setLoadingMediaUrl(true);
+    try {
+      const storagePath = getMediaPath(previewLesson);
+      if (storagePath) {
+        const downloadUrl = await getStorageDownloadURL(storagePath);
+        if (downloadUrl) {
+          setPreviewMediaUrl(downloadUrl);
+        } else {
+          console.warn('Failed to get download URL for:', storagePath);
+          setPreviewMediaUrl('');
+        }
+      } else {
+        setPreviewMediaUrl('');
+      }
+    } catch (error) {
+      console.error('Error converting media URL:', error);
+      setPreviewMediaUrl('');
+    } finally {
+      setLoadingMediaUrl(false);
+    }
+  };
+
   const renderMediaPreview = (lesson: Lesson) => {
-    // Video lesson - show thumbnail or video preview
+    // Video lesson - show thumbnail or icon
     if (lesson.type === 'video') {
       if (lesson.thumbnailUrl) {
         return (
@@ -117,16 +166,6 @@ export function LessonPickerDialog({
             src={lesson.thumbnailUrl}
             alt={lesson.title}
             className="h-12 w-12 rounded-lg object-cover"
-          />
-        );
-      }
-      // Fallback: Try to use first rendition as preview
-      if (lesson.renditions && lesson.renditions.length > 0) {
-        return (
-          <video
-            src={lesson.renditions[0].url}
-            className="h-12 w-12 rounded-lg object-cover"
-            muted
           />
         );
       }
@@ -147,15 +186,6 @@ export function LessonPickerDialog({
       );
     }
 
-    // Article - show article icon
-    if (lesson.type === 'article') {
-      return (
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-green-400 to-green-600 text-white">
-          <FileText className="h-6 w-6" />
-        </div>
-      );
-    }
-
     // Default fallback
     return (
       <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-gray-400 to-gray-600 text-white">
@@ -165,6 +195,7 @@ export function LessonPickerDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh]">
         <DialogHeader>
@@ -241,18 +272,17 @@ export function LessonPickerDialog({
                             <Badge variant="secondary" className="text-xs capitalize">
                               {lesson.type === 'video' && <Video className="h-3 w-3 mr-1" />}
                               {lesson.type === 'audio' && <Music className="h-3 w-3 mr-1" />}
-                              {lesson.type === 'article' && <FileText className="h-3 w-3 mr-1" />}
                               {lesson.type}
                             </Badge>
                           )}
                         </div>
                         <div className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                          {lesson.description || 'No description available'}
+                          {lesson.transcript ? lesson.transcript.substring(0, 100) + '...' : 'No transcript available'}
                         </div>
                         <div className="flex gap-2 mt-2">
-                          {lesson.category && (
+                          {lesson.tags && lesson.tags.length > 0 && (
                             <Badge variant="outline" className="text-xs capitalize">
-                              {lesson.category}
+                              {lesson.tags[0]}
                             </Badge>
                           )}
                           <Badge variant="secondary" className="text-xs">
@@ -260,6 +290,21 @@ export function LessonPickerDialog({
                           </Badge>
                         </div>
                       </div>
+
+                      {/* Preview Button */}
+                      {(lesson.type === 'video' || lesson.type === 'audio') && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewLesson(lesson);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   );
                 })}
@@ -281,5 +326,35 @@ export function LessonPickerDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Preview Dialog */}
+    <Dialog open={!!previewLesson} onOpenChange={() => setPreviewLesson(null)}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>{previewLesson?.title}</DialogTitle>
+          <DialogDescription>
+            {previewLesson?.type === 'video' ? 'Video' : 'Audio'} Preview
+          </DialogDescription>
+        </DialogHeader>
+
+        {loadingMediaUrl ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-sm text-muted-foreground">Loading media...</span>
+          </div>
+        ) : (
+          previewLesson && (previewLesson.type === 'video' || previewLesson.type === 'audio') && (
+            <MediaPlayer
+              type={previewLesson.type}
+              src={previewMediaUrl}
+              thumbnailUrl={previewLesson.thumbnailUrl || undefined}
+              title={previewLesson.title}
+              controls={true}
+            />
+          )
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
