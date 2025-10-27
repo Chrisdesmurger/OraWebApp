@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Users, BookOpen, GraduationCap, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
+import { RecentActivityFeed } from './_components/RecentActivityFeed';
 
 interface DashboardStats {
   totalUsers: number;
@@ -78,34 +79,9 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest user interactions and content updates</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {loading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center space-x-4">
-                      <div className="h-10 w-10 animate-pulse rounded-full bg-muted" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
-                        <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No recent activity to display</p>
-                  <p className="text-sm mt-2">Activity feed will appear here once users interact with the platform</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="col-span-4">
+          <RecentActivityFeed />
+        </div>
 
         <Card className="col-span-3">
           <CardHeader>
