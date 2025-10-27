@@ -57,6 +57,7 @@ export const audioVariantsSchema = z.object({
  */
 export const createLessonSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200, 'Title must be less than 200 characters'),
+  description: z.string().max(500, 'Description must be less than 500 characters').nullable().optional(),
   type: lessonTypeSchema,
   programId: z.string().min(1, 'Program ID is required'),
   order: z.number().int().min(0).default(0),
@@ -69,6 +70,7 @@ export const createLessonSchema = z.object({
  */
 export const updateLessonSchema = z.object({
   title: z.string().min(1).max(200).optional(),
+  description: z.string().max(500, 'Description must be less than 500 characters').nullable().optional(),
   order: z.number().int().min(0).optional(),
   tags: z.array(z.string()).optional(),
   transcript: z.string().nullable().optional(),

@@ -44,6 +44,7 @@ interface EditLessonDialogProps {
 
 const editLessonSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200, 'Title is too long'),
+  description: z.string().max(500, 'Description is too long').optional(),
   programId: z.string().min(1, 'Program is required'),
   order: z.number().int().min(0).optional(),
   tags: z.string().optional(),
@@ -77,6 +78,7 @@ export function EditLessonDialog({
     if (lesson) {
       reset({
         title: lesson.title,
+        description: lesson.description || '',
         programId: lesson.programId,
         order: lesson.order,
         tags: lesson.tags.join(', '),
@@ -102,6 +104,7 @@ export function EditLessonDialog({
       // Update lesson
       const updateRequest: UpdateLessonRequest = {
         title: data.title,
+        description: data.description,
         order: data.order,
         tags,
         transcript: data.transcript,
@@ -331,6 +334,21 @@ export function EditLessonDialog({
             />
             {errors.title && (
               <p className="text-sm text-red-500">{errors.title.message}</p>
+            )}
+          </div>
+
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              placeholder="Brief description of the lesson (optional)"
+              rows={3}
+              {...register('description')}
+              disabled={isSubmitting}
+            />
+            {errors.description && (
+              <p className="text-sm text-red-500">{errors.description.message}</p>
             )}
           </div>
 

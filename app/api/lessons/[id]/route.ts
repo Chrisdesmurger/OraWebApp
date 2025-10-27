@@ -119,6 +119,7 @@ export async function PATCH(
     const updateData: Partial<LessonDocument> = {
       ...mapLessonToFirestore({
         title: validatedData.title,
+        description: validatedData.description,
         order: validatedData.order,
         tags: validatedData.tags,
         transcript: validatedData.transcript,
