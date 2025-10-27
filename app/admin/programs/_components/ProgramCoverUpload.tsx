@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
-import { toast } from 'sonner';
+import { useToast } from '@/components/ui/use-toast';
 
 interface ProgramCoverUploadProps {
   programId: string;
@@ -21,6 +21,7 @@ export function ProgramCoverUpload({
   onRemove,
   disabled = false,
 }: ProgramCoverUploadProps) {
+  const { toast } = useToast();
   const [uploading, setUploading] = React.useState(false);
   const [preview, setPreview] = React.useState<string | null>(currentUrl || null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -70,10 +71,17 @@ export function ProgramCoverUpload({
 
       const data = await response.json();
       onUpload(data.coverUrl);
-      toast.success('Cover image uploaded successfully');
+      toast({
+        title: "Success",
+        description: "Cover image uploaded successfully",
+      });
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      toast.error(error.message || 'Failed to upload image');
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to upload image',
+        variant: "destructive",
+      });
       setPreview(currentUrl || null);
     } finally {
       setUploading(false);
@@ -97,10 +105,17 @@ export function ProgramCoverUpload({
 
       setPreview(null);
       onRemove();
-      toast.success('Cover image removed successfully');
+      toast({
+        title: "Success",
+        description: "Cover image removed successfully",
+      });
     } catch (error: any) {
       console.error('Error removing image:', error);
-      toast.error(error.message || 'Failed to remove image');
+      toast({
+        title: "Error",
+        description: error.message || 'Failed to remove image',
+        variant: "destructive",
+      });
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
