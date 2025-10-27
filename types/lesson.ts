@@ -36,6 +36,7 @@ export interface AudioVariants {
  */
 export interface LessonDocument {
   title: string;
+  description: string | null;
   type: LessonType;
   program_id: string;
   order: number;
@@ -61,6 +62,7 @@ export interface LessonDocument {
 export interface Lesson {
   id: string;
   title: string;
+  description: string | null;
   type: LessonType;
   programId: string;
   order: number;
@@ -85,6 +87,7 @@ export interface Lesson {
  */
 export interface CreateLessonRequest {
   title: string;
+  description?: string;
   type: LessonType;
   programId: string;
   order?: number;
@@ -97,6 +100,7 @@ export interface CreateLessonRequest {
  */
 export interface UpdateLessonRequest {
   title?: string;
+  description?: string;
   order?: number;
   tags?: string[];
   transcript?: string;
@@ -118,6 +122,7 @@ export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson 
   return {
     id,
     title: doc.title,
+    description: doc.description,
     type: doc.type,
     programId: doc.program_id,
     order: doc.order,
@@ -145,6 +150,7 @@ export function mapLessonToFirestore(lesson: Partial<Lesson>): Partial<LessonDoc
   const doc: Partial<LessonDocument> = {};
 
   if (lesson.title !== undefined) doc.title = lesson.title;
+  if (lesson.description !== undefined) doc.description = lesson.description;
   if (lesson.type !== undefined) doc.type = lesson.type;
   if (lesson.programId !== undefined) doc.program_id = lesson.programId;
   if (lesson.order !== undefined) doc.order = lesson.order;

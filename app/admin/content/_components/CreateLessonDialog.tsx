@@ -42,6 +42,7 @@ interface CreateLessonDialogProps {
 
 const createLessonSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200, 'Title is too long'),
+  description: z.string().max(500, 'Description is too long').optional(),
   type: z.enum(['video', 'audio']),
   programId: z.string().min(1, 'Program is required'),
   order: z.number().int().min(0).optional(),
@@ -203,6 +204,7 @@ export function CreateLessonDialog({
       // Create lesson
       const createRequest: CreateLessonRequest = {
         title: data.title,
+        description: data.description,
         type: data.type,
         programId: data.programId,
         order: data.order,
@@ -271,6 +273,21 @@ export function CreateLessonDialog({
             />
             {errors.title && (
               <p className="text-sm text-red-500">{errors.title.message}</p>
+            )}
+          </div>
+
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              placeholder="Brief description of the lesson (optional)"
+              rows={3}
+              {...register('description')}
+              disabled={uploading}
+            />
+            {errors.description && (
+              <p className="text-sm text-red-500">{errors.description.message}</p>
             )}
           </div>
 

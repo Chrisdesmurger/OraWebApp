@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
 
     const lessonData: LessonDocument = {
       title: validatedData.title,
+      description: validatedData.description || null,
       type: validatedData.type,
       program_id: validatedData.programId,
       order: validatedData.order || 0,
