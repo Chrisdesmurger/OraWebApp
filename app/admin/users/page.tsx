@@ -31,7 +31,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Search, MoreHorizontal, UserPlus, Filter } from 'lucide-react';
+import { Search, MoreHorizontal, UserPlus, Filter, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { CreateUserDialog } from './_components/CreateUserDialog';
+import { useToast } from '@/lib/hooks/use-toast';
 
 interface User {
   id: string;
@@ -45,10 +57,15 @@ interface User {
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
+  const { toast } = useToast();
   const [users, setUsers] = React.useState<User[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [roleFilter, setRoleFilter] = React.useState<string>('all');
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   const canEdit = currentUser?.role && hasPermission(currentUser.role, 'canEditUsers');
   const canDelete = currentUser?.role && hasPermission(currentUser.role, 'canDeleteUsers');
@@ -117,9 +134,86 @@ export default function UsersPage() {
         setUsers((prev) =>
           prev.map((user) => (user.id === userId ? { ...user, disabled } : user))
         );
+        toast({
+          title: 'Success',
+          description: `User ${disabled ? 'disabled' : 'enabled'} successfully`,
+        });
       }
     } catch (error) {
       console.error('Error toggling user status:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update user status',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCreateSuccess = async () => {
+    // Refresh users list
+    try {
+      const response = await fetchWithAuth('/api/users');
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data.users || []);
+      }
+      toast({
+        title: 'Success',
+        description: 'User created successfully',
+      });
+    } catch (error) {
+      console.error('Error refreshing users:', error);
+    }
+  };
+
+  const handleDeleteClick = (user: User) => {
+    // Prevent deleting yourself
+    if (user.id === currentUser?.uid) {
+      toast({
+        title: 'Error',
+        description: 'You cannot delete your own account',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setUserToDelete(user);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!userToDelete || !canDelete) return;
+
+    try {
+      setDeleting(true);
+      const response = await fetchWithAuth(`/api/users/${userToDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to delete user' }));
+        throw new Error(errorData.error || 'Failed to delete user');
+      }
+
+      // Remove user from list
+      setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
+
+      toast({
+        title: 'Success',
+        description: `User ${userToDelete.email} deleted successfully`,
+      });
+
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to delete user',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -130,7 +224,7 @@ export default function UsersPage() {
           <h1 className="text-3xl font-bold tracking-tight">Users</h1>
           <p className="text-muted-foreground">Manage user accounts and permissions</p>
         </div>
-        <Button disabled={!canEdit}>
+        <Button disabled={!canEdit} onClick={() => setCreateDialogOpen(true)}>
           <UserPlus className="mr-2 h-4 w-4" />
           Add User
         </Button>
@@ -255,6 +349,19 @@ export default function UsersPage() {
                             >
                               Viewer
                             </DropdownMenuItem>
+                            {canDelete && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteClick(user)}
+                                  className="text-red-600 focus:text-red-600"
+                                  disabled={user.id === currentUser?.uid}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete User
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -266,6 +373,40 @@ export default function UsersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Create User Dialog */}
+      <CreateUserDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onSuccess={handleCreateSuccess}
+      />
+
+      {/* Delete User Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User Account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the account for{' '}
+              <strong>{userToDelete?.email}</strong>?
+              <br />
+              <br />
+              This action cannot be undone. The user will be permanently removed from the system,
+              and all their data will be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {deleting ? 'Deleting...' : 'Delete User'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
