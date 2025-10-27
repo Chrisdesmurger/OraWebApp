@@ -137,9 +137,19 @@ export function ProgramTable({
             <TableRow key={program.id}>
               <TableCell>
                 <div className="flex items-center gap-3">
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br ${getCategoryColor(program.category)} text-white`}>
-                    {getCategoryIcon(program.category)}
-                  </div>
+                  {program.coverImageUrl ? (
+                    <div className="h-12 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                      <img
+                        src={program.coverImageUrl}
+                        alt={program.title}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br ${getCategoryColor(program.category)} text-white flex-shrink-0`}>
+                      {getCategoryIcon(program.category)}
+                    </div>
+                  )}
                   <div className="max-w-md">
                     <div className="font-medium">{program.title}</div>
                     <div className="text-sm text-muted-foreground line-clamp-1">

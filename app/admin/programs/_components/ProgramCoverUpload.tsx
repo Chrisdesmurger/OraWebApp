@@ -3,8 +3,11 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
+import { toast } from 'sonner';
 
 interface ProgramCoverUploadProps {
+  programId: string;
   currentUrl?: string | null;
   onUpload: (url: string) => void;
   onRemove: () => void;
@@ -12,6 +15,7 @@ interface ProgramCoverUploadProps {
 }
 
 export function ProgramCoverUpload({
+  programId,
   currentUrl,
   onUpload,
   onRemove,
@@ -51,24 +55,25 @@ export function ProgramCoverUpload({
     // Upload to Firebase Storage
     setUploading(true);
     try {
-      // TODO: Replace with actual Firebase Storage upload
-      // For now, we'll use a mock upload that simulates the process
-      // In production, you should use the same upload logic as LessonUpload
-
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', 'program-cover');
+      formData.append('cover', file);
 
-      // Mock upload - replace with actual Firebase Storage logic
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await fetchWithAuth(`/api/programs/${programId}/cover`, {
+        method: 'POST',
+        body: formData,
+      });
 
-      // For now, use the local preview URL
-      // In production, this should be the Firebase Storage URL
-      const mockUrl = URL.createObjectURL(file);
-      onUpload(mockUrl);
-    } catch (error) {
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
+      }
+
+      const data = await response.json();
+      onUpload(data.coverUrl);
+      toast.success('Cover image uploaded successfully');
+    } catch (error: any) {
       console.error('Error uploading image:', error);
-      alert('Failed to upload image');
+      toast.error(error.message || 'Failed to upload image');
       setPreview(currentUrl || null);
     } finally {
       setUploading(false);
@@ -78,11 +83,29 @@ export function ProgramCoverUpload({
     }
   };
 
-  const handleRemove = () => {
-    setPreview(null);
-    onRemove();
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const handleRemove = async () => {
+    try {
+      setUploading(true);
+      const response = await fetchWithAuth(`/api/programs/${programId}/cover`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Delete failed');
+      }
+
+      setPreview(null);
+      onRemove();
+      toast.success('Cover image removed successfully');
+    } catch (error: any) {
+      console.error('Error removing image:', error);
+      toast.error(error.message || 'Failed to remove image');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
