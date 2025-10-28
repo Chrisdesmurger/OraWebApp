@@ -15,7 +15,12 @@ export async function fetchWithAuth(
 
   const headers = new Headers(options?.headers);
   headers.set('Authorization', `Bearer ${idToken}`);
-  headers.set('Content-Type', 'application/json');
+
+  // Only set Content-Type to JSON if body is not FormData
+  // FormData needs to set its own Content-Type with boundary
+  if (!(options?.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   return fetch(url, {
     ...options,
