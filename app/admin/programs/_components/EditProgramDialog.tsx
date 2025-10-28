@@ -36,6 +36,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, X } from 'lucide-react';
+import { ProgramCoverUpload } from './ProgramCoverUpload';
 
 interface EditProgramDialogProps {
   open: boolean;
@@ -336,6 +337,21 @@ export function EditProgramDialog({
                 </div>
               )}
             </FormItem>
+
+            {/* Cover Image Upload */}
+            <ProgramCoverUpload
+              programId={program.id}
+              currentUrl={program.coverImageUrl}
+              onUpload={(url) => {
+                form.setValue('coverImageUrl', url);
+                // Don't call onSuccess() here - let the user continue editing
+              }}
+              onRemove={() => {
+                form.setValue('coverImageUrl', null);
+                // Don't call onSuccess() here - let the user continue editing
+              }}
+              disabled={isSubmitting}
+            />
 
             <DialogFooter>
               <Button

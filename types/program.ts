@@ -37,6 +37,7 @@ export interface ProgramDocument {
   duration_days: number;
   lessons: string[];  // Array of lesson IDs in order
   cover_image_url: string | null;
+  cover_storage_path: string | null;  // Firebase Storage path for deletion
   status: string;  // ProgramStatus enum
   author_id: string;  // Firebase Auth UID
   tags: string[];
@@ -61,6 +62,7 @@ export interface Program {
   durationDays: number;
   lessons: string[];  // Array of lesson IDs in order
   coverImageUrl: string | null;
+  coverStoragePath: string | null;  // Firebase Storage path for deletion
   status: ProgramStatus;
   authorId: string;
   tags: string[];
@@ -186,6 +188,7 @@ export function mapProgramFromFirestore(id: string, doc: ProgramDocument): Progr
     durationDays: doc.duration_days,
     lessons: doc.lessons || [],
     coverImageUrl: doc.cover_image_url,
+    coverStoragePath: doc.cover_storage_path || null,
     status: doc.status as ProgramStatus,
     authorId: doc.author_id,
     tags: doc.tags || [],
@@ -220,6 +223,7 @@ export function mapProgramToFirestore(program: Omit<Program, 'id'>): ProgramDocu
     duration_days: program.durationDays,
     lessons: program.lessons || [],
     cover_image_url: program.coverImageUrl,
+    cover_storage_path: program.coverStoragePath || null,
     status: program.status,
     author_id: program.authorId,
     tags: program.tags || [],

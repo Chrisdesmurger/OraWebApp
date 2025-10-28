@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
       duration_days: durationDays,
       lessons,
       cover_image_url: coverImageUrl,
+      cover_storage_path: null,
       status: 'draft',
       author_id: user.uid,
       tags,
