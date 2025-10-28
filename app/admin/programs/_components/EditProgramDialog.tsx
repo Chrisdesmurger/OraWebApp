@@ -344,11 +344,11 @@ export function EditProgramDialog({
               currentUrl={program.coverImageUrl}
               onUpload={(url) => {
                 form.setValue('coverImageUrl', url);
-                onSuccess();
+                // Don't call onSuccess() here - let the user continue editing
               }}
               onRemove={() => {
                 form.setValue('coverImageUrl', null);
-                onSuccess();
+                // Don't call onSuccess() here - let the user continue editing
               }}
               disabled={isSubmitting}
             />
