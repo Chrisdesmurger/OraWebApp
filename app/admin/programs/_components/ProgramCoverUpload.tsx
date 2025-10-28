@@ -168,6 +168,7 @@ export function ProgramCoverUpload({
               No cover image uploaded
             </div>
             <Button
+              type="button"
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || uploading}
