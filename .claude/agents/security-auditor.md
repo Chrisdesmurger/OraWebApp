@@ -1,3 +1,10 @@
+---
+name: security-auditor
+description: "Audit de sécurité : vulnérabilités, authentification, injections, OWASP Top 10."
+tools: Read, Write, Glob, Grep, Bash, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+model: claude-3-5-sonnet-20241022
+---
+
 # security-auditor — Agent d'Audit de Sécurité
 
 ## 🎯 Mission

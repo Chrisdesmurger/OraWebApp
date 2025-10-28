@@ -1,3 +1,10 @@
+---
+name: refactor-safety
+description: "Refactoring sûr : analyse d'impact, migration step-by-step, backward compatibility."
+tools: Read, Write, Glob, Grep, Bash, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+model: claude-3-5-sonnet-20241022
+---
+
 # refactor-safety — Agent de Refactoring Sûr
 
 ## 🎯 Mission

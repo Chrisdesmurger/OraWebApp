@@ -1,3 +1,10 @@
+---
+name: type-safety
+description: "Validation TypeScript stricte : éliminer any, typage strict, inference correcte."
+tools: Read, Write, Glob, Grep, Bash, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+model: claude-3-5-haiku-20241022
+---
+
 # type-safety — Agent de Sécurité TypeScript
 
 ## 🎯 Mission

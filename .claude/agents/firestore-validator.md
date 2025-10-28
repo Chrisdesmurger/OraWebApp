@@ -1,3 +1,10 @@
+---
+name: firestore-validator
+description: "Validation conventions Firestore : snake_case backend, camelCase frontend, mappers corrects."
+tools: Read, Write, Glob, Grep, Bash, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+model: claude-3-5-haiku-20241022
+---
+
 # firestore-validator — Agent de Validation Firestore Schema
 
 ## 🎯 Mission

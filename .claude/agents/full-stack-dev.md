@@ -1,3 +1,10 @@
+---
+name: full-stack-dev
+description: "Développement full-stack : API backend + composants frontend + tests + documentation."
+tools: Read, Write, Glob, Grep, Bash, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+model: claude-3-5-sonnet-20241022
+---
+
 # full-stack-dev — Agent de Développement Full-Stack
 
 ## 🎯 Mission

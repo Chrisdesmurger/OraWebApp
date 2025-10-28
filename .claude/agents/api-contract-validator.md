@@ -1,3 +1,10 @@
+---
+name: api-contract-validator
+description: "Validation contrats API : codes HTTP, RBAC, validation Zod, réponses cohérentes."
+tools: Read, Write, Glob, Grep, Bash, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+model: claude-3-5-haiku-20241022
+---
+
 # api-contract-validator — Agent de Validation des Contrats API
 
 ## 🎯 Mission

@@ -1,3 +1,10 @@
+---
+name: doc-generator
+description: "Génération documentation : JSDoc, README, OpenAPI specs, guides utilisateur."
+tools: Read, Write, Glob, Grep, Bash, mcp__context7__resolve-library-id, mcp__context7__get-library-docs
+model: claude-3-5-sonnet-20241022
+---
+
 # doc-generator — Agent de Génération de Documentation
 
 ## 🎯 Mission
