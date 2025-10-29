@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
 import { getFirestore } from '@/lib/firebase/admin';
-import * as admin from 'firebase-admin';
 import {
   validateCreateLesson,
   validateLessonFilters,
@@ -10,6 +9,7 @@ import {
 } from '@/lib/validators/lesson';
 import { mapLessonFromFirestore } from '@/types/lesson';
 import type { LessonDocument } from '@/types/lesson';
+import { logCreate } from '@/lib/audit/logger';
 
 /**
  * GET /api/lessons - List lessons with filters
@@ -187,6 +187,16 @@ export async function POST(request: NextRequest) {
     // Return mapped lesson
     const lesson = mapLessonFromFirestore(lessonRef.id, lessonData);
 
+    // Log audit event (don't await - fire and forget)
+    logCreate({
+      resourceType: 'lesson',
+      resourceId: lessonRef.id,
+      actorId: user.uid,
+      actorEmail: user.email || 'unknown',
+      resource: lessonData,
+      request,
+    });
+
     return apiSuccess({ lesson }, 201);
   } catch (error: any) {
     console.error('POST /api/lessons error:', error);
@@ -199,3 +209,4 @@ export async function POST(request: NextRequest) {
     return apiError(error.message || 'Failed to create lesson', 500);
   }
 }
+

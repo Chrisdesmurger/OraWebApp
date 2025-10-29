@@ -11,6 +11,7 @@ import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/ap
 import { getFirestore } from '@/lib/firebase/admin';
 import { mapProgramFromFirestore, type ProgramDocument } from '@/types/program';
 import { safeValidateUpdateProgram } from '@/lib/validators/program';
+import { logUpdate, logDelete, logStatusChange } from '@/lib/audit/logger';
 
 /**
  * GET /api/programs/[id] - Get specific program with lesson details
@@ -130,6 +131,9 @@ export async function PATCH(
       return apiError('You can only edit your own programs', 403);
     }
 
+    // Save before state for audit log
+    const beforeState = { ...programData };
+
     // Build update object with snake_case fields
     const updateData: Partial<ProgramDocument> = {
       updated_at: new Date().toISOString(),
@@ -152,6 +156,31 @@ export async function PATCH(
     const updatedDoc = await programRef.get();
     const updatedData = updatedDoc.data() as ProgramDocument;
     const program = mapProgramFromFirestore(id, updatedData);
+
+    // Log audit event (don't await - fire and forget)
+    const isStatusChange = status !== undefined && status !== beforeState.status;
+
+    if (isStatusChange) {
+      logStatusChange({
+        resourceType: 'program',
+        resourceId: id,
+        actorId: user.uid,
+        actorEmail: user.email || 'unknown',
+        before: { status: beforeState.status },
+        after: { status: updatedData.status },
+        request,
+      });
+    } else {
+      logUpdate({
+        resourceType: 'program',
+        resourceId: id,
+        actorId: user.uid,
+        actorEmail: user.email || 'unknown',
+        before: beforeState,
+        after: updatedData,
+        request,
+      });
+    }
 
     console.log('[PATCH /api/programs/[id]] Updated program:', program.id);
     return apiSuccess({ program });
@@ -193,7 +222,20 @@ export async function DELETE(
       return apiError('You can only delete your own programs', 403);
     }
 
+    // Save state before deletion for audit log
+    const beforeState = { ...programData };
+
     await programRef.delete();
+
+    // Log audit event (don't await - fire and forget)
+    logDelete({
+      resourceType: 'program',
+      resourceId: id,
+      actorId: user.uid,
+      actorEmail: user.email || 'unknown',
+      resource: beforeState,
+      request,
+    });
 
     console.log('[DELETE /api/programs/[id]] Deleted program:', id);
     return apiSuccess({ message: 'Program deleted successfully' });

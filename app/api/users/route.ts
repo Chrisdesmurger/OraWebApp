@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
 import { getFirestore, getAuth } from '@/lib/firebase/admin';
+import { logCreate, logUpdate, logDelete } from '@/lib/audit/logger';
 
 /**
  * GET /api/users - List all users (admin only)
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     // Create user document in Firestore
     const firestore = getFirestore();
-    await firestore.collection('users').doc(userRecord.uid).set({
+    const userData = {
       email: userRecord.email,
       displayName: userRecord.displayName,
       photoURL: userRecord.photoURL || null,
@@ -100,6 +101,18 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
       lastLoginAt: null,
       isFake: false,
+    };
+
+    await firestore.collection('users').doc(userRecord.uid).set(userData);
+
+    // Log audit event (don't await - fire and forget)
+    logCreate({
+      resourceType: 'user',
+      resourceId: userRecord.uid,
+      actorId: user.uid,
+      actorEmail: user.email || 'unknown',
+      resource: userData,
+      request,
     });
 
     return apiSuccess({ uid: userRecord.uid, email: userRecord.email, role }, 201);
@@ -130,6 +143,10 @@ export async function PATCH(request: NextRequest) {
     const auth = getAuth();
     const firestore = getFirestore();
 
+    // Get current state for audit log
+    const userDoc = await firestore.collection('users').doc(uid).get();
+    const beforeState = userDoc.exists ? userDoc.data() : {};
+
     // Update Firebase Auth
     const updateData: any = {};
     if (displayName) updateData.displayName = displayName;
@@ -145,14 +162,31 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update Firestore
+    const firestoreUpdate = {
+      ...updateData,
+      ...(role && { role }),
+      updatedAt: new Date().toISOString(),
+    };
+
     await firestore
       .collection('users')
       .doc(uid)
-      .update({
-        ...updateData,
-        ...(role && { role }),
-        updatedAt: new Date().toISOString(),
-      });
+      .update(firestoreUpdate);
+
+    // Get updated state for audit log
+    const updatedDoc = await firestore.collection('users').doc(uid).get();
+    const afterState = updatedDoc.exists ? updatedDoc.data() : {};
+
+    // Log audit event (don't await - fire and forget)
+    logUpdate({
+      resourceType: 'user',
+      resourceId: uid,
+      actorId: user.uid,
+      actorEmail: user.email || 'unknown',
+      before: beforeState,
+      after: afterState,
+      request,
+    });
 
     return apiSuccess({ success: true, uid });
   } catch (error: any) {
@@ -182,11 +216,25 @@ export async function DELETE(request: NextRequest) {
     const auth = getAuth();
     const firestore = getFirestore();
 
+    // Get user data before deletion for audit log
+    const userDoc = await firestore.collection('users').doc(uid).get();
+    const beforeState = userDoc.exists ? userDoc.data() : {};
+
     // Delete from Firebase Auth
     await auth.deleteUser(uid);
 
     // Delete from Firestore
     await firestore.collection('users').doc(uid).delete();
+
+    // Log audit event (don't await - fire and forget)
+    logDelete({
+      resourceType: 'user',
+      resourceId: uid,
+      actorId: user.uid,
+      actorEmail: user.email || 'unknown',
+      resource: beforeState,
+      request,
+    });
 
     return apiSuccess({ success: true, uid });
   } catch (error: any) {

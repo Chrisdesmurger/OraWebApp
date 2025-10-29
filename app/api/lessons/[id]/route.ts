@@ -5,6 +5,7 @@ import { validateUpdateLesson, type UpdateLessonInput } from '@/lib/validators/l
 import { mapLessonFromFirestore, mapLessonToFirestore } from '@/types/lesson';
 import type { LessonDocument } from '@/types/lesson';
 import { deleteLessonMedia } from '@/lib/storage';
+import { logUpdate, logDelete } from '@/lib/audit/logger';
 
 /**
  * GET /api/lessons/[id] - Get single lesson by ID
@@ -82,6 +83,9 @@ export async function PATCH(
       return apiError('You can only edit your own lessons', 403);
     }
 
+    // Save before state for audit log
+    const beforeState = { ...lessonData };
+
     // If moving to a different program, verify permissions
     if (validatedData.programId && validatedData.programId !== lessonData.program_id) {
       const newProgramDoc = await firestore.collection('programs').doc(validatedData.programId).get();
@@ -140,7 +144,19 @@ export async function PATCH(
 
     // Fetch updated lesson
     const updatedDoc = await lessonRef.get();
-    const updatedLesson = mapLessonFromFirestore(lessonId, updatedDoc.data() as LessonDocument);
+    const updatedData = updatedDoc.data() as LessonDocument;
+    const updatedLesson = mapLessonFromFirestore(lessonId, updatedData);
+
+    // Log audit event (don't await - fire and forget)
+    logUpdate({
+      resourceType: 'lesson',
+      resourceId: lessonId,
+      actorId: user.uid,
+      actorEmail: user.email || 'unknown',
+      before: beforeState,
+      after: updatedData,
+      request,
+    });
 
     return apiSuccess({ lesson: updatedLesson });
   } catch (error: any) {
@@ -182,6 +198,9 @@ export async function DELETE(
 
     const lessonData = lessonDoc.data() as LessonDocument;
 
+    // Save state before deletion for audit log
+    const beforeState = { ...lessonData };
+
     // Update program media count
     if (lessonData.program_id) {
       const programRef = firestore.collection('programs').doc(lessonData.program_id);
@@ -208,6 +227,16 @@ export async function DELETE(
     // Delete Firestore document
     await lessonRef.delete();
     console.log(`✅ Deleted lesson ${lessonId}`);
+
+    // Log audit event (don't await - fire and forget)
+    logDelete({
+      resourceType: 'lesson',
+      resourceId: lessonId,
+      actorId: user.uid,
+      actorEmail: user.email || 'unknown',
+      resource: beforeState,
+      request,
+    });
 
     return apiSuccess({ success: true, id: lessonId });
   } catch (error: any) {

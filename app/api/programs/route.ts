@@ -3,6 +3,7 @@ import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/ap
 import { getFirestore } from '@/lib/firebase/admin';
 import { mapProgramFromFirestore, type ProgramDocument } from '@/types/program';
 import { safeValidateGetProgramsQuery } from '@/lib/validators/program';
+import { logCreate } from '@/lib/audit/logger';
 
 /**
  * GET /api/programs - List all programs
@@ -159,6 +160,16 @@ export async function POST(request: NextRequest) {
 
     // Return camelCase response
     const program = mapProgramFromFirestore(programRef.id, programDocument);
+
+    // Log audit event (don't await - fire and forget)
+    logCreate({
+      resourceType: 'program',
+      resourceId: programRef.id,
+      actorId: user.uid,
+      actorEmail: user.email || 'unknown',
+      resource: programDocument,
+      request,
+    });
 
     console.log('[POST /api/programs] Created program:', program.id);
     return apiSuccess(program, 201);

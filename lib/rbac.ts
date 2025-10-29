@@ -33,6 +33,9 @@ export interface RBACPermissions {
   // Statistics
   canViewStats: boolean;
   canViewAdvancedStats: boolean;
+
+  // Audit logs
+  canViewAuditLogs: boolean;
 }
 
 /**
@@ -64,6 +67,8 @@ export function getPermissions(role: UserRole): RBACPermissions {
 
         canViewStats: true,
         canViewAdvancedStats: true,
+
+        canViewAuditLogs: true,
       };
 
     case 'teacher':
@@ -90,6 +95,8 @@ export function getPermissions(role: UserRole): RBACPermissions {
 
         canViewStats: true,
         canViewAdvancedStats: false,
+
+        canViewAuditLogs: false,
       };
 
     case 'viewer':
@@ -116,6 +123,8 @@ export function getPermissions(role: UserRole): RBACPermissions {
 
         canViewStats: false,
         canViewAdvancedStats: false,
+
+        canViewAuditLogs: false,
       };
   }
 }
@@ -142,6 +151,10 @@ export function canAccessRoute(role: UserRole, route: string): boolean {
 
   if (route.startsWith('/admin/commands')) {
     return hasPermission(role, 'canRunCommands');
+  }
+
+  if (route.startsWith('/admin/audit-logs')) {
+    return hasPermission(role, 'canViewAuditLogs');
   }
 
   if (route.startsWith('/admin')) {
