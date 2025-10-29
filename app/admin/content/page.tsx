@@ -20,7 +20,8 @@ import { LessonFilters } from './_components/LessonFilters';
 import { LessonTable } from './_components/LessonTable';
 import { CreateLessonDialog } from './_components/CreateLessonDialog';
 import { EditLessonDialog } from './_components/EditLessonDialog';
-import { Plus, RefreshCw } from 'lucide-react';
+import { BulkActionToolbar } from '@/components/admin/BulkActionToolbar';
+import { Plus, RefreshCw, Loader2 } from 'lucide-react';
 import { toast } from '@/lib/hooks/use-toast';
 import type { Lesson, LessonStatus, LessonType } from '@/types/lesson';
 
@@ -35,6 +36,9 @@ export default function ContentPage() {
   const [programs, setPrograms] = React.useState<Program[]>([]);
   const [loading, setLoading] = React.useState(true);
 
+  // Selection state
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+
   // Filter state
   const [search, setSearch] = React.useState('');
   const [statusFilter, setStatusFilter] = React.useState<LessonStatus | 'all'>('all');
@@ -47,6 +51,10 @@ export default function ContentPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [selectedLesson, setSelectedLesson] = React.useState<Lesson | null>(null);
   const [lessonToDelete, setLessonToDelete] = React.useState<string | null>(null);
+
+  // Bulk operation states
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = React.useState(false);
+  const [bulkOperationLoading, setBulkOperationLoading] = React.useState(false);
 
   // Auto-refresh state
   const [autoRefresh, setAutoRefresh] = React.useState(false);
@@ -235,6 +243,56 @@ export default function ContentPage() {
     }
   };
 
+  // Bulk operations
+  const handleBulkDelete = () => {
+    if (selectedIds.length === 0) return;
+    setBulkDeleteDialogOpen(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    setBulkOperationLoading(true);
+    try {
+      const response = await fetchWithAuth('/api/lessons/bulk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lessonIds: selectedIds }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast({
+          title: "Lessons deleted",
+          description: `Successfully deleted ${data.deleted} lesson(s).${
+            data.failed > 0 ? ` Failed to delete ${data.failed} lesson(s).` : ''
+          }`,
+        });
+
+        // Refresh lessons list
+        await fetchLessons();
+
+        // Clear selection
+        setSelectedIds([]);
+        setBulkDeleteDialogOpen(false);
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Error",
+          description: error.error || 'Failed to delete lessons',
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error bulk deleting lessons:', error);
+      toast({
+        title: "Error",
+        description: 'Failed to delete lessons',
+        variant: "destructive",
+      });
+    } finally {
+      setBulkOperationLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -287,6 +345,14 @@ export default function ContentPage() {
             onReset={handleResetFilters}
           />
 
+          {/* Bulk Action Toolbar */}
+          <BulkActionToolbar
+            selectedCount={selectedIds.length}
+            onDelete={handleBulkDelete}
+            onClearSelection={() => setSelectedIds([])}
+            entityType="lesson"
+          />
+
           {/* Loading skeleton */}
           {loading ? (
             <div className="space-y-3">
@@ -303,6 +369,8 @@ export default function ContentPage() {
               onEdit={handleEdit}
               onDelete={handleDelete}
               onDuplicate={handleDuplicate}
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
             />
           ) : (
             <div className="text-center py-12">
@@ -355,6 +423,36 @@ export default function ContentPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Multiple Lessons</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedIds.length} lesson(s)? This action cannot be
+              undone. All associated files will be permanently removed from storage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkOperationLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkDelete}
+              disabled={bulkOperationLoading}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {bulkOperationLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete All'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

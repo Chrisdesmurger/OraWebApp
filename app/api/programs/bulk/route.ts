@@ -2,17 +2,12 @@ import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
 import { getFirestore } from '@/lib/firebase/admin';
 import { isProgramStatus, type ProgramStatus } from '@/types/program';
-
-/**
- * Bulk operation response format
- */
-interface BulkOperationResponse {
-  success: boolean;
-  deleted?: number;
-  updated?: number;
-  failed: number;
-  errors?: string[];
-}
+import {
+  BulkOperationResponse,
+  BulkDeleteProgramsRequest,
+  BulkUpdateProgramsRequest,
+  isStringArray,
+} from '@/types/bulk-operations';
 
 /**
  * DELETE /api/programs/bulk - Bulk delete programs
@@ -26,7 +21,7 @@ interface BulkOperationResponse {
  *
  * Respects Firestore batch limit of 500 operations
  */
-export async function DELETE(request: NextRequest) {
+export async function DELETE(request: NextRequest): Promise<Response> {
   try {
     const user = await authenticateRequest(request);
 
@@ -34,16 +29,18 @@ export async function DELETE(request: NextRequest) {
       return apiError('Insufficient permissions', 403);
     }
 
-    const body = await request.json();
-    const { programIds } = body;
+    const body: unknown = await request.json();
 
-    // Validate input
-    if (!programIds || !Array.isArray(programIds) || programIds.length === 0) {
-      return apiError('programIds must be a non-empty array', 400);
+    // Type validation
+    if (typeof body !== 'object' || body === null) {
+      return apiError('Invalid request body', 400);
     }
 
-    if (programIds.some((id: any) => typeof id !== 'string' || !id.trim())) {
-      return apiError('All programIds must be valid strings', 400);
+    const { programIds } = body as Partial<BulkDeleteProgramsRequest>;
+
+    // Validate input
+    if (!isStringArray(programIds)) {
+      return apiError('programIds must be a non-empty array of valid strings', 400);
     }
 
     const firestore = getFirestore();
@@ -137,7 +134,7 @@ export async function DELETE(request: NextRequest) {
  *
  * Respects Firestore batch limit of 500 operations
  */
-export async function PATCH(request: NextRequest) {
+export async function PATCH(request: NextRequest): Promise<Response> {
   try {
     const user = await authenticateRequest(request);
 
@@ -145,16 +142,18 @@ export async function PATCH(request: NextRequest) {
       return apiError('Insufficient permissions', 403);
     }
 
-    const body = await request.json();
-    const { programIds, status } = body;
+    const body: unknown = await request.json();
 
-    // Validate input
-    if (!programIds || !Array.isArray(programIds) || programIds.length === 0) {
-      return apiError('programIds must be a non-empty array', 400);
+    // Type validation
+    if (typeof body !== 'object' || body === null) {
+      return apiError('Invalid request body', 400);
     }
 
-    if (programIds.some((id: any) => typeof id !== 'string' || !id.trim())) {
-      return apiError('All programIds must be valid strings', 400);
+    const { programIds, status } = body as Partial<BulkUpdateProgramsRequest>;
+
+    // Validate input
+    if (!isStringArray(programIds)) {
+      return apiError('programIds must be a non-empty array of valid strings', 400);
     }
 
     if (!status || !isProgramStatus(status)) {

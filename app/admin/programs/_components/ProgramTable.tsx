@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Program } from '@/types/program';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -30,6 +31,8 @@ interface ProgramTableProps {
   onDelete: (programId: string) => void;
   onPublishToggle: (programId: string, newStatus: 'published' | 'draft' | 'archived') => void;
   onManageLessons: (program: Program) => void;
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
 }
 
 export function ProgramTable({
@@ -40,7 +43,36 @@ export function ProgramTable({
   onDelete,
   onPublishToggle,
   onManageLessons,
+  selectedIds,
+  onSelectionChange,
 }: ProgramTableProps) {
+  const handleSelectAll = React.useCallback(
+    (checked: boolean | 'indeterminate') => {
+      // Only select/deselect on true boolean values, ignore indeterminate
+      if (checked === true) {
+        onSelectionChange(programs.map((p) => p.id));
+      } else if (checked === false) {
+        onSelectionChange([]);
+      }
+    },
+    [programs, onSelectionChange]
+  );
+
+  const handleSelectOne = React.useCallback(
+    (programId: string, checked: boolean | 'indeterminate') => {
+      // Only handle true boolean values, ignore indeterminate
+      if (checked === true) {
+        onSelectionChange([...selectedIds, programId]);
+      } else if (checked === false) {
+        onSelectionChange(selectedIds.filter((id) => id !== programId));
+      }
+    },
+    [selectedIds, onSelectionChange]
+  );
+
+  const isAllSelected = programs.length > 0 && selectedIds.length === programs.length;
+  const isIndeterminate = selectedIds.length > 0 && selectedIds.length < programs.length;
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -53,7 +85,7 @@ export function ProgramTable({
     );
   }
 
-  const getCategoryColor = (category: string) => {
+  const getCategoryColor = (category: string): string => {
     switch (category) {
       case 'meditation':
         return 'from-purple-400 to-purple-600';
@@ -81,7 +113,7 @@ export function ProgramTable({
     }
   };
 
-  const getCategoryIcon = (category: string) => {
+  const getCategoryIcon = (category: string): React.ReactNode => {
     const iconClass = "h-6 w-6";
     switch (category) {
       case 'meditation':
@@ -97,7 +129,7 @@ export function ProgramTable({
     }
   };
 
-  const getDifficultyBadge = (difficulty: string) => {
+  const getDifficultyBadge = (difficulty: string): React.ReactNode => {
     const variants: Record<string, { label: string; className: string }> = {
       beginner: { label: 'Beginner', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' },
       intermediate: { label: 'Intermediate', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100' },
@@ -116,6 +148,14 @@ export function ProgramTable({
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead className="w-12">
+            <Checkbox
+              checked={isAllSelected}
+              onCheckedChange={handleSelectAll}
+              aria-label="Select all programs"
+              className={isIndeterminate ? 'data-[state=checked]:bg-primary/50' : ''}
+            />
+          </TableHead>
           <TableHead>Program</TableHead>
           <TableHead>Category</TableHead>
           <TableHead>Difficulty</TableHead>
@@ -128,123 +168,136 @@ export function ProgramTable({
       <TableBody>
         {programs.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
               No programs found. Create your first program to get started!
             </TableCell>
           </TableRow>
         ) : (
-          programs.map((program) => (
-            <TableRow key={program.id}>
-              <TableCell>
-                <div className="flex items-center gap-3">
-                  {program.coverImageUrl ? (
-                    <div className="h-12 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                      <img
-                        src={program.coverImageUrl}
-                        alt={program.title}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br ${getCategoryColor(program.category)} text-white flex-shrink-0`}>
-                      {getCategoryIcon(program.category)}
-                    </div>
-                  )}
-                  <div className="max-w-md">
-                    <div className="font-medium">{program.title}</div>
-                    <div className="text-sm text-muted-foreground line-clamp-1">
-                      {program.description}
-                    </div>
-                    {program.tags && program.tags.length > 0 && (
-                      <div className="flex gap-1 mt-1">
-                        {program.tags.slice(0, 3).map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {program.tags.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{program.tags.length - 3}
-                          </Badge>
-                        )}
+          programs.map((program) => {
+            const isSelected = selectedIds.includes(program.id);
+            return (
+              <TableRow
+                key={program.id}
+                className={isSelected ? 'bg-muted/50' : ''}
+              >
+                <TableCell>
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={(checked) => handleSelectOne(program.id, checked)}
+                    aria-label={`Select ${program.title}`}
+                  />
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    {program.coverImageUrl ? (
+                      <div className="h-12 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                        <img
+                          src={program.coverImageUrl}
+                          alt={program.title}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br ${getCategoryColor(program.category)} text-white flex-shrink-0`}>
+                        {getCategoryIcon(program.category)}
                       </div>
                     )}
+                    <div className="max-w-md">
+                      <div className="font-medium">{program.title}</div>
+                      <div className="text-sm text-muted-foreground line-clamp-1">
+                        {program.description}
+                      </div>
+                      {program.tags && program.tags.length > 0 && (
+                        <div className="flex gap-1 mt-1">
+                          {program.tags.slice(0, 3).map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {program.tags.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{program.tags.length - 3}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline" className="capitalize">
-                  {program.category}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                {getDifficultyBadge(program.difficulty)}
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {program.durationDays} {program.durationDays === 1 ? 'day' : 'days'}
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {program.lessons?.length || 0} {program.lessons?.length === 1 ? 'lesson' : 'lessons'}
-              </TableCell>
-              <TableCell>
-                <Badge variant={getStatusVariant(program.status)} className="capitalize">
-                  {program.status}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreHorizontal className="h-4 w-4" />
-                      <span className="sr-only">Actions</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      disabled={!canEdit}
-                      onClick={() => onEdit(program)}
-                    >
-                      Edit Program
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={!canEdit}
-                      onClick={() => onManageLessons(program)}
-                    >
-                      Manage Lessons
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      disabled={!canEdit}
-                      onClick={() => {
-                        const newStatus = program.status === 'published' ? 'draft' : 'published';
-                        onPublishToggle(program.id, newStatus as 'published' | 'draft');
-                      }}
-                    >
-                      {program.status === 'published' ? 'Unpublish' : 'Publish'}
-                    </DropdownMenuItem>
-                    {program.status !== 'archived' && (
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline" className="capitalize">
+                    {program.category}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {getDifficultyBadge(program.difficulty)}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {program.durationDays} {program.durationDays === 1 ? 'day' : 'days'}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {program.lessons?.length || 0} {program.lessons?.length === 1 ? 'lesson' : 'lessons'}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={getStatusVariant(program.status)} className="capitalize">
+                    {program.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Actions</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem
                         disabled={!canEdit}
-                        onClick={() => onPublishToggle(program.id, 'archived')}
+                        onClick={() => onEdit(program)}
                       >
-                        Archive
+                        Edit Program
                       </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      disabled={!canEdit}
-                      className="text-red-600 focus:text-red-600"
-                      onClick={() => onDelete(program.id)}
-                    >
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))
+                      <DropdownMenuItem
+                        disabled={!canEdit}
+                        onClick={() => onManageLessons(program)}
+                      >
+                        Manage Lessons
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        disabled={!canEdit}
+                        onClick={() => {
+                          const newStatus = program.status === 'published' ? 'draft' : 'published';
+                          onPublishToggle(program.id, newStatus as 'published' | 'draft');
+                        }}
+                      >
+                        {program.status === 'published' ? 'Unpublish' : 'Publish'}
+                      </DropdownMenuItem>
+                      {program.status !== 'archived' && (
+                        <DropdownMenuItem
+                          disabled={!canEdit}
+                          onClick={() => onPublishToggle(program.id, 'archived')}
+                        >
+                          Archive
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        disabled={!canEdit}
+                        className="text-red-600 focus:text-red-600"
+                        onClick={() => onDelete(program.id)}
+                      >
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            );
+          })
         )}
       </TableBody>
     </Table>

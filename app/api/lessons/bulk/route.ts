@@ -3,16 +3,11 @@ import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/ap
 import { getFirestore } from '@/lib/firebase/admin';
 import { deleteLessonMedia } from '@/lib/storage';
 import type { LessonDocument } from '@/types/lesson';
-
-/**
- * Bulk operation response format
- */
-interface BulkOperationResponse {
-  success: boolean;
-  deleted: number;
-  failed: number;
-  errors?: string[];
-}
+import {
+  BulkOperationResponse,
+  BulkDeleteLessonsRequest,
+  isStringArray,
+} from '@/types/bulk-operations';
 
 /**
  * DELETE /api/lessons/bulk - Bulk delete lessons
@@ -30,7 +25,7 @@ interface BulkOperationResponse {
  * - Updates program media_count for affected programs
  * - Continues processing even if some operations fail
  */
-export async function DELETE(request: NextRequest) {
+export async function DELETE(request: NextRequest): Promise<Response> {
   try {
     const user = await authenticateRequest(request);
 
@@ -38,16 +33,18 @@ export async function DELETE(request: NextRequest) {
       return apiError('Insufficient permissions', 403);
     }
 
-    const body = await request.json();
-    const { lessonIds } = body;
+    const body: unknown = await request.json();
 
-    // Validate input
-    if (!lessonIds || !Array.isArray(lessonIds) || lessonIds.length === 0) {
-      return apiError('lessonIds must be a non-empty array', 400);
+    // Type validation
+    if (typeof body !== 'object' || body === null) {
+      return apiError('Invalid request body', 400);
     }
 
-    if (lessonIds.some((id: any) => typeof id !== 'string' || !id.trim())) {
-      return apiError('All lessonIds must be valid strings', 400);
+    const { lessonIds } = body as Partial<BulkDeleteLessonsRequest>;
+
+    // Validate input
+    if (!isStringArray(lessonIds)) {
+      return apiError('lessonIds must be a non-empty array of valid strings', 400);
     }
 
     const firestore = getFirestore();
