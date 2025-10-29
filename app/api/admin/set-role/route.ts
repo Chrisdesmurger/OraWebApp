@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
 import { getAuth } from '@/lib/firebase/admin';
+import { logRoleChange } from '@/lib/audit/logger';
 
 /**
  * POST /api/admin/set-role - Set user role (admin only)
@@ -37,6 +38,9 @@ export async function POST(request: NextRequest) {
     // Get target user
     const targetUser = await auth.getUser(uid);
 
+    // Get current role for audit log
+    const currentRole = targetUser.customClaims?.role || 'user';
+
     // Set custom claims
     if (role === 'user') {
       // Remove role claim for regular users
@@ -45,8 +49,17 @@ export async function POST(request: NextRequest) {
       await auth.setCustomUserClaims(uid, { role });
     }
 
-    // Log action in audit_logs (optional)
-    // await logAuditAction(currentUser.uid, 'set_role', 'user', uid, { role });
+    // Log audit event (don't await - fire and forget)
+    if (currentRole !== role) {
+      logRoleChange({
+        resourceId: uid,
+        actorId: currentUser.uid,
+        actorEmail: currentUser.email || 'unknown',
+        before: { role: currentRole },
+        after: { role },
+        request,
+      });
+    }
 
     return apiSuccess({
       success: true,

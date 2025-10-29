@@ -13,6 +13,7 @@ import {
   GraduationCap,
   Terminal,
   BarChart3,
+  FileText,
   Menu,
   X,
 } from 'lucide-react';
@@ -60,6 +61,12 @@ const navItems: NavItem[] = [
     href: '/admin/stats',
     icon: BarChart3,
     permission: 'canViewStats',
+  },
+  {
+    title: 'Audit Logs',
+    href: '/admin/audit-logs',
+    icon: FileText,
+    permission: 'canViewAuditLogs',
   },
 ];
 

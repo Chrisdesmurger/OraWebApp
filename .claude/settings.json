@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install:*)",
+      "Bash(pnpm run build:*)",
+      "Read(//c/Users/chris/source/repos/OraWebApp/app/admin/programs/**)",
+      "Read(//c/Users/chris/source/repos/OraWebApp/**)",
+      "Bash(gh issue create:*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat(programs): Implement lesson management dialog\n\nImplement comprehensive lesson management interface for programs,\nreplacing the \"Coming soon\" toast with a fully functional dialog.\n\nFeatures:\n- Two-tab interface: \"Current Lessons\" and \"Add Lessons\"\n- Drag-and-drop lesson reordering with @dnd-kit\n- Add lessons from lesson library with picker dialog\n- Remove lessons from program\n- Real-time sync with Firestore\n- Optimistic UI updates with error rollback\n- Toast notifications for all actions\n- Empty state with call-to-action\n- Loading states and error handling\n\nComponents:\n- ManageLessonsDialog.tsx (NEW): Main orchestrator with tabs\n  - Fetches program details with populated lessons\n  - Handles add/remove/reorder operations\n  - Manages optimistic updates and error recovery\n- Updated ProgramsPage.tsx:\n  - Replace handleManageLessons toast with dialog\n  - Add state management for lesson dialog\n  - Refresh program list after changes\n\nAPI Integration:\n- POST /api/programs/[id]/lessons for updates\n- GET /api/programs/[id] for fetching with lessons\n- Validates lesson IDs exist before updating\n- RBAC enforced (teachers own, admins all)\n\nUX Improvements:\n- Seamless nested dialog for lesson picker\n- Prevents duplicate lesson additions\n- Shows lesson count in dialog header\n- Responsive layout with overflow handling\n\nResolves #8\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(pnpm add:*)",
+      "Bash(git commit:*)",
+      "Bash(cat:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh api:*)",
+      "Bash(tee:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
