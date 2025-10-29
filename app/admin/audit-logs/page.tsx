@@ -7,6 +7,7 @@ import { AuditLogTable } from './_components/AuditLogTable';
 import { useAuth } from '@/lib/auth/auth-context';
 import { hasPermission } from '@/lib/rbac';
 import { redirect } from 'next/navigation';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import type { AuditLog, GetAuditLogsQuery } from '@/types/audit';
 
 export default function AuditLogsPage() {
@@ -44,16 +45,7 @@ export default function AuditLogsPage() {
       if (query.limit) params.append('limit', query.limit.toString());
       if (query.startAfter) params.append('startAfter', query.startAfter);
 
-      const idToken = await user?.getIdToken();
-      if (!idToken) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await fetch(`/api/audit-logs?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-        },
-      });
+      const response = await fetchWithAuth(`/api/audit-logs?${params.toString()}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch audit logs');
@@ -74,7 +66,7 @@ export default function AuditLogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
   // Initial fetch
   React.useEffect(() => {
