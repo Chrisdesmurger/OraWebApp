@@ -177,11 +177,14 @@ export async function PATCH(
 
     // Log audit event (don't await - fire and forget)
     const isStatusChange = status !== undefined && status !== beforeState.status;
-    const isSchedulingChange =
-      scheduledPublishAt !== undefined ||
-      scheduledArchiveAt !== undefined ||
-      autoPublishEnabled !== undefined;
 
+    // Check if scheduling fields actually changed (compare values, not just presence)
+    const schedulingFieldsChanged =
+      (scheduledPublishAt !== undefined && scheduledPublishAt !== beforeState.scheduled_publish_at) ||
+      (scheduledArchiveAt !== undefined && scheduledArchiveAt !== beforeState.scheduled_archive_at) ||
+      (autoPublishEnabled !== undefined && autoPublishEnabled !== beforeState.auto_publish_enabled);
+
+    // Log status changes
     if (isStatusChange) {
       logStatusChange({
         resourceType: 'program',
@@ -192,8 +195,10 @@ export async function PATCH(
         after: { status: updatedData.status },
         request,
       });
-    } else if (isSchedulingChange) {
-      // Log scheduling changes separately for better visibility
+    }
+
+    // ALWAYS log scheduling changes separately when they occur (independent of status)
+    if (schedulingFieldsChanged) {
       logUpdate({
         resourceType: 'program',
         resourceId: id,
@@ -211,7 +216,10 @@ export async function PATCH(
         },
         request,
       });
-    } else {
+    }
+
+    // Log other field changes (only if not status/scheduling)
+    if (!isStatusChange && !schedulingFieldsChanged) {
       logUpdate({
         resourceType: 'program',
         resourceId: id,

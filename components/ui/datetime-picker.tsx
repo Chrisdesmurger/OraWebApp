@@ -148,16 +148,26 @@ export function DateTimePicker({
           type="datetime-local"
           value={localValue}
           onChange={handleChange}
+          onBlur={(e) => {
+            // If user selected date but left time empty, set to midnight
+            const val = e.target.value;
+            if (val && val.length === 16 && val.endsWith('T')) {
+              e.target.value = `${val}00:00`;
+              handleChange(e as any);
+            }
+          }}
           disabled={disabled}
           min={minLocal}
           max={maxLocal}
           required={required}
+          step="60"
           className={cn(
             'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
             'file:border-0 file:bg-transparent file:text-sm file:font-medium',
             'placeholder:text-muted-foreground',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:cursor-not-allowed disabled:opacity-50',
+            '[&::-webkit-calendar-picker-indicator]:cursor-pointer',
             'appearance-none'
           )}
         />
