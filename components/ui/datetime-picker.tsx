@@ -63,14 +63,23 @@ function isoToDateTimeLocal(iso: string | null): string {
  * Convert datetime-local format to ISO 8601 timestamp
  *
  * Input format: "2025-12-15T14:30"
- * Output format: "2025-12-15T14:30:00Z" (UTC)
+ * Output format: "2025-12-15T00:00:00Z" (UTC, defaults to midnight)
+ *
+ * Note: If time is not specified (just date), defaults to midnight (00:00)
  */
 function dateTimeLocalToIso(local: string): string {
   if (!local) return '';
 
   try {
+    // If only date is provided (no time), add T00:00 to set to midnight
+    let dateTimeStr = local;
+    if (local.length === 10) {
+      // Format: "2025-12-15" (date only)
+      dateTimeStr = `${local}T00:00`;
+    }
+
     // Parse the local datetime string
-    const date = new Date(local);
+    const date = new Date(dateTimeStr);
 
     // Return ISO string in UTC
     return date.toISOString();
@@ -99,11 +108,21 @@ export function DateTimePicker({
   const maxLocal = maxDate ? isoToDateTimeLocal(maxDate) : undefined;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const localDateTime = e.target.value;
+    let localDateTime = e.target.value;
 
     if (!localDateTime) {
       onChange(null);
       return;
+    }
+
+    // If user selected a date without time, normalize to midnight
+    // datetime-local input returns format: "2025-12-15T14:30" or just "2025-12-15"
+    if (!localDateTime.includes('T')) {
+      // If somehow just date is returned, add midnight time
+      localDateTime = `${localDateTime}T00:00`;
+    } else if (localDateTime.endsWith('T')) {
+      // If time part is empty, set to midnight
+      localDateTime = `${localDateTime}00:00`;
     }
 
     // Convert back to ISO 8601 for the API

@@ -177,6 +177,10 @@ export async function PATCH(
 
     // Log audit event (don't await - fire and forget)
     const isStatusChange = status !== undefined && status !== beforeState.status;
+    const isSchedulingChange =
+      scheduledPublishAt !== undefined ||
+      scheduledArchiveAt !== undefined ||
+      autoPublishEnabled !== undefined;
 
     if (isStatusChange) {
       logStatusChange({
@@ -186,6 +190,25 @@ export async function PATCH(
         actorEmail: user.email || 'unknown',
         before: { status: beforeState.status },
         after: { status: updatedData.status },
+        request,
+      });
+    } else if (isSchedulingChange) {
+      // Log scheduling changes separately for better visibility
+      logUpdate({
+        resourceType: 'program',
+        resourceId: id,
+        actorId: user.uid,
+        actorEmail: user.email || 'unknown',
+        before: {
+          scheduled_publish_at: beforeState.scheduled_publish_at,
+          scheduled_archive_at: beforeState.scheduled_archive_at,
+          auto_publish_enabled: beforeState.auto_publish_enabled,
+        },
+        after: {
+          scheduled_publish_at: updatedData.scheduled_publish_at,
+          scheduled_archive_at: updatedData.scheduled_archive_at,
+          auto_publish_enabled: updatedData.auto_publish_enabled,
+        },
         request,
       });
     } else {
