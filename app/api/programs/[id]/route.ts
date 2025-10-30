@@ -93,6 +93,9 @@ export async function GET(
  * - coverImageUrl?: string | null
  * - status?: 'draft' | 'published' | 'archived'
  * - tags?: string[] (max 10)
+ * - scheduledPublishAt?: string | null (ISO timestamp)
+ * - scheduledArchiveAt?: string | null (ISO timestamp)
+ * - autoPublishEnabled?: boolean
  */
 export async function PATCH(
   request: NextRequest,
@@ -139,7 +142,19 @@ export async function PATCH(
       updated_at: new Date().toISOString(),
     };
 
-    const { title, description, category, difficulty, durationDays, coverImageUrl, status, tags } = validation.data;
+    const {
+      title,
+      description,
+      category,
+      difficulty,
+      durationDays,
+      coverImageUrl,
+      status,
+      tags,
+      scheduledPublishAt,
+      scheduledArchiveAt,
+      autoPublishEnabled,
+    } = validation.data;
 
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
@@ -149,6 +164,9 @@ export async function PATCH(
     if (coverImageUrl !== undefined) updateData.cover_image_url = coverImageUrl;
     if (status !== undefined) updateData.status = status;
     if (tags !== undefined) updateData.tags = tags;
+    if (scheduledPublishAt !== undefined) updateData.scheduled_publish_at = scheduledPublishAt;
+    if (scheduledArchiveAt !== undefined) updateData.scheduled_archive_at = scheduledArchiveAt;
+    if (autoPublishEnabled !== undefined) updateData.auto_publish_enabled = autoPublishEnabled;
 
     await programRef.update(updateData);
 
@@ -182,7 +200,11 @@ export async function PATCH(
       });
     }
 
-    console.log('[PATCH /api/programs/[id]] Updated program:', program.id);
+    console.log('[PATCH /api/programs/[id]] Updated program:', program.id, 'with scheduling:', {
+      scheduledPublishAt: updateData.scheduled_publish_at,
+      scheduledArchiveAt: updateData.scheduled_archive_at,
+      autoPublishEnabled: updateData.auto_publish_enabled,
+    });
     return apiSuccess({ program });
   } catch (error: any) {
     console.error('PATCH /api/programs/[id] error:', error);
