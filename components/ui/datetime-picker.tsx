@@ -100,52 +100,77 @@ export function DateTimePicker({
   className,
   required = false,
 }: DateTimePickerProps) {
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  // Split ISO timestamp into date and time parts
+  const [dateValue, setDateValue] = React.useState('');
+  const [timeValue, setTimeValue] = React.useState('00:00'); // Default to midnight
 
-  // Convert ISO value to datetime-local format for input
-  const localValue = isoToDateTimeLocal(value);
+  // Update local state when external value changes
+  React.useEffect(() => {
+    if (value) {
+      const date = new Date(value);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
 
-  // Convert min/max dates to datetime-local format
-  const minLocal = minDate ? isoToDateTimeLocal(minDate) : undefined;
-  const maxLocal = maxDate ? isoToDateTimeLocal(maxDate) : undefined;
+      setDateValue(`${year}-${month}-${day}`);
+      setTimeValue(`${hours}:${minutes}`);
+    } else {
+      setDateValue('');
+      setTimeValue('00:00'); // Reset to midnight when cleared
+    }
+  }, [value]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const localDateTime = e.target.value;
+  // Convert min/max ISO dates to date format (YYYY-MM-DD)
+  const getMinDateString = (): string | undefined => {
+    if (!minDate) return undefined;
+    const date = new Date(minDate);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
 
-    if (!localDateTime) {
+  const getMaxDateString = (): string | undefined => {
+    if (!maxDate) return undefined;
+    const date = new Date(maxDate);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+
+  const minDateString = getMinDateString();
+  const maxDateString = getMaxDateString();
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = e.target.value;
+    setDateValue(newDate);
+
+    if (!newDate) {
       onChange(null);
       return;
     }
 
-    // Only process if we have a complete datetime (YYYY-MM-DDTHH:mm)
-    if (localDateTime.length === 16 && localDateTime.includes('T')) {
-      const isoDateTime = dateTimeLocalToIso(localDateTime);
-      onChange(isoDateTime);
-    }
+    // Combine date and time (time defaults to 00:00 if not set)
+    const combinedDateTime = `${newDate}T${timeValue || '00:00'}`;
+    const isoDateTime = dateTimeLocalToIso(combinedDateTime);
+    onChange(isoDateTime);
   };
 
-  // When user clicks on the calendar and selects just a date,
-  // the input might not have time. Force it to midnight when user finishes.
-  const handleClick = () => {
-    if (!inputRef.current) return;
+  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTime = e.target.value;
+    setTimeValue(newTime);
 
-    // Set up a timer to check if user selected date without time
-    setTimeout(() => {
-      if (!inputRef.current) return;
-      const val = inputRef.current.value;
+    if (!dateValue) {
+      // Can't set time without a date
+      return;
+    }
 
-      // If value exists but incomplete (no time), add midnight
-      if (val && val.length >= 10 && !val.includes('T')) {
-        const dateWithMidnight = `${val.slice(0, 10)}T00:00`;
-        inputRef.current.value = dateWithMidnight;
-        // Trigger change handler manually
-        const event = new Event('change', { bubbles: true });
-        inputRef.current.dispatchEvent(event);
-      }
-    }, 100);
+    // Combine date and time
+    const combinedDateTime = `${dateValue}T${newTime}`;
+    const isoDateTime = dateTimeLocalToIso(combinedDateTime);
+    onChange(isoDateTime);
   };
 
   const handleClear = () => {
+    setDateValue('');
+    setTimeValue('00:00');
     onChange(null);
   };
 
@@ -158,47 +183,49 @@ export function DateTimePicker({
         </Label>
       )}
 
-      <div className="relative flex items-center gap-2">
-        <input
-          ref={inputRef}
-          type="datetime-local"
-          value={localValue}
-          onChange={handleChange}
-          onClick={handleClick}
-          onBlur={(e) => {
-            // Final safety: if user somehow has incomplete datetime on blur, complete it
-            const val = e.target.value;
-            if (val && val.length >= 10) {
-              let complete = val;
-              if (!val.includes('T')) {
-                complete = `${val.slice(0, 10)}T00:00`;
-              } else if (val.length < 16) {
-                // Has T but incomplete time
-                complete = `${val.slice(0, 10)}T00:00`;
-              }
-              if (complete !== val) {
-                e.target.value = complete;
-                const event = new Event('change', { bubbles: true });
-                e.target.dispatchEvent(event);
-              }
-            }
-          }}
-          disabled={disabled}
-          min={minLocal}
-          max={maxLocal}
-          required={required}
-          step="60"
-          className={cn(
-            'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
-            'file:border-0 file:bg-transparent file:text-sm file:font-medium',
-            'placeholder:text-muted-foreground',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            '[&::-webkit-calendar-picker-indicator]:cursor-pointer',
-            'appearance-none'
-          )}
-        />
+      <div className="flex items-center gap-2">
+        {/* Date input */}
+        <div className="relative flex-1">
+          <input
+            type="date"
+            value={dateValue}
+            onChange={handleDateChange}
+            disabled={disabled}
+            min={minDateString}
+            max={maxDateString}
+            required={required}
+            className={cn(
+              'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
+              'file:border-0 file:bg-transparent file:text-sm file:font-medium',
+              'placeholder:text-muted-foreground',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              '[&::-webkit-calendar-picker-indicator]:cursor-pointer'
+            )}
+          />
+        </div>
 
+        {/* Time input */}
+        <div className="relative w-32">
+          <input
+            type="time"
+            value={timeValue}
+            onChange={handleTimeChange}
+            disabled={disabled || !dateValue}
+            required={required && !!dateValue}
+            step="60"
+            className={cn(
+              'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
+              'file:border-0 file:bg-transparent file:text-sm file:font-medium',
+              'placeholder:text-muted-foreground',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              '[&::-webkit-calendar-picker-indicator]:cursor-pointer'
+            )}
+          />
+        </div>
+
+        {/* Clear button */}
         {value && !disabled && (
           <Button
             type="button"
@@ -206,7 +233,7 @@ export function DateTimePicker({
             size="icon"
             className="h-10 w-10 flex-shrink-0"
             onClick={handleClear}
-            aria-label="Clear date"
+            aria-label="Clear date and time"
           >
             <X className="h-4 w-4" />
           </Button>
