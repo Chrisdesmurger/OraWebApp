@@ -17,6 +17,7 @@ import {
   Calendar,
   Menu,
   X,
+  Image,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -50,6 +51,12 @@ const navItems: NavItem[] = [
     href: '/admin/programs',
     icon: GraduationCap,
     permission: 'canViewPrograms',
+  },
+  {
+    title: 'Media Library',
+    href: '/admin/media',
+    icon: Image,
+    permission: 'canViewMedia',
   },
   {
     title: 'Commands',

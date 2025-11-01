@@ -26,6 +26,11 @@ export interface RBACPermissions {
   canEditAllPrograms: boolean;
   canDeletePrograms: boolean;
 
+  // Media management
+  canViewMedia: boolean;
+  canUploadMedia: boolean;
+  canDeleteMedia: boolean;
+
   // Commands
   canRunCommands: boolean;
   canViewCommandLogs: boolean;
@@ -62,6 +67,10 @@ export function getPermissions(role: UserRole): RBACPermissions {
         canEditAllPrograms: true,
         canDeletePrograms: true,
 
+        canViewMedia: true,
+        canUploadMedia: true,
+        canDeleteMedia: true,
+
         canRunCommands: true,
         canViewCommandLogs: true,
 
@@ -90,6 +99,10 @@ export function getPermissions(role: UserRole): RBACPermissions {
         canEditAllPrograms: false,
         canDeletePrograms: false,
 
+        canViewMedia: true,
+        canUploadMedia: true,
+        canDeleteMedia: false,
+
         canRunCommands: false,
         canViewCommandLogs: false,
 
@@ -117,6 +130,10 @@ export function getPermissions(role: UserRole): RBACPermissions {
         canEditOwnPrograms: false,
         canEditAllPrograms: false,
         canDeletePrograms: false,
+
+        canViewMedia: true,
+        canUploadMedia: false,
+        canDeleteMedia: false,
 
         canRunCommands: false,
         canViewCommandLogs: false,
@@ -147,6 +164,10 @@ export function canAccessRoute(role: UserRole, route: string): boolean {
 
   if (route.startsWith('/admin/content') || route.startsWith('/admin/programs')) {
     return hasPermission(role, 'canViewContent');
+  }
+
+  if (route.startsWith('/admin/media')) {
+    return hasPermission(role, 'canViewMedia');
   }
 
   if (route.startsWith('/admin/commands')) {
