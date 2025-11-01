@@ -63,7 +63,10 @@ export function MediaListView({
 
       switch (sortBy) {
         case 'name':
-          comparison = a.name.localeCompare(b.name);
+          // Sort by lessonTitle if available, otherwise by file name
+          const nameA = a.lessonTitle || a.name;
+          const nameB = b.lessonTitle || b.name;
+          comparison = nameA.localeCompare(nameB);
           break;
         case 'size':
           comparison = a.size - b.size;
@@ -169,112 +172,125 @@ export function MediaListView({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedFiles.map((file) => (
-              <TableRow
-                key={file.id}
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() => onPreview(file)}
-              >
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <Checkbox
-                    checked={selectedFiles.has(file.id)}
-                    onCheckedChange={(checked) => onSelectionChange(file.id, checked === true)}
-                  />
-                </TableCell>
+            {sortedFiles.map((file) => {
+              const displayName = file.lessonTitle || file.name;
 
-                {/* Preview Thumbnail */}
-                <TableCell>
-                  <div className="w-12 h-12 rounded overflow-hidden bg-muted flex items-center justify-center">
-                    {file.type === 'image' && (
-                      <img
-                        src={file.url}
-                        alt={file.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    )}
-                    {file.type === 'video' && (
-                      <div className="relative w-full h-full">
-                        <video
+              return (
+                <TableRow
+                  key={file.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => onPreview(file)}
+                >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedFiles.has(file.id)}
+                      onCheckedChange={(checked) => onSelectionChange(file.id, checked === true)}
+                    />
+                  </TableCell>
+
+                  {/* Preview Thumbnail */}
+                  <TableCell>
+                    <div className="w-12 h-12 rounded overflow-hidden bg-muted flex items-center justify-center">
+                      {file.type === 'image' && (
+                        <img
                           src={file.url}
+                          alt={file.name}
                           className="w-full h-full object-cover"
-                          preload="metadata"
+                          loading="lazy"
                         />
+                      )}
+                      {file.type === 'video' && (
+                        <div className="relative w-full h-full">
+                          <video
+                            src={file.url}
+                            className="w-full h-full object-cover"
+                            preload="metadata"
+                          />
+                        </div>
+                      )}
+                      {file.type === 'audio' && (
+                        <Music className="h-6 w-6 text-green-600 dark:text-green-400" />
+                      )}
+                    </div>
+                  </TableCell>
+
+                  {/* Name */}
+                  <TableCell>
+                    <div className="space-y-1">
+                      <p className="font-medium max-w-xs truncate" title={displayName}>
+                        {displayName}
+                      </p>
+                      {file.lessonTitle && (
+                        <p className="text-xs text-muted-foreground max-w-xs truncate" title={file.name}>
+                          {file.name}
+                        </p>
+                      )}
+                      {file.isOrphaned && (
+                        <Badge variant="destructive" className="text-xs gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          Orphaned
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+
+                  {/* Type */}
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {getTypeIcon(file.type)}
+                      <span className="capitalize">{file.type}</span>
+                    </div>
+                  </TableCell>
+
+                  {/* Size */}
+                  <TableCell>{formatBytes(file.size)}</TableCell>
+
+                  {/* Uploaded Date */}
+                  <TableCell className="text-muted-foreground">
+                    {formatDate(file.uploadedAt)}
+                  </TableCell>
+
+                  {/* Used In Lessons */}
+                  <TableCell>
+                    {file.usedInLessons.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 max-w-xs">
+                        {file.usedInLessons.map((lesson) => (
+                          <Badge key={lesson.id} variant="secondary" className="text-xs">
+                            {lesson.title}
+                          </Badge>
+                        ))}
                       </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
                     )}
-                    {file.type === 'audio' && (
-                      <Music className="h-6 w-6 text-green-600 dark:text-green-400" />
-                    )}
-                  </div>
-                </TableCell>
+                  </TableCell>
 
-                {/* Name */}
-                <TableCell>
-                  <div className="space-y-1">
-                    <p className="font-medium max-w-xs truncate" title={file.name}>
-                      {file.name}
-                    </p>
-                    {file.isOrphaned && (
-                      <Badge variant="destructive" className="text-xs gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        Orphaned
-                      </Badge>
-                    )}
-                  </div>
-                </TableCell>
-
-                {/* Type */}
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    {getTypeIcon(file.type)}
-                    <span className="capitalize">{file.type}</span>
-                  </div>
-                </TableCell>
-
-                {/* Size */}
-                <TableCell>{formatBytes(file.size)}</TableCell>
-
-                {/* Uploaded Date */}
-                <TableCell className="text-muted-foreground">
-                  {formatDate(file.uploadedAt)}
-                </TableCell>
-
-                {/* Used In Lessons */}
-                <TableCell>
-                  {file.usedInLessons.length > 0 ? (
-                    <Badge variant="secondary">
-                      {file.usedInLessons.length} lesson{file.usedInLessons.length !== 1 ? 's' : ''}
-                    </Badge>
-                  ) : (
-                    <span className="text-muted-foreground text-sm">-</span>
-                  )}
-                </TableCell>
-
-                {/* Actions */}
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleDownload(file)}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Download
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => onDelete(file)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
+                  {/* Actions */}
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleDownload(file)}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onDelete(file)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
 
             {/* Loading Skeleton */}
             {loading && (

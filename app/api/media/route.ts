@@ -4,7 +4,6 @@ import { getFirestore } from '@/lib/firebase/admin';
 import {
   listStorageFiles,
   getReferencedFilePaths,
-  findLessonsUsingFile,
   convertToMediaFile,
   filterMediaFiles,
   paginateMediaFiles,
@@ -73,13 +72,8 @@ export async function GET(request: NextRequest) {
     const mediaFiles: MediaFile[] = [];
 
     for (const fileMetadata of storageFiles) {
-      const filePath = fileMetadata.name;
-
-      // Find which lessons use this file
-      const usedInLessons = await findLessonsUsingFile(firestore, filePath);
-
-      // Convert to MediaFile object
-      const mediaFile = await convertToMediaFile(fileMetadata, referencedPaths, usedInLessons);
+      // Convert to MediaFile object (includes finding lessons and alternative versions)
+      const mediaFile = await convertToMediaFile(fileMetadata, referencedPaths, firestore);
 
       if (mediaFile) {
         mediaFiles.push(mediaFile);

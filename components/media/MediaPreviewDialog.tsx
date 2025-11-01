@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Download, Trash2, Image as ImageIcon, Video, Music, AlertCircle } from 'lucide-react';
+import { Download, Trash2, Image as ImageIcon, Video, Music, AlertCircle, Play } from 'lucide-react';
 import { type MediaFile } from '@/types/media';
 import { formatBytes } from '@/types/media';
 
@@ -28,6 +28,15 @@ export function MediaPreviewDialog({
   onOpenChange,
   onDelete,
 }: MediaPreviewDialogProps) {
+  const [currentUrl, setCurrentUrl] = React.useState<string>('');
+
+  // Reset current URL when file changes
+  React.useEffect(() => {
+    if (file) {
+      setCurrentUrl(file.url);
+    }
+  }, [file]);
+
   if (!file) return null;
 
   const handleDownload = () => {
@@ -60,16 +69,19 @@ export function MediaPreviewDialog({
     }
   };
 
+  const displayName = file.lessonTitle || file.name;
+  const subtitle = file.lessonTitle ? file.name : `${file.contentType} • ${formatBytes(file.size)}`;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getTypeIcon()}
-            {file.name}
+            {displayName}
           </DialogTitle>
           <DialogDescription>
-            {file.contentType} • {formatBytes(file.size)}
+            {subtitle}
           </DialogDescription>
         </DialogHeader>
 
@@ -78,7 +90,7 @@ export function MediaPreviewDialog({
           <div className="rounded-lg border bg-muted/50 overflow-hidden">
             {file.type === 'image' && (
               <img
-                src={file.url}
+                src={currentUrl}
                 alt={file.name}
                 className="w-full h-auto max-h-[500px] object-contain"
               />
@@ -86,7 +98,8 @@ export function MediaPreviewDialog({
 
             {file.type === 'video' && (
               <video
-                src={file.url}
+                key={currentUrl}
+                src={currentUrl}
                 controls
                 className="w-full h-auto max-h-[500px]"
                 preload="metadata"
@@ -103,7 +116,7 @@ export function MediaPreviewDialog({
                       <Music className="h-16 w-16 text-white" />
                     </div>
                   </div>
-                  <audio src={file.url} controls className="w-full">
+                  <audio key={currentUrl} src={currentUrl} controls className="w-full">
                     Your browser does not support the audio tag.
                   </audio>
                 </div>
@@ -111,11 +124,73 @@ export function MediaPreviewDialog({
             )}
           </div>
 
+          {/* Alternative Quality Versions */}
+          {file.alternativeVersions && file.alternativeVersions.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm">Available Quality Versions</h4>
+              <div className="space-y-2">
+                {/* High quality (current file) */}
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg border-2 border-primary">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="default">HIGH</Badge>
+                    <span className="text-sm font-medium">{formatBytes(file.size)}</span>
+                    <span className="text-xs text-muted-foreground">(Current)</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" asChild>
+                      <a href={file.url} download>
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Alternative versions */}
+                {file.alternativeVersions.map((version) => (
+                  <div
+                    key={version.quality}
+                    className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Badge variant="secondary">
+                        {version.quality.toUpperCase()}
+                      </Badge>
+                      <span className="text-sm">{version.sizeFormatted}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setCurrentUrl(version.url)}
+                      >
+                        <Play className="h-4 w-4 mr-1" />
+                        Play
+                      </Button>
+                      <Button size="sm" variant="outline" asChild>
+                        <a href={version.url} download>
+                          <Download className="h-4 w-4 mr-1" />
+                          Download
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* File Details */}
           <div className="space-y-4">
             <div>
               <h3 className="font-semibold mb-2">File Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                {file.lessonTitle && (
+                  <div>
+                    <span className="text-muted-foreground">Lesson:</span>
+                    <p className="font-medium">{file.lessonTitle}</p>
+                  </div>
+                )}
                 <div>
                   <span className="text-muted-foreground">File Name:</span>
                   <p className="font-medium break-all">{file.name}</p>
@@ -161,9 +236,9 @@ export function MediaPreviewDialog({
                 <div>
                   <h3 className="font-semibold mb-2">Used In Lessons</h3>
                   <div className="flex flex-wrap gap-2">
-                    {file.usedInLessons.map((lessonId) => (
-                      <Badge key={lessonId} variant="outline">
-                        {lessonId}
+                    {file.usedInLessons.map((lesson) => (
+                      <Badge key={lesson.id} variant="outline" className="text-sm">
+                        {lesson.title}
                       </Badge>
                     ))}
                   </div>

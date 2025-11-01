@@ -15,19 +15,42 @@
 export type MediaType = 'image' | 'video' | 'audio';
 
 /**
+ * Alternative quality version for video/audio files
+ */
+export interface AlternativeVersion {
+  quality: 'high' | 'medium' | 'low';
+  path: string;
+  url: string;
+  size: number;
+  sizeFormatted: string;
+}
+
+/**
+ * Lesson reference with ID and title
+ */
+export interface LessonReference {
+  id: string;
+  title: string;
+}
+
+/**
  * Client-side media file object (camelCase)
  */
 export interface MediaFile {
   id: string;                      // File path in Storage
-  name: string;                    // File name
+  name: string;                    // FILE NAME (keep for technical reference)
+  lessonTitle?: string;            // Lesson title for display (if part of lesson)
   type: MediaType;
   size: number;                    // Bytes
   url: string;                     // Download URL
   contentType: string;             // MIME type
   uploadedAt: string;              // ISO timestamp
   uploadedBy?: string;             // User ID
-  usedInLessons: string[];         // Lesson IDs using this file
+  usedInLessons: LessonReference[]; // Array of objects with ID and title
   isOrphaned: boolean;             // Not referenced anywhere
+
+  // Alternative quality versions (for videos/audio)
+  alternativeVersions?: AlternativeVersion[];
 }
 
 /**

@@ -42,9 +42,7 @@ export async function GET(request: NextRequest) {
     const mediaFiles: MediaFile[] = [];
 
     for (const fileMetadata of storageFiles) {
-      const filePath = fileMetadata.name;
-      const usedInLessons = await findLessonsUsingFile(firestore, filePath);
-      const mediaFile = await convertToMediaFile(fileMetadata, referencedPaths, usedInLessons);
+      const mediaFile = await convertToMediaFile(fileMetadata, referencedPaths, firestore);
 
       if (mediaFile) {
         mediaFiles.push(mediaFile);

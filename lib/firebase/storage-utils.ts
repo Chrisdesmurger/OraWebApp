@@ -6,7 +6,7 @@
 
 import { getStorage } from '@/lib/firebase/admin';
 import { getSignedUrl } from '@/lib/storage';
-import type { MediaFile, MediaType } from '@/types/media';
+import type { MediaFile, MediaType, LessonReference, AlternativeVersion } from '@/types/media';
 import { getMediaTypeFromMimeType, formatBytes } from '@/types/media';
 
 /**
@@ -23,6 +23,90 @@ interface StorageFileMetadata {
   size: string; // Firebase returns size as string
   md5Hash: string;
   metadata?: Record<string, string>;
+}
+
+/**
+ * Determine if a file should be included in the main media list
+ *
+ * Filters out medium and low quality renditions - only show high quality
+ *
+ * @param filePath - Storage file path
+ * @returns True if file should be included in list
+ */
+function shouldIncludeInMediaList(filePath: string): boolean {
+  // Exclude medium and low quality versions
+  if (filePath.includes('/medium/') || filePath.includes('/low/')) {
+    return false;
+  }
+
+  // Include high quality, original, and standalone files
+  return true;
+}
+
+/**
+ * Extract lesson ID from a storage path
+ *
+ * @param filePath - Storage file path (e.g., "media/lessons/lesson123/high/video.mp4")
+ * @returns Lesson ID or null
+ */
+function extractLessonIdFromPath(filePath: string): string | null {
+  // Pattern: media/lessons/{lessonId}/...
+  const match = filePath.match(/media\/lessons\/([^\/]+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Get alternative quality versions for a high quality file
+ *
+ * @param lessonData - Lesson document data
+ * @param isVideo - True for video, false for audio
+ * @returns Array of alternative versions
+ */
+async function getAlternativeVersions(
+  lessonData: any,
+  isVideo: boolean
+): Promise<AlternativeVersion[]> {
+  const versions: AlternativeVersion[] = [];
+  const variantsKey = isVideo ? 'renditions' : 'audio_variants';
+  const variants = lessonData[variantsKey];
+
+  if (!variants) {
+    return versions;
+  }
+
+  // Check medium version
+  if (variants.medium?.path) {
+    try {
+      const url = await getSignedUrl(variants.medium.path, 60);
+      versions.push({
+        quality: 'medium',
+        path: variants.medium.path,
+        url,
+        size: variants.medium.size_bytes || 0,
+        sizeFormatted: formatBytes(variants.medium.size_bytes || 0),
+      });
+    } catch (error) {
+      console.warn('[getAlternativeVersions] Failed to get URL for medium quality:', error);
+    }
+  }
+
+  // Check low version
+  if (variants.low?.path) {
+    try {
+      const url = await getSignedUrl(variants.low.path, 60);
+      versions.push({
+        quality: 'low',
+        path: variants.low.path,
+        url,
+        size: variants.low.size_bytes || 0,
+        sizeFormatted: formatBytes(variants.low.size_bytes || 0),
+      });
+    } catch (error) {
+      console.warn('[getAlternativeVersions] Failed to get URL for low quality:', error);
+    }
+  }
+
+  return versions;
 }
 
 /**
@@ -119,15 +203,15 @@ export async function getReferencedFilePaths(firestore: FirebaseFirestore.Firest
  *
  * @param firestore - Firestore instance
  * @param filePath - Storage path to search for
- * @returns Array of lesson IDs using this file
+ * @returns Array of lesson references with ID and title
  */
 export async function findLessonsUsingFile(
   firestore: FirebaseFirestore.Firestore,
   filePath: string
-): Promise<string[]> {
+): Promise<LessonReference[]> {
   try {
     const lessonsSnapshot = await firestore.collection('lessons').get();
-    const lessonIds: string[] = [];
+    const lessonReferences: LessonReference[] = [];
 
     lessonsSnapshot.docs.forEach((doc) => {
       const data = doc.data();
@@ -150,11 +234,14 @@ export async function findLessonsUsingFile(
       }
 
       if (isUsed) {
-        lessonIds.push(doc.id);
+        lessonReferences.push({
+          id: doc.id,
+          title: data.title || 'Untitled Lesson',
+        });
       }
     });
 
-    return lessonIds;
+    return lessonReferences;
   } catch (error: any) {
     console.error('[findLessonsUsingFile] Error:', error);
     return [];
@@ -166,16 +253,23 @@ export async function findLessonsUsingFile(
  *
  * @param metadata - Storage file metadata
  * @param referencedPaths - Set of paths referenced in lessons
- * @param usedInLessons - Array of lesson IDs using this file
- * @returns MediaFile object
+ * @param firestore - Firestore instance for fetching lesson data
+ * @returns MediaFile object or null if should be filtered
  */
 export async function convertToMediaFile(
   metadata: StorageFileMetadata,
   referencedPaths: Set<string>,
-  usedInLessons: string[]
+  firestore: FirebaseFirestore.Firestore
 ): Promise<MediaFile | null> {
   try {
     const filePath = metadata.name;
+
+    // Filter out medium and low quality renditions
+    if (!shouldIncludeInMediaList(filePath)) {
+      console.log('[convertToMediaFile] Skipping non-high quality rendition:', filePath);
+      return null;
+    }
+
     const size = parseInt(metadata.size, 10);
     const mediaType = getMediaTypeFromMimeType(metadata.contentType);
 
@@ -196,9 +290,46 @@ export async function convertToMediaFile(
     // Extract uploadedBy from metadata if available
     const uploadedBy = metadata.metadata?.uploadedBy || metadata.metadata?.uploaded_by;
 
+    // Find lessons using this file (with titles)
+    const usedInLessons = await findLessonsUsingFile(firestore, filePath);
+
+    // Set lesson title if used in exactly one lesson
+    let lessonTitle: string | undefined;
+    if (usedInLessons.length === 1) {
+      lessonTitle = usedInLessons[0].title;
+    }
+
+    // Get alternative versions for video/audio files
+    let alternativeVersions: AlternativeVersion[] | undefined;
+
+    // Extract lesson ID from path
+    const lessonId = extractLessonIdFromPath(filePath);
+
+    if (lessonId && (mediaType === 'video' || mediaType === 'audio')) {
+      // Check if this is a high quality file
+      const isHighQuality = filePath.includes('/high/');
+
+      if (isHighQuality) {
+        try {
+          // Fetch lesson data to get alternative versions
+          const lessonDoc = await firestore.collection('lessons').doc(lessonId).get();
+          if (lessonDoc.exists) {
+            const lessonData = lessonDoc.data();
+            alternativeVersions = await getAlternativeVersions(
+              lessonData,
+              mediaType === 'video'
+            );
+          }
+        } catch (error) {
+          console.warn('[convertToMediaFile] Failed to fetch alternative versions:', error);
+        }
+      }
+    }
+
     return {
       id: filePath,
       name: fileName,
+      lessonTitle,
       type: mediaType,
       size,
       url,
@@ -207,6 +338,7 @@ export async function convertToMediaFile(
       uploadedBy,
       usedInLessons,
       isOrphaned,
+      alternativeVersions,
     };
   } catch (error: any) {
     console.error('[convertToMediaFile] Error converting file:', metadata.name, error);
@@ -308,7 +440,9 @@ export function filterMediaFiles(
   // Filter by lesson usage
   if (query.lessonId) {
     const lessonId = query.lessonId;
-    filtered = filtered.filter((file) => file.usedInLessons.includes(lessonId));
+    filtered = filtered.filter((file) =>
+      file.usedInLessons.some(lesson => lesson.id === lessonId)
+    );
   }
 
   // Filter by orphaned status
