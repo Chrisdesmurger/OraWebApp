@@ -100,6 +100,8 @@ export function DateTimePicker({
   className,
   required = false,
 }: DateTimePickerProps) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
   // Convert ISO value to datetime-local format for input
   const localValue = isoToDateTimeLocal(value);
 
@@ -108,26 +110,39 @@ export function DateTimePicker({
   const maxLocal = maxDate ? isoToDateTimeLocal(maxDate) : undefined;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let localDateTime = e.target.value;
+    const localDateTime = e.target.value;
 
     if (!localDateTime) {
       onChange(null);
       return;
     }
 
-    // If user selected a date without time, normalize to midnight
-    // datetime-local input returns format: "2025-12-15T14:30" or just "2025-12-15"
-    if (!localDateTime.includes('T')) {
-      // If somehow just date is returned, add midnight time
-      localDateTime = `${localDateTime}T00:00`;
-    } else if (localDateTime.endsWith('T')) {
-      // If time part is empty, set to midnight
-      localDateTime = `${localDateTime}00:00`;
+    // Only process if we have a complete datetime (YYYY-MM-DDTHH:mm)
+    if (localDateTime.length === 16 && localDateTime.includes('T')) {
+      const isoDateTime = dateTimeLocalToIso(localDateTime);
+      onChange(isoDateTime);
     }
+  };
 
-    // Convert back to ISO 8601 for the API
-    const isoDateTime = dateTimeLocalToIso(localDateTime);
-    onChange(isoDateTime);
+  // When user clicks on the calendar and selects just a date,
+  // the input might not have time. Force it to midnight when user finishes.
+  const handleClick = () => {
+    if (!inputRef.current) return;
+
+    // Set up a timer to check if user selected date without time
+    setTimeout(() => {
+      if (!inputRef.current) return;
+      const val = inputRef.current.value;
+
+      // If value exists but incomplete (no time), add midnight
+      if (val && val.length >= 10 && !val.includes('T')) {
+        const dateWithMidnight = `${val.slice(0, 10)}T00:00`;
+        inputRef.current.value = dateWithMidnight;
+        // Trigger change handler manually
+        const event = new Event('change', { bubbles: true });
+        inputRef.current.dispatchEvent(event);
+      }
+    }, 100);
   };
 
   const handleClear = () => {
@@ -145,15 +160,27 @@ export function DateTimePicker({
 
       <div className="relative flex items-center gap-2">
         <input
+          ref={inputRef}
           type="datetime-local"
           value={localValue}
           onChange={handleChange}
+          onClick={handleClick}
           onBlur={(e) => {
-            // If user selected date but left time empty, set to midnight
+            // Final safety: if user somehow has incomplete datetime on blur, complete it
             const val = e.target.value;
-            if (val && val.length === 16 && val.endsWith('T')) {
-              e.target.value = `${val}00:00`;
-              handleChange(e as any);
+            if (val && val.length >= 10) {
+              let complete = val;
+              if (!val.includes('T')) {
+                complete = `${val.slice(0, 10)}T00:00`;
+              } else if (val.length < 16) {
+                // Has T but incomplete time
+                complete = `${val.slice(0, 10)}T00:00`;
+              }
+              if (complete !== val) {
+                e.target.value = complete;
+                const event = new Event('change', { bubbles: true });
+                e.target.dispatchEvent(event);
+              }
             }
           }}
           disabled={disabled}
