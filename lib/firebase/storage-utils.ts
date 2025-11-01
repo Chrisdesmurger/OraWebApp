@@ -35,7 +35,24 @@ interface StorageFileMetadata {
  */
 function shouldIncludeInMediaList(filePath: string): boolean {
   // Exclude medium and low quality versions
-  if (filePath.includes('/medium/') || filePath.includes('/low/')) {
+  // Check both path segments (e.g., "/medium/") and filenames (e.g., "medium.mp4", "low.mp4")
+  const pathLower = filePath.toLowerCase();
+
+  if (pathLower.includes('/medium/') || pathLower.includes('/low/')) {
+    return false;
+  }
+
+  // Extract filename from path
+  const fileName = filePath.split('/').pop() || '';
+  const fileNameLower = fileName.toLowerCase();
+
+  // Exclude files named "medium.*" or "low.*"
+  if (fileNameLower.startsWith('medium.') || fileNameLower.startsWith('low.')) {
+    return false;
+  }
+
+  // Exclude files with "_medium" or "_low" suffix before extension
+  if (fileNameLower.match(/(medium|low)\.(mp4|mp3|webm|ogg|m4a)/i)) {
     return false;
   }
 
