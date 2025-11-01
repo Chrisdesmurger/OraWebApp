@@ -130,13 +130,27 @@ export function MediaPreviewDialog({
               <h4 className="font-medium text-sm">Available Quality Versions</h4>
 
               {/* ORIGINAL quality (current file being viewed) */}
-              <div className="flex items-center justify-between p-3 bg-muted rounded border-2 border-primary">
+              <div
+                className={`flex items-center justify-between p-3 bg-muted rounded ${
+                  currentUrl === file.url ? 'border-2 border-primary' : 'border-2 border-transparent'
+                }`}
+              >
                 <div className="flex items-center gap-2">
                   <Badge variant="default">ORIGINAL</Badge>
                   <span className="text-sm font-medium">{formatBytes(file.size)}</span>
-                  <Badge variant="outline" className="text-xs">Current</Badge>
+                  {currentUrl === file.url && (
+                    <Badge variant="outline" className="text-xs">Current</Badge>
+                  )}
                 </div>
                 <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentUrl(file.url)}
+                  >
+                    <Play className="h-4 w-4 mr-1" />
+                    Play
+                  </Button>
                   <Button size="sm" variant="outline" asChild>
                     <a href={file.url} download>
                       <Download className="h-4 w-4 mr-1" />
@@ -150,13 +164,18 @@ export function MediaPreviewDialog({
               {file.alternativeVersions.map((version) => (
                 <div
                   key={version.quality}
-                  className="flex items-center justify-between p-3 bg-muted rounded"
+                  className={`flex items-center justify-between p-3 bg-muted rounded ${
+                    currentUrl === version.url ? 'border-2 border-primary' : 'border-2 border-transparent'
+                  }`}
                 >
                   <div className="flex items-center gap-3">
                     <Badge variant={version.quality === 'high' ? 'default' : 'secondary'}>
                       {version.quality.toUpperCase()}
                     </Badge>
                     <span className="text-sm">{version.sizeFormatted}</span>
+                    {currentUrl === version.url && (
+                      <Badge variant="outline" className="text-xs">Current</Badge>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <Button
