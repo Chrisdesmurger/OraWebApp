@@ -166,6 +166,11 @@ export async function POST(request: NextRequest) {
       mime_type: null,
       thumbnail_url: null,
 
+      // Scheduling (nullable, defaults to null)
+      scheduled_publish_at: null,
+      scheduled_archive_at: null,
+      auto_publish_enabled: false,
+
       // Ownership & timestamps
       author_id: user.uid,
       created_at: now,

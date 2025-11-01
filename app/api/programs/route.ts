@@ -112,6 +112,9 @@ export async function GET(request: NextRequest) {
  * - durationDays: number (1-365)
  * - lessons?: string[] (optional, lesson IDs)
  * - tags?: string[] (optional, max 10)
+ * - scheduledPublishAt?: string | null (ISO timestamp)
+ * - scheduledArchiveAt?: string | null (ISO timestamp)
+ * - autoPublishEnabled?: boolean
  */
 export async function POST(request: NextRequest) {
   try {
@@ -132,7 +135,19 @@ export async function POST(request: NextRequest) {
       return apiError(`Validation failed: ${errors}`, 400);
     }
 
-    const { title, description, category, difficulty, durationDays, lessons = [], tags = [], coverImageUrl = null } = validation.data;
+    const {
+      title,
+      description,
+      category,
+      difficulty,
+      durationDays,
+      lessons = [],
+      tags = [],
+      coverImageUrl = null,
+      scheduledPublishAt = null,
+      scheduledArchiveAt = null,
+      autoPublishEnabled = false,
+    } = validation.data;
 
     const firestore = getFirestore();
     const programRef = firestore.collection('programs').doc();
@@ -154,6 +169,9 @@ export async function POST(request: NextRequest) {
       tags,
       created_at: now,
       updated_at: now,
+      scheduled_publish_at: scheduledPublishAt,
+      scheduled_archive_at: scheduledArchiveAt,
+      auto_publish_enabled: autoPublishEnabled,
     };
 
     await programRef.set(programDocument);
@@ -171,11 +189,14 @@ export async function POST(request: NextRequest) {
       request,
     });
 
-    console.log('[POST /api/programs] Created program:', program.id);
+    console.log('[POST /api/programs] Created program:', program.id, 'with scheduling:', {
+      scheduledPublishAt,
+      scheduledArchiveAt,
+      autoPublishEnabled,
+    });
     return apiSuccess(program, 201);
   } catch (error: any) {
     console.error('POST /api/programs error:', error);
     return apiError(error.message || 'Failed to create program', 500);
   }
 }
-

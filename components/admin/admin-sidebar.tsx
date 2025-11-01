@@ -14,6 +14,7 @@ import {
   Terminal,
   BarChart3,
   FileText,
+  Calendar,
   Menu,
   X,
 } from 'lucide-react';
@@ -61,6 +62,12 @@ const navItems: NavItem[] = [
     href: '/admin/stats',
     icon: BarChart3,
     permission: 'canViewStats',
+  },
+  {
+    title: 'Scheduled Content',
+    href: '/admin/scheduled-content',
+    icon: Calendar,
+    permission: 'canViewPrograms', // Same permission as programs since it shows scheduled programs/lessons
   },
   {
     title: 'Audit Logs',

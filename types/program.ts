@@ -43,6 +43,11 @@ export interface ProgramDocument {
   tags: string[];
   created_at: string;  // ISO timestamp
   updated_at: string;  // ISO timestamp
+
+  // Scheduling fields (Issue #22)
+  scheduled_publish_at: string | null;  // ISO timestamp
+  scheduled_archive_at: string | null;  // ISO timestamp
+  auto_publish_enabled: boolean;
 }
 
 // ============================================================================
@@ -68,6 +73,11 @@ export interface Program {
   tags: string[];
   createdAt: string;  // ISO timestamp
   updatedAt: string;  // ISO timestamp
+
+  // Scheduling fields (Issue #22)
+  scheduledPublishAt: string | null;  // ISO timestamp
+  scheduledArchiveAt: string | null;  // ISO timestamp
+  autoPublishEnabled: boolean;
 }
 
 // ============================================================================
@@ -101,6 +111,9 @@ export interface CreateProgramRequest {
   durationDays: number;
   lessons?: string[];  // Optional: can be added later
   tags?: string[];
+  scheduledPublishAt?: string | null;  // ISO timestamp
+  scheduledArchiveAt?: string | null;  // ISO timestamp
+  autoPublishEnabled?: boolean;
 }
 
 /**
@@ -130,6 +143,9 @@ export interface UpdateProgramRequest {
   coverImageUrl?: string | null;
   status?: ProgramStatus;
   tags?: string[];
+  scheduledPublishAt?: string | null;  // ISO timestamp
+  scheduledArchiveAt?: string | null;  // ISO timestamp
+  autoPublishEnabled?: boolean;
 }
 
 /**
@@ -194,6 +210,9 @@ export function mapProgramFromFirestore(id: string, doc: ProgramDocument): Progr
     tags: doc.tags || [],
     createdAt: doc.created_at,
     updatedAt: doc.updated_at,
+    scheduledPublishAt: doc.scheduled_publish_at || null,
+    scheduledArchiveAt: doc.scheduled_archive_at || null,
+    autoPublishEnabled: doc.auto_publish_enabled || false,
   };
 }
 
@@ -229,6 +248,9 @@ export function mapProgramToFirestore(program: Omit<Program, 'id'>): ProgramDocu
     tags: program.tags || [],
     created_at: program.createdAt,
     updated_at: program.updatedAt,
+    scheduled_publish_at: program.scheduledPublishAt || null,
+    scheduled_archive_at: program.scheduledArchiveAt || null,
+    auto_publish_enabled: program.autoPublishEnabled || false,
   };
 }
 

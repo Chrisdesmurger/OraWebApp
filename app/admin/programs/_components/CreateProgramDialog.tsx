@@ -34,8 +34,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, X } from 'lucide-react';
+import { DateTimePicker } from '@/components/ui/datetime-picker';
+import { Loader2, X, Calendar } from 'lucide-react';
 
 interface CreateProgramDialogProps {
   open: boolean;
@@ -62,6 +65,9 @@ export function CreateProgramDialog({
       durationDays: 7,
       tags: [],
       lessons: [],
+      scheduledPublishAt: null,
+      scheduledArchiveAt: null,
+      autoPublishEnabled: false,
     },
   });
 
@@ -260,6 +266,81 @@ export function CreateProgramDialog({
                 </FormItem>
               )}
             />
+
+            {/* Scheduling Section */}
+            <Separator className="my-6" />
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+                <h3 className="text-lg font-semibold">Scheduling (Optional)</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Schedule when this program should be automatically published or archived
+              </p>
+
+              {/* Auto-Publish Enabled Toggle */}
+              <FormField
+                control={form.control}
+                name="autoPublishEnabled"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Enable Auto-Publishing</FormLabel>
+                      <FormDescription>
+                        Automatically publish/archive at scheduled times
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {/* Scheduled Publish Date */}
+              <FormField
+                control={form.control}
+                name="scheduledPublishAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <DateTimePicker
+                      value={field.value || null}
+                      onChange={field.onChange}
+                      disabled={isSubmitting}
+                      label="Scheduled Publish Date"
+                      description="When should this program be automatically published?"
+                      minDate={new Date().toISOString()}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Scheduled Archive Date */}
+              <FormField
+                control={form.control}
+                name="scheduledArchiveAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <DateTimePicker
+                      value={field.value || null}
+                      onChange={field.onChange}
+                      disabled={isSubmitting}
+                      label="Scheduled Archive Date"
+                      description="When should this program be automatically archived?"
+                      minDate={form.watch('scheduledPublishAt') || new Date().toISOString()}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <Separator className="my-6" />
 
             {/* Tags */}
             <FormItem>

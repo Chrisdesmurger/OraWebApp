@@ -33,6 +33,62 @@ export const programStatusSchema = z.enum(['draft', 'published', 'archived'], {
 });
 
 // ============================================================================
+// Scheduling Validation Helpers
+// ============================================================================
+
+/**
+ * ISO timestamp string validation
+ */
+const isoTimestampSchema = z
+  .string()
+  .datetime({ message: 'Must be a valid ISO 8601 timestamp' })
+  .nullable()
+  .optional();
+
+/**
+ * Custom refinement to ensure publish date is before archive date
+ */
+function validateSchedulingDates(data: {
+  scheduledPublishAt?: string | null;
+  scheduledArchiveAt?: string | null;
+}): boolean {
+  if (!data.scheduledPublishAt || !data.scheduledArchiveAt) {
+    return true; // Skip validation if either is missing
+  }
+
+  const publishDate = new Date(data.scheduledPublishAt);
+  const archiveDate = new Date(data.scheduledArchiveAt);
+
+  return publishDate < archiveDate;
+}
+
+/**
+ * Custom refinement to ensure scheduled dates are in the future
+ */
+function validateFutureDates(data: {
+  scheduledPublishAt?: string | null;
+  scheduledArchiveAt?: string | null;
+}): boolean {
+  const now = new Date();
+
+  if (data.scheduledPublishAt) {
+    const publishDate = new Date(data.scheduledPublishAt);
+    if (publishDate <= now) {
+      return false;
+    }
+  }
+
+  if (data.scheduledArchiveAt) {
+    const archiveDate = new Date(data.scheduledArchiveAt);
+    if (archiveDate <= now) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// ============================================================================
 // Create Program Schema
 // ============================================================================
 
@@ -79,6 +135,17 @@ export const createProgramSchema = z.object({
     .url('Cover image URL must be a valid URL')
     .nullable()
     .optional(),
+
+  // Scheduling fields (Issue #22)
+  scheduledPublishAt: isoTimestampSchema,
+  scheduledArchiveAt: isoTimestampSchema,
+  autoPublishEnabled: z.boolean().optional().default(false),
+}).refine(validateSchedulingDates, {
+  message: 'Scheduled publish date must be before scheduled archive date',
+  path: ['scheduledArchiveAt'],
+}).refine(validateFutureDates, {
+  message: 'Scheduled dates must be in the future',
+  path: ['scheduledPublishAt'],
 });
 
 // ============================================================================
@@ -129,10 +196,18 @@ export const updateProgramSchema = z.object({
     .array(z.string())
     .max(10, 'Maximum 10 tags allowed')
     .optional(),
+
+  // Scheduling fields (Issue #22)
+  scheduledPublishAt: isoTimestampSchema,
+  scheduledArchiveAt: isoTimestampSchema,
+  autoPublishEnabled: z.boolean().optional(),
 }).refine(
   (data) => Object.keys(data).length > 0,
   { message: 'At least one field must be provided for update' }
-);
+).refine(validateSchedulingDates, {
+  message: 'Scheduled publish date must be before scheduled archive date',
+  path: ['scheduledArchiveAt'],
+});
 
 // ============================================================================
 // Update Lessons Schema

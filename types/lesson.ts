@@ -54,6 +54,11 @@ export interface LessonDocument {
   author_id: string;
   thumbnail_url?: string | null;
   mime_type?: string | null;
+
+  // Scheduling fields (Issue #22)
+  scheduled_publish_at: string | null;  // ISO timestamp
+  scheduled_archive_at: string | null;  // ISO timestamp
+  auto_publish_enabled: boolean;
 }
 
 /**
@@ -80,6 +85,11 @@ export interface Lesson {
   authorId: string;
   thumbnailUrl?: string | null;
   mimeType?: string | null;
+
+  // Scheduling fields (Issue #22)
+  scheduledPublishAt: string | null;  // ISO timestamp
+  scheduledArchiveAt: string | null;  // ISO timestamp
+  autoPublishEnabled: boolean;
 }
 
 /**
@@ -93,6 +103,9 @@ export interface CreateLessonRequest {
   order?: number;
   tags?: string[];
   transcript?: string;
+  scheduledPublishAt?: string | null;  // ISO timestamp
+  scheduledArchiveAt?: string | null;  // ISO timestamp
+  autoPublishEnabled?: boolean;
 }
 
 /**
@@ -104,6 +117,9 @@ export interface UpdateLessonRequest {
   order?: number;
   tags?: string[];
   transcript?: string;
+  scheduledPublishAt?: string | null;  // ISO timestamp
+  scheduledArchiveAt?: string | null;  // ISO timestamp
+  autoPublishEnabled?: boolean;
 }
 
 /**
@@ -140,6 +156,9 @@ export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson 
     authorId: doc.author_id,
     thumbnailUrl: doc.thumbnail_url,
     mimeType: doc.mime_type,
+    scheduledPublishAt: doc.scheduled_publish_at || null,
+    scheduledArchiveAt: doc.scheduled_archive_at || null,
+    autoPublishEnabled: doc.auto_publish_enabled || false,
   };
 }
 
@@ -168,6 +187,9 @@ export function mapLessonToFirestore(lesson: Partial<Lesson>): Partial<LessonDoc
   if (lesson.authorId !== undefined) doc.author_id = lesson.authorId;
   if (lesson.thumbnailUrl !== undefined) doc.thumbnail_url = lesson.thumbnailUrl;
   if (lesson.mimeType !== undefined) doc.mime_type = lesson.mimeType;
+  if (lesson.scheduledPublishAt !== undefined) doc.scheduled_publish_at = lesson.scheduledPublishAt;
+  if (lesson.scheduledArchiveAt !== undefined) doc.scheduled_archive_at = lesson.scheduledArchiveAt;
+  if (lesson.autoPublishEnabled !== undefined) doc.auto_publish_enabled = lesson.autoPublishEnabled;
 
   return doc;
 }
