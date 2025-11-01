@@ -4,7 +4,7 @@
  * Helper functions for analyzing and managing media files in Firebase Storage.
  */
 
-import { getStorage } from '@/lib/firebase/admin';
+import { getStorage, getFirestore } from '@/lib/firebase/admin';
 import { getSignedUrl } from '@/lib/storage';
 import type { MediaFile, MediaType, LessonReference, AlternativeVersion } from '@/types/media';
 import { getMediaTypeFromMimeType, formatBytes } from '@/types/media';
@@ -28,42 +28,47 @@ interface StorageFileMetadata {
 /**
  * Determine if a file should be included in the main media list
  *
- * Filters out medium and low quality renditions - only show high quality
+ * ONLY show ORIGINAL files - exclude all renditions (high, medium, low)
  *
  * @param filePath - Storage file path
  * @returns True if file should be included in list
  */
 function shouldIncludeInMediaList(filePath: string): boolean {
-  // Exclude medium and low quality versions
-  // Check both path segments (e.g., "/medium/") and filenames (e.g., "medium.mp4", "low.mp4")
+  // ONLY include original files
+  // Original files are stored in: media/lessons/{id}/original/
+
+  // Exclude all renditions (high, medium, low)
   const pathLower = filePath.toLowerCase();
 
-  if (pathLower.includes('/medium/') || pathLower.includes('/low/')) {
+  if (pathLower.includes('/high/') ||
+      pathLower.includes('/medium/') ||
+      pathLower.includes('/low/')) {
     return false;
   }
 
-  // Extract filename from path
+  // Exclude filename patterns
   const fileName = filePath.split('/').pop() || '';
   const fileNameLower = fileName.toLowerCase();
 
-  // Exclude files named "medium.*" or "low.*"
-  if (fileNameLower.startsWith('medium.') || fileNameLower.startsWith('low.')) {
+  if (fileNameLower.startsWith('high.') ||
+      fileNameLower.startsWith('medium.') ||
+      fileNameLower.startsWith('low.') ||
+      fileNameLower.match(/(high|medium|low)\.(mp4|mp3|webm|ogg|m4a)/i)) {
     return false;
   }
 
-  // Exclude files with "_medium" or "_low" suffix before extension
-  if (fileNameLower.match(/(medium|low)\.(mp4|mp3|webm|ogg|m4a)/i)) {
-    return false;
+  // ONLY include files in /original/ directory OR standalone files
+  if (pathLower.includes('/original/') || !pathLower.match(/\/(high|medium|low)\//)) {
+    return true;
   }
 
-  // Include high quality, original, and standalone files
-  return true;
+  return false;
 }
 
 /**
  * Extract lesson ID from a storage path
  *
- * @param filePath - Storage file path (e.g., "media/lessons/lesson123/high/video.mp4")
+ * @param filePath - Storage file path (e.g., "media/lessons/lesson123/original/video.mp4")
  * @returns Lesson ID or null
  */
 function extractLessonIdFromPath(filePath: string): string | null {
@@ -73,7 +78,8 @@ function extractLessonIdFromPath(filePath: string): string | null {
 }
 
 /**
- * Get alternative quality versions for a high quality file
+ * Get alternative quality versions for an original file
+ * Includes HIGH, MEDIUM, and LOW quality renditions
  *
  * @param lessonData - Lesson document data
  * @param isVideo - True for video, false for audio
@@ -91,7 +97,23 @@ async function getAlternativeVersions(
     return versions;
   }
 
-  // Check medium version
+  // Add HIGH quality version
+  if (variants.high?.path) {
+    try {
+      const url = await getSignedUrl(variants.high.path, 60);
+      versions.push({
+        quality: 'high',
+        path: variants.high.path,
+        url,
+        size: variants.high.size_bytes || 0,
+        sizeFormatted: formatBytes(variants.high.size_bytes || 0),
+      });
+    } catch (error) {
+      console.warn('[getAlternativeVersions] Failed to get URL for high quality:', error);
+    }
+  }
+
+  // Add MEDIUM quality version
   if (variants.medium?.path) {
     try {
       const url = await getSignedUrl(variants.medium.path, 60);
@@ -107,7 +129,7 @@ async function getAlternativeVersions(
     }
   }
 
-  // Check low version
+  // Add LOW quality version
   if (variants.low?.path) {
     try {
       const url = await getSignedUrl(variants.low.path, 60);
@@ -124,6 +146,61 @@ async function getAlternativeVersions(
   }
 
   return versions;
+}
+
+/**
+ * Get all file paths related to a media file (original + all renditions)
+ *
+ * @param firestore - Firestore instance
+ * @param originalFilePath - Path to the original file
+ * @returns Array of all related file paths to delete
+ */
+export async function getAllRelatedFilePaths(
+  firestore: FirebaseFirestore.Firestore,
+  originalFilePath: string
+): Promise<string[]> {
+  const paths: string[] = [originalFilePath];
+
+  try {
+    // Extract lesson ID from path
+    const lessonId = extractLessonIdFromPath(originalFilePath);
+
+    if (!lessonId) {
+      // Not a lesson file, return just the original
+      return paths;
+    }
+
+    // Fetch lesson document
+    const lessonDoc = await firestore.collection('lessons').doc(lessonId).get();
+
+    if (!lessonDoc.exists) {
+      return paths;
+    }
+
+    const lessonData = lessonDoc.data();
+
+    // Add video renditions
+    if (lessonData?.renditions) {
+      if (lessonData.renditions.high?.path) paths.push(lessonData.renditions.high.path);
+      if (lessonData.renditions.medium?.path) paths.push(lessonData.renditions.medium.path);
+      if (lessonData.renditions.low?.path) paths.push(lessonData.renditions.low.path);
+    }
+
+    // Add audio variants
+    if (lessonData?.audio_variants) {
+      if (lessonData.audio_variants.high?.path) paths.push(lessonData.audio_variants.high.path);
+      if (lessonData.audio_variants.medium?.path) paths.push(lessonData.audio_variants.medium.path);
+      if (lessonData.audio_variants.low?.path) paths.push(lessonData.audio_variants.low.path);
+    }
+
+    console.log('[getAllRelatedFilePaths] Found', paths.length, 'files to delete for:', originalFilePath);
+
+    return paths;
+  } catch (error: any) {
+    console.error('[getAllRelatedFilePaths] Error:', error);
+    // Return at least the original file
+    return paths;
+  }
 }
 
 /**
@@ -281,9 +358,9 @@ export async function convertToMediaFile(
   try {
     const filePath = metadata.name;
 
-    // Filter out medium and low quality renditions
+    // Filter out high, medium and low quality renditions - only show originals
     if (!shouldIncludeInMediaList(filePath)) {
-      console.log('[convertToMediaFile] Skipping non-high quality rendition:', filePath);
+      console.log('[convertToMediaFile] Skipping rendition:', filePath);
       return null;
     }
 
@@ -323,12 +400,12 @@ export async function convertToMediaFile(
     const lessonId = extractLessonIdFromPath(filePath);
 
     if (lessonId && (mediaType === 'video' || mediaType === 'audio')) {
-      // Check if this is a high quality file
-      const isHighQuality = filePath.includes('/high/');
+      // Check if this is an original file
+      const isOriginal = filePath.includes('/original/');
 
-      if (isHighQuality) {
+      if (isOriginal) {
         try {
-          // Fetch lesson data to get alternative versions
+          // Fetch lesson data to get ALL renditions (high, medium, low)
           const lessonDoc = await firestore.collection('lessons').doc(lessonId).get();
           if (lessonDoc.exists) {
             const lessonData = lessonDoc.data();
