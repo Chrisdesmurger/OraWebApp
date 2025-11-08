@@ -11,7 +11,7 @@ import { logAuditEvent } from '@/lib/audit/logger';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const currentUser = await authenticateRequest(request);
@@ -20,7 +20,7 @@ export async function GET(
       return apiError('Insufficient permissions', 403);
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return apiError('Configuration ID is required', 400);

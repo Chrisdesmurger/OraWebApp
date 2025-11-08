@@ -12,7 +12,7 @@ import type { OnboardingConfig } from '@/types/onboarding';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const currentUser = await authenticateRequest(request);
@@ -21,7 +21,7 @@ export async function POST(
       return apiError('Only admins can publish onboarding configurations', 403);
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     if (!id) {
       return apiError('Configuration ID is required', 400);
