@@ -136,7 +136,7 @@ export async function PUT(
       resourceId: id,
       actorId: currentUser.uid,
       actorEmail: currentUser.email || 'unknown',
-      metadata: {
+      changesAfter: {
         version: existingData.version,
         updatedFields: Object.keys(updates),
       },
@@ -201,7 +201,7 @@ export async function DELETE(
       resourceId: id,
       actorId: currentUser.uid,
       actorEmail: currentUser.email || 'unknown',
-      metadata: {
+      changesAfter: {
         version: data.version,
         status: data.status,
       },

@@ -83,7 +83,7 @@ export async function POST(
       resourceId: id,
       actorId: currentUser.uid,
       actorEmail: currentUser.email || 'unknown',
-      metadata: {
+      changesAfter: {
         version: data.version,
         questionCount: data.questions.length,
       },

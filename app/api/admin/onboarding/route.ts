@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       resourceId: docRef.id,
       actorId: currentUser.uid,
       actorEmail: currentUser.email || 'unknown',
-      metadata: {
+      changesAfter: {
         version: versionNumber,
         questionCount: questionsWithIds.length,
       },

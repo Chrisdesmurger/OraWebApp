@@ -60,7 +60,7 @@ export async function GET(
       resourceId: id,
       actorId: currentUser.uid,
       actorEmail: currentUser.email || 'unknown',
-      metadata: {
+      changesAfter: {
         version: configData?.version,
         format,
         responseCount: responsesSnapshot.size,

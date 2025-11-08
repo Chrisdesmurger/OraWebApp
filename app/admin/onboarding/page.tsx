@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { hasPermission } from '@/lib/rbac';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import type { OnboardingConfig } from '@/types/onboarding';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +21,6 @@ export default function OnboardingPage() {
   const [statusFilter, setStatusFilter] = React.useState<'all' | 'draft' | 'active' | 'archived'>('all');
 
   const canCreate = currentUser?.role === 'admin';
-  const canView = currentUser?.role && hasPermission(currentUser.role, 'canViewAnalytics');
 
   const fetchConfigs = React.useCallback(async () => {
     try {
