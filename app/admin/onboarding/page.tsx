@@ -12,6 +12,23 @@ import { Search, Plus, Settings, BarChart3 } from 'lucide-react';
 import { OnboardingTable } from './_components/OnboardingTable';
 import Link from 'next/link';
 
+
+// Helper function to convert Firestore timestamp to Date
+function toDate(timestamp: any): Date {
+  if (!timestamp) return new Date();
+  if (timestamp instanceof Date) return timestamp;
+  if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+    return timestamp.toDate();
+  }
+  if (timestamp.seconds) {
+    return new Date(timestamp.seconds * 1000);
+  }
+  if (timestamp._seconds) {
+    return new Date(timestamp._seconds * 1000);
+  }
+  return new Date(timestamp);
+}
+
 export default function OnboardingPage() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -160,7 +177,7 @@ export default function OnboardingPage() {
                 <p className="text-xs text-green-600 mt-1">
                   {activeConfig.questions.length} questions • Published on{' '}
                   {activeConfig.publishedAt
-                    ? new Date(activeConfig.publishedAt as any).toLocaleDateString()
+                    ? toDate(activeConfig.publishedAt).toLocaleDateString()
                     : 'Unknown'}
                 </p>
               </div>

@@ -28,6 +28,23 @@ interface OnboardingTableProps {
   canEdit: boolean;
 }
 
+// Helper function to convert Firestore timestamp to Date
+function toDate(timestamp: any): Date {
+  if (!timestamp) return new Date();
+  if (timestamp instanceof Date) return timestamp;
+  if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+    return timestamp.toDate();
+  }
+  if (timestamp.seconds) {
+    return new Date(timestamp.seconds * 1000);
+  }
+  if (timestamp._seconds) {
+    return new Date(timestamp._seconds * 1000);
+  }
+  return new Date(timestamp);
+}
+
+
 export function OnboardingTable({ configs, onPublish, onDelete, canEdit }: OnboardingTableProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -81,12 +98,12 @@ export function OnboardingTable({ configs, onPublish, onDelete, canEdit }: Onboa
               </TableCell>
               <TableCell>
                 <span className="text-sm text-muted-foreground">
-                  {new Date(config.createdAt as any).toLocaleDateString()}
+                  {toDate(config.createdAt).toLocaleDateString()}
                 </span>
               </TableCell>
               <TableCell>
                 <span className="text-sm text-muted-foreground">
-                  {new Date(config.updatedAt as any).toLocaleDateString()}
+                  {toDate(config.updatedAt).toLocaleDateString()}
                 </span>
               </TableCell>
               {canEdit && (
