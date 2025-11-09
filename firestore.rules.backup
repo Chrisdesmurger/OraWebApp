@@ -212,30 +212,6 @@ service cloud.firestore {
     }
 
     // ==========================================
-    // COLLECTION: onboarding_configs/{configId}
-    // Admin Web: Onboarding questionnaire configurations
-    // Android App: Read access to active configs only
-    // ==========================================
-    match /onboarding_configs/{configId} {
-      // Read: Active configs for all authenticated users
-      //       All configs for admin/teachers
-      allow read: if isAuthenticated() && (
-        resource.data.status == 'active' ||
-        isAdmin() ||
-        isTeacher()
-      );
-
-      // Create: Admin only
-      allow create: if isAdmin() && validateOnboardingConfig(request.resource.data);
-
-      // Update: Admin only
-      allow update: if isAdmin() && validateOnboardingConfig(request.resource.data);
-
-      // Delete: Admin only (cannot delete active configs - must archive first)
-      allow delete: if isAdmin() && resource.data.status != 'active';
-    }
-
-    // ==========================================
     // VALIDATION FUNCTIONS
     // ==========================================
 
@@ -268,24 +244,6 @@ service cloud.firestore {
           && data.lessons.size() <= 100
           && data.tags is list
           && data.tags.size() <= 10;
-    }
-
-    // Validate onboarding configuration
-    function validateOnboardingConfig(data) {
-      return data.title is string
-          && data.title.size() >= 3
-          && data.title.size() <= 200
-          && data.description is string
-          && data.description.size() >= 10
-          && data.description.size() <= 1000
-          && data.status in ['draft', 'active', 'archived']
-          && data.version is string
-          && data.questions is list
-          && data.questions.size() >= 1
-          && data.questions.size() <= 50
-          && data.createdBy is string
-          && data.createdAt is timestamp
-          && data.updatedAt is timestamp;
     }
 
     // ==========================================

@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   Image,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -59,6 +60,11 @@ const navItems: NavItem[] = [
     permission: 'canViewMedia',
   },
   {
+    title: 'Onboarding',
+    href: '/admin/onboarding',
+    icon: ClipboardList,
+  },
+  {
     title: 'Commands',
     href: '/admin/commands',
     icon: Terminal,
@@ -98,7 +104,6 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
 
     return navItems.filter((item) => {
       if (!item.permission) return true;
-      // user.role is guaranteed to exist here because of the guard above
       return hasPermission(user.role!, item.permission as any);
     });
   }, [user?.role]);

@@ -13,12 +13,33 @@
 // Enums & Constants
 // ============================================================================
 
-export type AuditAction = 'create' | 'update' | 'delete' | 'role_change' | 'status_change';
-export type ResourceType = 'user' | 'program' | 'lesson';
+export type AuditAction =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'role_change'
+  | 'status_change'
+  | 'onboarding.created'
+  | 'onboarding.updated'
+  | 'onboarding.published'
+  | 'onboarding.deleted'
+  | 'onboarding.exported';
 
-export const AUDIT_ACTIONS: AuditAction[] = ['create', 'update', 'delete', 'role_change', 'status_change'];
-export const RESOURCE_TYPES: ResourceType[] = ['user', 'program', 'lesson'];
+export type ResourceType = 'user' | 'program' | 'lesson' | 'onboarding_config' | 'onboarding_responses';
 
+export const AUDIT_ACTIONS: AuditAction[] = [
+  'create',
+  'update',
+  'delete',
+  'role_change',
+  'status_change',
+  'onboarding.created',
+  'onboarding.updated',
+  'onboarding.published',
+  'onboarding.deleted',
+  'onboarding.exported'
+];
+export const RESOURCE_TYPES: ResourceType[] = ['user', 'program', 'lesson', 'onboarding_config', 'onboarding_responses'];
 // ============================================================================
 // Firestore Document Interface (snake_case)
 // ============================================================================
