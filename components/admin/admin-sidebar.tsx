@@ -80,7 +80,7 @@ const navItems: NavItem[] = [
     title: 'Scheduled Content',
     href: '/admin/scheduled-content',
     icon: Calendar,
-    permission: 'canViewPrograms',
+    permission: 'canViewPrograms', // Same permission as programs since it shows scheduled programs/lessons
   },
   {
     title: 'Audit Logs',
