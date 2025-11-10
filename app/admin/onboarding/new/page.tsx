@@ -148,7 +148,8 @@ export default function NewOnboardingPage() {
         return;
       }
 
-      if (q.options.length === 0) {
+      // Les sliders et circular pickers n'ont pas besoin d'options
+      if (q.type.kind !== 'slider' && q.type.kind !== 'circular_picker' && q.options.length === 0) {
         toast({
           title: 'Erreur',
           description: 'Toutes les questions doivent avoir au moins une option',
@@ -292,6 +293,11 @@ export default function NewOnboardingPage() {
                             {question.type.kind === 'rating' && 'Notation'}
                             {question.type.kind === 'text_input' && 'Texte libre'}
                             {question.type.kind === 'time_selection' && 'Sélection de temps'}
+                            {question.type.kind === 'grid_selection' && 'Grille de sélection'}
+                            {question.type.kind === 'toggle_list' && 'Liste à bascule'}
+                            {question.type.kind === 'slider' && 'Curseur'}
+                            {question.type.kind === 'circular_picker' && 'Sélecteur circulaire'}
+                            {question.type.kind === 'image_card' && 'Cartes avec images'}
                           </CardDescription>
                         </div>
                       </div>
@@ -352,57 +358,234 @@ export default function NewOnboardingPage() {
                         <option value="rating">Notation</option>
                         <option value="text_input">Texte libre</option>
                         <option value="time_selection">Sélection de temps</option>
+                        <option value="grid_selection">Grille de sélection</option>
+                        <option value="toggle_list">Liste à bascule</option>
+                        <option value="slider">Curseur</option>
+                        <option value="circular_picker">Sélecteur circulaire</option>
+                        <option value="image_card">Cartes avec images</option>
                       </select>
                     </div>
 
-                    {/* Options de réponse */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label>Options de réponse ({question.options.length})</Label>
-                        <Button
-                          type="button"
-                          onClick={() => addOption(question.tempId)}
-                          variant="outline"
-                          size="sm"
+                    {/* Configuration spécifique par type */}
+                    {question.type.kind === 'multiple_choice' && (
+                      <div className="space-y-2 p-4 bg-muted/50 rounded-md">
+                        <Label>Mode d&apos;affichage</Label>
+                        <select
+                          className="w-full px-3 py-2 border rounded-md"
+                          value={question.type.displayMode || 'list'}
+                          onChange={(e) =>
+                            updateQuestion(question.tempId, {
+                              type: { ...question.type, displayMode: e.target.value as any },
+                            })
+                          }
                         >
-                          <Plus className="h-3 w-3 mr-1" />
-                          Option
-                        </Button>
+                          <option value="list">Liste</option>
+                          <option value="grid">Grille</option>
+                        </select>
                       </div>
+                    )}
 
-                      {question.options.map((option) => (
-                        <div key={option.id} className="flex gap-2">
-                          <Input
-                            value={option.label}
+                    {question.type.kind === 'grid_selection' && (
+                      <div className="space-y-2 p-4 bg-muted/50 rounded-md">
+                        <Label>Nombre de colonnes</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="4"
+                          value={question.type.gridColumns || 2}
+                          onChange={(e) =>
+                            updateQuestion(question.tempId, {
+                              type: { ...question.type, gridColumns: parseInt(e.target.value) },
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+
+                    {question.type.kind === 'rating' && (
+                      <div className="space-y-2 p-4 bg-muted/50 rounded-md">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`showLabels_${question.tempId}`}
+                            checked={question.type.showLabels || false}
                             onChange={(e) =>
-                              updateOption(question.tempId, option.id, {
-                                label: e.target.value,
+                              updateQuestion(question.tempId, {
+                                type: { ...question.type, showLabels: e.target.checked },
                               })
                             }
-                            placeholder="Label de l'option"
-                            className="flex-1"
                           />
+                          <Label htmlFor={`showLabels_${question.tempId}`}>Afficher les labels sous les icônes</Label>
+                        </div>
+                      </div>
+                    )}
+
+                    {question.type.kind === 'text_input' && (
+                      <div className="space-y-4 p-4 bg-muted/50 rounded-md">
+                        <div className="space-y-2">
+                          <Label>Nombre de lignes</Label>
                           <Input
-                            value={option.icon || ''}
+                            type="number"
+                            min="1"
+                            max="10"
+                            value={question.type.maxLines || 1}
                             onChange={(e) =>
-                              updateOption(question.tempId, option.id, {
-                                icon: e.target.value,
+                              updateQuestion(question.tempId, {
+                                type: { ...question.type, maxLines: parseInt(e.target.value) },
                               })
                             }
-                            placeholder="Emoji"
-                            className="w-20"
                           />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Nombre maximum de caractères</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="5000"
+                            value={question.type.maxCharacters || 500}
+                            onChange={(e) =>
+                              updateQuestion(question.tempId, {
+                                type: { ...question.type, maxCharacters: parseInt(e.target.value) },
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Placeholder</Label>
+                          <Input
+                            value={question.type.placeholder || ''}
+                            onChange={(e) =>
+                              updateQuestion(question.tempId, {
+                                type: { ...question.type, placeholder: e.target.value },
+                              })
+                            }
+                            placeholder="Texte d'aide..."
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {(question.type.kind === 'slider' || question.type.kind === 'circular_picker') && (
+                      <div className="space-y-4 p-4 bg-muted/50 rounded-md">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Valeur minimale</Label>
+                            <Input
+                              type="number"
+                              value={question.type.sliderMin || 0}
+                              onChange={(e) =>
+                                updateQuestion(question.tempId, {
+                                  type: { ...question.type, sliderMin: parseInt(e.target.value) },
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Valeur maximale</Label>
+                            <Input
+                              type="number"
+                              value={question.type.sliderMax || 100}
+                              onChange={(e) =>
+                                updateQuestion(question.tempId, {
+                                  type: { ...question.type, sliderMax: parseInt(e.target.value) },
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Pas (step)</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={question.type.sliderStep || 1}
+                              onChange={(e) =>
+                                updateQuestion(question.tempId, {
+                                  type: { ...question.type, sliderStep: parseInt(e.target.value) },
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Unité</Label>
+                            <Input
+                              value={question.type.sliderUnit || ''}
+                              onChange={(e) =>
+                                updateQuestion(question.tempId, {
+                                  type: { ...question.type, sliderUnit: e.target.value },
+                                })
+                              }
+                              placeholder="minutes, jours..."
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Options de réponse */}
+                    {question.type.kind !== 'slider' && question.type.kind !== 'circular_picker' && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Options de réponse ({question.options.length})</Label>
                           <Button
                             type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeOption(question.tempId, option.id)}
+                            onClick={() => addOption(question.tempId)}
+                            variant="outline"
+                            size="sm"
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                            <Plus className="h-3 w-3 mr-1" />
+                            Option
                           </Button>
                         </div>
-                      ))}
-                    </div>
+
+                        {question.options.map((option) => (
+                          <div key={option.id} className="flex gap-2">
+                            <Input
+                              value={option.label}
+                              onChange={(e) =>
+                                updateOption(question.tempId, option.id, {
+                                  label: e.target.value,
+                                })
+                              }
+                              placeholder="Label de l'option"
+                              className="flex-1"
+                            />
+                            <Input
+                              value={option.icon || ''}
+                              onChange={(e) =>
+                                updateOption(question.tempId, option.id, {
+                                  icon: e.target.value,
+                                })
+                              }
+                              placeholder="Emoji"
+                              className="w-20"
+                            />
+                            {question.type.kind === 'grid_selection' && (
+                              <Input
+                                value={option.color || ''}
+                                onChange={(e) =>
+                                  updateOption(question.tempId, option.id, {
+                                    color: e.target.value,
+                                  })
+                                }
+                                placeholder="#FF5733"
+                                className="w-24"
+                                type="color"
+                              />
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeOption(question.tempId, option.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))

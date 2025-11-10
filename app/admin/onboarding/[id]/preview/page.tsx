@@ -20,6 +20,8 @@ export default function PreviewOnboardingPage() {
   const [config, setConfig] = React.useState<OnboardingConfig | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = React.useState(0);
   const [selectedOptions, setSelectedOptions] = React.useState<Record<string, string[]>>({});
+  const [textInputs, setTextInputs] = React.useState<Record<string, string>>({});
+  const [numericValues, setNumericValues] = React.useState<Record<string, number>>({});
 
   React.useEffect(() => {
     const fetchConfig = async () => {
@@ -108,6 +110,19 @@ export default function PreviewOnboardingPage() {
   const canGoNext = () => {
     if (!currentQuestion.required) return true;
     const questionId = currentQuestion.id;
+
+    // Text input questions
+    if (currentQuestion.type.kind === 'text_input') {
+      const text = textInputs[questionId] || '';
+      return text.trim().length > 0;
+    }
+
+    // Slider and circular picker questions
+    if (currentQuestion.type.kind === 'slider' || currentQuestion.type.kind === 'circular_picker') {
+      return numericValues[questionId] !== undefined;
+    }
+
+    // Options-based questions
     const selected = selectedOptions[questionId] || [];
     return selected.length > 0;
   };
@@ -190,41 +205,230 @@ export default function PreviewOnboardingPage() {
                   <p className="text-muted-foreground">{currentQuestion.subtitle}</p>
                 )}
 
-                {/* Options */}
-                <div className="grid gap-3 mt-6">
-                  {currentQuestion.options.map((option) => (
-                    <button
-                      key={option.id}
-                      onClick={() => handleOptionSelect(option.id)}
-                      className={cn(
-                        'flex items-center gap-4 p-4 rounded-xl border-2 transition-all hover:scale-[1.02] active:scale-[0.98]',
-                        isOptionSelected(option.id)
-                          ? 'border-orange-500 bg-orange-50 dark:bg-orange-950 shadow-md'
-                          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-orange-300'
-                      )}
-                    >
-                      {/* Emoji Icon */}
-                      {option.icon && (
-                        <div className="text-3xl flex-shrink-0">{option.icon}</div>
-                      )}
-
-                      {/* Label */}
-                      <div className="flex-1 text-left">
-                        <p className="font-medium text-gray-900 dark:text-gray-100">
-                          {option.label}
-                        </p>
-                      </div>
-
-                      {/* Checkmark */}
-                      {isOptionSelected(option.id) && (
-                        <div className="flex-shrink-0">
-                          <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center">
-                            <Check className="h-4 w-4 text-white" />
+                {/* Options - Conditional rendering based on question type */}
+                <div className="mt-6">
+                  {/* Multiple Choice & Time Selection (List or Grid) */}
+                  {(currentQuestion.type.kind === 'multiple_choice' || currentQuestion.type.kind === 'time_selection') && (
+                    <div className={cn(
+                      currentQuestion.type.displayMode === 'grid' ? 'grid grid-cols-2 gap-3' : 'grid gap-3'
+                    )}>
+                      {currentQuestion.options.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => handleOptionSelect(option.id)}
+                          className={cn(
+                            'flex items-center gap-4 p-4 rounded-xl border-2 transition-all hover:scale-[1.02] active:scale-[0.98]',
+                            isOptionSelected(option.id)
+                              ? 'border-orange-500 bg-orange-50 dark:bg-orange-950 shadow-md'
+                              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-orange-300'
+                          )}
+                        >
+                          {option.icon && (
+                            <div className="text-3xl flex-shrink-0">{option.icon}</div>
+                          )}
+                          <div className="flex-1 text-left">
+                            <p className="font-medium text-gray-900 dark:text-gray-100">
+                              {option.label}
+                            </p>
                           </div>
+                          {isOptionSelected(option.id) && (
+                            <div className="flex-shrink-0">
+                              <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center">
+                                <Check className="h-4 w-4 text-white" />
+                              </div>
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Grid Selection (Large colored cards) */}
+                  {currentQuestion.type.kind === 'grid_selection' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {currentQuestion.options.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => handleOptionSelect(option.id)}
+                          className={cn(
+                            'aspect-square p-4 rounded-2xl border-4 transition-all hover:scale-[1.02] active:scale-[0.98] flex flex-col items-center justify-center text-center gap-2',
+                            isOptionSelected(option.id)
+                              ? 'border-orange-500 shadow-lg'
+                              : 'border-transparent'
+                          )}
+                          style={{ backgroundColor: option.color || '#f5f5f5' }}
+                        >
+                          {option.icon && (
+                            <div className="text-5xl">{option.icon}</div>
+                          )}
+                          <p className="font-semibold text-gray-900">{option.label}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Toggle List */}
+                  {currentQuestion.type.kind === 'toggle_list' && (
+                    <div className="space-y-2">
+                      {currentQuestion.options.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => handleOptionSelect(option.id)}
+                          className="w-full flex items-center justify-between p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+                        >
+                          <span className="font-medium text-gray-900 dark:text-gray-100">
+                            {option.label}
+                          </span>
+                          <div className={cn(
+                            'w-12 h-7 rounded-full transition-colors',
+                            isOptionSelected(option.id)
+                              ? 'bg-orange-500'
+                              : 'bg-gray-300'
+                          )}>
+                            <div className={cn(
+                              'w-5 h-5 bg-white rounded-full m-1 transition-transform',
+                              isOptionSelected(option.id) ? 'translate-x-5' : 'translate-x-0'
+                            )}></div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Rating */}
+                  {currentQuestion.type.kind === 'rating' && (
+                    <div className="flex justify-center gap-2">
+                      {currentQuestion.options.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => handleOptionSelect(option.id)}
+                          className={cn(
+                            'flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all',
+                            isOptionSelected(option.id)
+                              ? 'border-orange-500 bg-orange-50 dark:bg-orange-950'
+                              : 'border-gray-200 dark:border-gray-700'
+                          )}
+                        >
+                          <div className="text-2xl">{option.icon || option.label}</div>
+                          {currentQuestion.type.showLabels && (
+                            <span className="text-xs">{option.label}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Text Input */}
+                  {currentQuestion.type.kind === 'text_input' && (
+                    <div className="space-y-2">
+                      <textarea
+                        className="w-full p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 focus:border-orange-500 outline-none"
+                        rows={currentQuestion.type.maxLines || 3}
+                        maxLength={currentQuestion.type.maxCharacters || 500}
+                        placeholder={currentQuestion.type.placeholder || 'Votre réponse...'}
+                        value={textInputs[currentQuestion.id] || ''}
+                        onChange={(e) =>
+                          setTextInputs({ ...textInputs, [currentQuestion.id]: e.target.value })
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground text-right">
+                        {(textInputs[currentQuestion.id] || '').length} / {currentQuestion.type.maxCharacters || 500}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Slider */}
+                  {currentQuestion.type.kind === 'slider' && (
+                    <div className="space-y-6">
+                      <div className="flex justify-center">
+                        <div className="px-8 py-3 bg-orange-100 dark:bg-orange-900 rounded-2xl">
+                          <span className="text-3xl font-bold text-orange-600">
+                            {numericValues[currentQuestion.id] || currentQuestion.type.sliderMin || 0} {currentQuestion.type.sliderUnit || ''}
+                          </span>
                         </div>
-                      )}
-                    </button>
-                  ))}
+                      </div>
+                      <input
+                        type="range"
+                        min={currentQuestion.type.sliderMin || 0}
+                        max={currentQuestion.type.sliderMax || 100}
+                        step={currentQuestion.type.sliderStep || 1}
+                        value={numericValues[currentQuestion.id] || currentQuestion.type.sliderMin || 0}
+                        onChange={(e) =>
+                          setNumericValues({ ...numericValues, [currentQuestion.id]: parseInt(e.target.value) })
+                        }
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                      />
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>{currentQuestion.type.sliderMin || 0} {currentQuestion.type.sliderUnit}</span>
+                        <span>{currentQuestion.type.sliderMax || 100} {currentQuestion.type.sliderUnit}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Circular Picker */}
+                  {currentQuestion.type.kind === 'circular_picker' && (
+                    <div className="flex flex-col items-center gap-6">
+                      <div className="w-48 h-48 rounded-full bg-orange-100 dark:bg-orange-900 flex flex-col items-center justify-center">
+                        <span className="text-5xl font-bold text-orange-600">
+                          {numericValues[currentQuestion.id] || currentQuestion.type.sliderMin || 1}
+                        </span>
+                        <span className="text-lg text-orange-600">{currentQuestion.type.sliderUnit || 'jours'}</span>
+                      </div>
+                      <div className="flex gap-4">
+                        <button
+                          onClick={() => {
+                            const current = numericValues[currentQuestion.id] || currentQuestion.type.sliderMin || 1;
+                            const min = currentQuestion.type.sliderMin || 1;
+                            if (current > min) {
+                              setNumericValues({ ...numericValues, [currentQuestion.id]: current - (currentQuestion.type.sliderStep || 1) });
+                            }
+                          }}
+                          className="w-12 h-12 rounded-full bg-orange-500 text-white text-2xl flex items-center justify-center"
+                        >
+                          -
+                        </button>
+                        <button
+                          onClick={() => {
+                            const current = numericValues[currentQuestion.id] || currentQuestion.type.sliderMin || 1;
+                            const max = currentQuestion.type.sliderMax || 7;
+                            if (current < max) {
+                              setNumericValues({ ...numericValues, [currentQuestion.id]: current + (currentQuestion.type.sliderStep || 1) });
+                            }
+                          }}
+                          className="w-12 h-12 rounded-full bg-orange-500 text-white text-2xl flex items-center justify-center"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Image Card */}
+                  {currentQuestion.type.kind === 'image_card' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {currentQuestion.options.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => handleOptionSelect(option.id)}
+                          className={cn(
+                            'rounded-xl border-2 overflow-hidden transition-all hover:scale-[1.02] active:scale-[0.98]',
+                            isOptionSelected(option.id)
+                              ? 'border-orange-500 shadow-lg'
+                              : 'border-gray-200 dark:border-gray-700'
+                          )}
+                        >
+                          <div className="aspect-video bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-6xl">
+                            {option.icon || '📷'}
+                          </div>
+                          <div className="p-3 bg-white dark:bg-gray-800">
+                            <p className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                              {option.label}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Required indicator */}

@@ -13,13 +13,36 @@ export type QuestionTypeKind =
   | 'multiple_choice'
   | 'rating'
   | 'time_selection'
-  | 'text_input';
+  | 'text_input'
+  | 'grid_selection'
+  | 'toggle_list'
+  | 'slider'
+  | 'circular_picker'
+  | 'image_card';
 
 export interface QuestionTypeConfig {
   kind: QuestionTypeKind;
+
+  // Multiple choice / Grid selection
   allowMultiple?: boolean;
   minSelections?: number;
   maxSelections?: number;
+  gridColumns?: number; // For grid_selection (default: 2)
+  displayMode?: 'list' | 'grid'; // Layout mode
+
+  // Rating
+  showLabels?: boolean; // Display labels below rating icons
+
+  // Slider / Circular Picker
+  sliderMin?: number;
+  sliderMax?: number;
+  sliderStep?: number;
+  sliderUnit?: string; // "minutes", "days", "hours", etc.
+
+  // Text input
+  maxLines?: number; // Number of lines for multiline input
+  maxCharacters?: number; // Character limit
+  placeholder?: string; // Placeholder text
 }
 
 export interface AnswerOption {
@@ -31,6 +54,13 @@ export interface AnswerOption {
   color?: string; // Hex color for visual distinction
   imageUrl?: string; // Optional illustration URL
   order: number;
+
+  // For slider and circular picker types
+  minValue?: number;
+  maxValue?: number;
+  step?: number;
+  unit?: string; // "minutes", "days", "hours", etc.
+  value?: number; // Numeric value for this option
 }
 
 export interface SkipLogic {
