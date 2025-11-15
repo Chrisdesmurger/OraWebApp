@@ -45,8 +45,14 @@ export async function POST(
     // Validate all questions have required fields
     for (let i = 0; i < data.questions.length; i++) {
       const q = data.questions[i];
-      if (!q.title || !q.category || !q.type || !q.options || q.options.length === 0) {
+      if (!q.title || !q.category || !q.type) {
         return apiError(`Question at index ${i} is incomplete`, 400);
+      }
+
+      // Sliders and circular pickers don't need options (they use sliderMin/Max/Step)
+      const needsOptions = q.type.kind !== 'slider' && q.type.kind !== 'circular_picker';
+      if (needsOptions && (!q.options || q.options.length === 0)) {
+        return apiError(`Question at index ${i} must have at least one option`, 400);
       }
     }
 
