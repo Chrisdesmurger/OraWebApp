@@ -12,7 +12,8 @@
     "type-check": "tsc --noEmit",
     "set-role": "tsx scripts/set-user-role.ts",
     "list-admins": "tsx scripts/list-admin-users.ts",
-    "remove-role": "tsx scripts/remove-user-role.ts"
+    "remove-role": "tsx scripts/remove-user-role.ts",
+    "seed-onboarding": "tsx scripts/seed-onboarding.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
