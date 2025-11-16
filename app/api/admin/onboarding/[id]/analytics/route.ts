@@ -41,20 +41,21 @@ export async function GET(
 
     const configData = configDoc.data();
 
-    // Build query for user responses
+    // Build query for user responses using collectionGroup (efficient)
+    // NEW: Query dedicated collection instead of nested field
     let responsesQuery = db
-      .collection('users')
-      .where('onboarding.configVersion', '==', id);
+      .collectionGroup('responses')
+      .where('config_version', '==', id);
 
     // Apply date filters if provided
     if (startDateParam) {
       const startDate = new Date(startDateParam);
-      responsesQuery = responsesQuery.where('onboarding.startedAt', '>=', startDate) as any;
+      responsesQuery = responsesQuery.where('started_at', '>=', startDate) as any;
     }
 
     if (endDateParam) {
       const endDate = new Date(endDateParam);
-      responsesQuery = responsesQuery.where('onboarding.startedAt', '<=', endDate) as any;
+      responsesQuery = responsesQuery.where('started_at', '<=', endDate) as any;
     }
 
     const responsesSnapshot = await responsesQuery.get();
@@ -81,29 +82,26 @@ export async function GET(
       });
     }
 
-    // Process responses
+    // Process responses (NEW: using dedicated collection data structure)
     responsesSnapshot.docs.forEach(doc => {
       const data = doc.data();
-      const onboardingData = data.onboarding;
-
-      if (!onboardingData) return;
 
       totalStarts++;
 
-      if (onboardingData.completed) {
+      if (data.completed) {
         totalCompletions++;
       }
 
-      if (onboardingData.metadata?.totalTimeSeconds) {
-        totalTimeSeconds += onboardingData.metadata.totalTimeSeconds;
+      if (data.metadata?.total_time_seconds) {
+        totalTimeSeconds += data.metadata.total_time_seconds;
       }
 
       // Process answers
-      if (onboardingData.answers && Array.isArray(onboardingData.answers)) {
+      if (data.answers && Array.isArray(data.answers)) {
         const answeredQuestionIds = new Set<string>();
 
-        onboardingData.answers.forEach((answer: any) => {
-          const qId = answer.questionId;
+        data.answers.forEach((answer: any) => {
+          const qId = answer.question_id;
 
           if (questionMetrics[qId]) {
             questionMetrics[qId].views++;
@@ -111,7 +109,7 @@ export async function GET(
             answeredQuestionIds.add(qId);
 
             // Count answer distribution
-            answer.selectedOptions?.forEach((optionId: string) => {
+            answer.selected_options?.forEach((optionId: string) => {
               if (!questionMetrics[qId].answerDistribution[optionId]) {
                 questionMetrics[qId].answerDistribution[optionId] = 0;
               }
@@ -121,7 +119,7 @@ export async function GET(
         });
 
         // Calculate drop-offs
-        if (!onboardingData.completed && configData?.questions) {
+        if (!data.completed && configData?.questions) {
           // Find last answered question
           const lastAnsweredIndex = configData.questions.findIndex(
             (q: any) => !answeredQuestionIds.has(q.id)
