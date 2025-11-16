@@ -43,10 +43,11 @@ export async function GET(
 
     const configData = configDoc.data();
 
-    // Fetch all user responses for this config
+    // Fetch all user responses for this config using collectionGroup (efficient)
+    // NEW: Query dedicated collection instead of nested field
     const responsesSnapshot = await db
-      .collection('users')
-      .where('onboarding.configVersion', '==', id)
+      .collectionGroup('responses')
+      .where('config_version', '==', id)
       .get();
 
     if (responsesSnapshot.empty) {
@@ -69,15 +70,26 @@ export async function GET(
     });
 
     if (format === 'json') {
-      // Export as JSON
+      // Export as JSON (NEW: using dedicated collection data structure)
       const responses = responsesSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
-          uid: doc.id,
-          email: data.email || '',
-          firstName: data.first_name || '',
-          lastName: data.last_name || '',
-          ...data.onboarding,
+          uid: data.uid,
+          configVersion: data.config_version,
+          completed: data.completed,
+          completedAt: data.completed_at,
+          startedAt: data.started_at,
+          answers: data.answers,
+          metadata: data.metadata,
+          goals: data.goals,
+          mainGoal: data.main_goal,
+          experienceLevels: data.experience_levels,
+          dailyTimeCommitment: data.daily_time_commitment,
+          preferredTimes: data.preferred_times,
+          contentPreferences: data.content_preferences,
+          practiceStyle: data.practice_style,
+          challenges: data.challenges,
+          supportPreferences: data.support_preferences,
         };
       });
 
@@ -114,35 +126,34 @@ export async function GET(
 
       const csvRows: string[] = [headers.join(',')];
 
-      // Build CSV rows
+      // Build CSV rows (NEW: using dedicated collection data structure)
       responsesSnapshot.docs.forEach(doc => {
         const data = doc.data();
-        const onboarding = data.onboarding || {};
 
         const row: string[] = [
-          doc.id,
-          escapeCSV(data.email || ''),
-          escapeCSV(data.first_name || ''),
-          escapeCSV(data.last_name || ''),
-          onboarding.completed ? 'Yes' : 'No',
-          onboarding.startedAt ? new Date(onboarding.startedAt.toDate()).toISOString() : '',
-          onboarding.completedAt ? new Date(onboarding.completedAt.toDate()).toISOString() : '',
-          onboarding.metadata?.totalTimeSeconds?.toString() || '',
-          escapeCSV(onboarding.metadata?.deviceType || ''),
-          escapeCSV(onboarding.metadata?.appVersion || ''),
-          escapeCSV(onboarding.metadata?.locale || ''),
+          data.uid || '',
+          '', // Email (not stored in responses collection)
+          '', // First Name (not stored in responses collection)
+          '', // Last Name (not stored in responses collection)
+          data.completed ? 'Yes' : 'No',
+          data.started_at ? new Date(data.started_at.toDate()).toISOString() : '',
+          data.completed_at ? new Date(data.completed_at.toDate()).toISOString() : '',
+          data.metadata?.total_time_seconds?.toString() || '',
+          escapeCSV(data.metadata?.device_type || ''),
+          escapeCSV(data.metadata?.app_version || ''),
+          escapeCSV(data.metadata?.locale || ''),
         ];
 
         // Add answers for each question
         const answerMap = new Map<string, string>();
-        if (onboarding.answers && Array.isArray(onboarding.answers)) {
-          onboarding.answers.forEach((answer: any) => {
+        if (data.answers && Array.isArray(data.answers)) {
+          data.answers.forEach((answer: any) => {
             const selectedLabels: string[] = [];
 
             // Find option labels from question definition
-            const question = questions.find((q: any) => q.id === answer.questionId);
-            if (question && answer.selectedOptions) {
-              answer.selectedOptions.forEach((optionId: string) => {
+            const question = questions.find((q: any) => q.id === answer.question_id);
+            if (question && answer.selected_options) {
+              answer.selected_options.forEach((optionId: string) => {
                 const option = question.options.find((opt: any) => opt.id === optionId);
                 if (option) {
                   selectedLabels.push(option.label);
@@ -150,7 +161,12 @@ export async function GET(
               });
             }
 
-            answerMap.set(answer.questionId, selectedLabels.join('; '));
+            // For text answers, use the text_answer field
+            if (answer.text_answer) {
+              selectedLabels.push(answer.text_answer);
+            }
+
+            answerMap.set(answer.question_id, selectedLabels.join('; '));
           });
         }
 

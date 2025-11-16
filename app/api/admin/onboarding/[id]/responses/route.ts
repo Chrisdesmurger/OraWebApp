@@ -41,17 +41,18 @@ export async function GET(
       return apiError('Onboarding configuration not found', 404);
     }
 
-    // Build query for user responses
+    // Build query for user responses using collectionGroup (efficient)
+    // NEW: Query dedicated collection instead of nested field
     let responsesQuery = db
-      .collection('users')
-      .where('onboarding.configVersion', '==', id)
-      .orderBy('onboarding.startedAt', 'desc');
+      .collectionGroup('responses')
+      .where('config_version', '==', id)
+      .orderBy('started_at', 'desc');
 
     // Filter by completion status if provided
     if (completedFilter === 'true') {
-      responsesQuery = responsesQuery.where('onboarding.completed', '==', true) as any;
+      responsesQuery = responsesQuery.where('completed', '==', true) as any;
     } else if (completedFilter === 'false') {
-      responsesQuery = responsesQuery.where('onboarding.completed', '==', false) as any;
+      responsesQuery = responsesQuery.where('completed', '==', false) as any;
     }
 
     // Apply pagination
@@ -59,12 +60,11 @@ export async function GET(
     responsesQuery = responsesQuery.limit(limit);
 
     if (offset > 0) {
-      // Note: For production, implement cursor-based pagination for better performance
-      // This is a simple offset implementation
+      // Cursor-based pagination for better performance
       const skipSnapshot = await db
-        .collection('users')
-        .where('onboarding.configVersion', '==', id)
-        .orderBy('onboarding.startedAt', 'desc')
+        .collectionGroup('responses')
+        .where('config_version', '==', id)
+        .orderBy('started_at', 'desc')
         .limit(offset)
         .get();
 
@@ -78,25 +78,39 @@ export async function GET(
 
     // Get total count (for pagination metadata)
     let countQuery = db
-      .collection('users')
-      .where('onboarding.configVersion', '==', id);
+      .collectionGroup('responses')
+      .where('config_version', '==', id);
 
     if (completedFilter === 'true') {
-      countQuery = countQuery.where('onboarding.completed', '==', true) as any;
+      countQuery = countQuery.where('completed', '==', true) as any;
     } else if (completedFilter === 'false') {
-      countQuery = countQuery.where('onboarding.completed', '==', false) as any;
+      countQuery = countQuery.where('completed', '==', false) as any;
     }
 
     const countSnapshot = await countQuery.count().get();
     const totalCount = countSnapshot.data().count;
 
-    // Map responses
+    // Map responses (data already in camelCase format from Firestore)
     const responses: UserOnboardingResponse[] = responsesSnapshot.docs.map(doc => {
       const data = doc.data();
       return {
-        uid: doc.id,
-        ...data.onboarding,
-      };
+        uid: data.uid,
+        configVersion: data.config_version,
+        completed: data.completed,
+        completedAt: data.completed_at,
+        startedAt: data.started_at,
+        answers: data.answers || [],
+        metadata: data.metadata,
+        goals: data.goals,
+        mainGoal: data.main_goal,
+        experienceLevels: data.experience_levels,
+        dailyTimeCommitment: data.daily_time_commitment,
+        preferredTimes: data.preferred_times,
+        contentPreferences: data.content_preferences,
+        practiceStyle: data.practice_style,
+        challenges: data.challenges,
+        supportPreferences: data.support_preferences,
+      } as UserOnboardingResponse;
     });
 
     const totalPages = Math.ceil(totalCount / limit);
