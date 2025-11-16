@@ -320,7 +320,7 @@ function SortableQuestion({
         )}
 
         {/* Options de réponse */}
-        {question.type.kind !== 'slider' && question.type.kind !== 'circular_picker' && (
+        {question.type.kind !== 'slider' && question.type.kind !== 'circular_picker' && question.type.kind !== 'text_input' && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Options de réponse ({question.options.length})</Label>

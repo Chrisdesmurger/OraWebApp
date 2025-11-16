@@ -148,8 +148,8 @@ export default function NewOnboardingPage() {
         return;
       }
 
-      // Les sliders et circular pickers n'ont pas besoin d'options
-      if (q.type.kind !== 'slider' && q.type.kind !== 'circular_picker' && q.options.length === 0) {
+      // Les sliders, circular pickers et text inputs n'ont pas besoin d'options
+      if (q.type.kind !== 'slider' && q.type.kind !== 'circular_picker' && q.type.kind !== 'text_input' && q.options.length === 0) {
         toast({
           title: 'Erreur',
           description: 'Toutes les questions doivent avoir au moins une option',
