@@ -275,3 +275,282 @@ export interface OnboardingValidationResult {
   errors: OnboardingValidationError[];
   warnings: OnboardingValidationError[];
 }
+
+// ============================================================================
+// Information Screens (Phase 3 - Dynamic Information Screens)
+// ============================================================================
+
+/**
+ * Display conditions for information screens
+ * Controls when a screen should be shown based on user responses
+ */
+export interface DisplayConditions {
+  showIfAnswer?: string; // Question ID
+  expectedAnswer?: string | string[]; // Expected answer value(s)
+  showIfGoal?: string; // Show if user selected this goal
+  showIfExperience?: 'beginner' | 'intermediate' | 'advanced';
+  logicOperator?: 'AND' | 'OR'; // For multiple conditions
+}
+
+/**
+ * Information Screen
+ * Dynamic screens shown between onboarding questions
+ * Provides contextual information, tips, or encouragement
+ */
+export interface InformationScreen {
+  id: string;
+  position: number; // Position in onboarding flow (0 = before first question)
+  title: string;
+  titleFr?: string;
+  titleEn?: string;
+  subtitle?: string;
+  subtitleFr?: string;
+  subtitleEn?: string;
+  content?: string; // Rich content (markdown or HTML)
+  contentFr?: string;
+  contentEn?: string;
+  bulletPoints?: string[]; // Key points to highlight
+  bulletPointsFr?: string[];
+  bulletPointsEn?: string[];
+  imageUrl?: string; // Optional illustration
+  ctaText?: string; // Call-to-action button text
+  ctaTextFr?: string;
+  ctaTextEn?: string;
+  backgroundColor?: string; // Hex color
+  displayConditions?: DisplayConditions;
+  order: number; // Order if multiple screens at same position
+  createdAt: Timestamp | Date;
+  updatedAt: Timestamp | Date;
+}
+
+// ============================================================================
+// Recommendation Rules (Phase 3 - Program Recommendation Engine)
+// ============================================================================
+
+/**
+ * Rule condition for recommendation engine
+ * Defines matching criteria based on user onboarding responses
+ */
+export interface RuleCondition {
+  questionId: string; // Which question to check
+  operator: 'contains' | 'equals' | 'not_contains' | 'not_equals' | 'greater_than' | 'less_than';
+  value: string | string[] | number;
+  weight?: number; // Priority weight (higher = more important)
+}
+
+/**
+ * Recommendation Rule
+ * Maps user onboarding answers to recommended programs
+ */
+export interface RecommendationRule {
+  id: string;
+  programId: string; // Which program to recommend
+  programTitle: string; // Cached for display
+  conditions: RuleCondition[]; // All conditions must match (AND logic)
+  priority: number; // Display order (1 = highest priority)
+  active: boolean; // Can be disabled without deletion
+  description?: string; // Admin notes
+  createdAt: Timestamp | Date;
+  updatedAt: Timestamp | Date;
+  createdBy: string; // Admin UID
+}
+
+// ============================================================================
+// Enhanced Onboarding Config (with Phase 3 additions)
+// ============================================================================
+
+export interface EnhancedOnboardingConfig extends OnboardingConfig {
+  informationScreens?: InformationScreen[];
+  recommendationRules?: RecommendationRule[];
+}
+
+// ============================================================================
+// API Request/Response Types (Phase 3)
+// ============================================================================
+
+export interface CreateInformationScreenRequest {
+  position: number;
+  title: string;
+  titleFr?: string;
+  titleEn?: string;
+  subtitle?: string;
+  content?: string;
+  bulletPoints?: string[];
+  imageUrl?: string;
+  ctaText?: string;
+  backgroundColor?: string;
+  displayConditions?: DisplayConditions;
+  order: number;
+}
+
+export interface UpdateInformationScreenRequest {
+  position?: number;
+  title?: string;
+  titleFr?: string;
+  titleEn?: string;
+  subtitle?: string;
+  content?: string;
+  bulletPoints?: string[];
+  imageUrl?: string;
+  ctaText?: string;
+  backgroundColor?: string;
+  displayConditions?: DisplayConditions;
+  order?: number;
+}
+
+export interface CreateRecommendationRuleRequest {
+  programId: string;
+  conditions: RuleCondition[];
+  priority: number;
+  description?: string;
+}
+
+export interface UpdateRecommendationRuleRequest {
+  programId?: string;
+  conditions?: RuleCondition[];
+  priority?: number;
+  active?: boolean;
+  description?: string;
+}
+
+// ============================================================================
+// Validation Helpers (Phase 3)
+// ============================================================================
+
+/**
+ * Validates an information screen configuration
+ */
+export function validateInformationScreen(screen: Partial<InformationScreen>): OnboardingValidationResult {
+  const errors: OnboardingValidationError[] = [];
+  const warnings: OnboardingValidationError[] = [];
+
+  // Required fields
+  if (!screen.title || screen.title.trim() === '') {
+    errors.push({ field: 'title', message: 'Title is required' });
+  }
+
+  if (screen.position === undefined || screen.position < 0) {
+    errors.push({ field: 'position', message: 'Valid position is required (>= 0)' });
+  }
+
+  // Background color validation
+  if (screen.backgroundColor && !/^#[0-9A-F]{6}$/i.test(screen.backgroundColor)) {
+    errors.push({ field: 'backgroundColor', message: 'Background color must be a valid hex color (#RRGGBB)' });
+  }
+
+  // Display conditions validation
+  if (screen.displayConditions) {
+    if (screen.displayConditions.showIfAnswer && !screen.displayConditions.expectedAnswer) {
+      warnings.push({ field: 'displayConditions.expectedAnswer', message: 'Expected answer should be specified when using showIfAnswer' });
+    }
+  }
+
+  // Localization warnings
+  if (!screen.titleFr && !screen.titleEn) {
+    warnings.push({ field: 'title', message: 'Consider adding French or English translations' });
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Validates a recommendation rule configuration
+ */
+export function validateRecommendationRule(rule: Partial<RecommendationRule>): OnboardingValidationResult {
+  const errors: OnboardingValidationError[] = [];
+  const warnings: OnboardingValidationError[] = [];
+
+  // Required fields
+  if (!rule.programId || rule.programId.trim() === '') {
+    errors.push({ field: 'programId', message: 'Program ID is required' });
+  }
+
+  if (!rule.conditions || rule.conditions.length === 0) {
+    errors.push({ field: 'conditions', message: 'At least one condition is required' });
+  }
+
+  if (rule.priority === undefined || rule.priority < 1) {
+    errors.push({ field: 'priority', message: 'Priority must be >= 1' });
+  }
+
+  // Validate each condition
+  rule.conditions?.forEach((condition, index) => {
+    if (!condition.questionId) {
+      errors.push({ field: `conditions[${index}].questionId`, message: 'Question ID is required' });
+    }
+
+    if (!condition.operator) {
+      errors.push({ field: `conditions[${index}].operator`, message: 'Operator is required' });
+    }
+
+    if (condition.value === undefined || condition.value === null) {
+      errors.push({ field: `conditions[${index}].value`, message: 'Value is required' });
+    }
+  });
+
+  // Warnings
+  if (!rule.description) {
+    warnings.push({ field: 'description', message: 'Consider adding a description for clarity' });
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Checks if a user response matches a rule condition
+ */
+export function matchesCondition(condition: RuleCondition, userAnswer: string | string[] | number): boolean {
+  const { operator, value } = condition;
+
+  switch (operator) {
+    case 'equals':
+      return userAnswer === value;
+
+    case 'not_equals':
+      return userAnswer !== value;
+
+    case 'contains':
+      if (Array.isArray(userAnswer)) {
+        return Array.isArray(value)
+          ? value.some(v => userAnswer.includes(v))
+          : userAnswer.includes(value as string);
+      }
+      return String(userAnswer).includes(String(value));
+
+    case 'not_contains':
+      if (Array.isArray(userAnswer)) {
+        return Array.isArray(value)
+          ? !value.some(v => userAnswer.includes(v))
+          : !userAnswer.includes(value as string);
+      }
+      return !String(userAnswer).includes(String(value));
+
+    case 'greater_than':
+      return Number(userAnswer) > Number(value);
+
+    case 'less_than':
+      return Number(userAnswer) < Number(value);
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Evaluates if all rule conditions match user responses
+ */
+export function evaluateRule(rule: RecommendationRule, userResponses: Record<string, string | string[] | number>): boolean {
+  return rule.conditions.every(condition => {
+    const userAnswer = userResponses[condition.questionId];
+    if (userAnswer === undefined) return false;
+    return matchesCondition(condition, userAnswer);
+  });
+}
