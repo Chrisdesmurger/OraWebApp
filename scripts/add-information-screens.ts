@@ -279,9 +279,10 @@ async function addInformationScreens() {
     }));
 
     // Update the config with information screens
+    // Use snake_case to match Android backend schema
     await db.collection('onboarding_configs').doc(configId).update({
-      informationScreens: screensWithIds,
-      updatedAt: now,
+      information_screens: screensWithIds,
+      updated_at: now,
     });
 
     console.log(`✅ ${screensWithIds.length} écrans d'information ajoutés avec succès !`);
