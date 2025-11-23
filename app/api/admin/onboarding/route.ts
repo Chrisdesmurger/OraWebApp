@@ -78,10 +78,15 @@ export async function POST(request: NextRequest) {
     // Validate questions structure
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      if (!q.title || !q.category || !q.type || !q.options) {
+      if (!q.title || !q.category || !q.type) {
         return apiError(`Question at index ${i} is missing required fields`, 400);
       }
-      if (q.options.length === 0) {
+
+      // Sliders, circular pickers, and text inputs don't need options
+      const needsOptions = q.type.kind !== 'slider'
+        && q.type.kind !== 'circular_picker'
+        && q.type.kind !== 'text_input';
+      if (needsOptions && (!q.options || q.options.length === 0)) {
         return apiError(`Question at index ${i} must have at least one option`, 400);
       }
     }
