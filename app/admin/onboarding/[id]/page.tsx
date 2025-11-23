@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Trash2, GripVertical, Rocket, Archive, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, GripVertical, Rocket, Archive, Save, Info, Brain } from 'lucide-react';
 import Link from 'next/link';
 import type { OnboardingConfig, OnboardingQuestion, AnswerOption } from '@/types/onboarding';
 import {
@@ -701,6 +701,34 @@ export default function EditOnboardingPage() {
           )}
         </div>
       </div>
+
+      {/* Navigation Tabs */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="flex border-b">
+            <Link
+              href={`/admin/onboarding/${params.id}`}
+              className="flex-1 py-3 px-4 text-center border-b-2 border-primary font-medium text-primary"
+            >
+              Questions
+            </Link>
+            <Link
+              href={`/admin/onboarding/${params.id}/information-screens`}
+              className="flex-1 py-3 px-4 text-center border-b-2 border-transparent hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-2"
+            >
+              <Info className="h-4 w-4" />
+              Écrans d&apos;information
+            </Link>
+            <Link
+              href="/admin/onboarding/recommendation-rules"
+              className="flex-1 py-3 px-4 text-center border-b-2 border-transparent hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-2"
+            >
+              <Brain className="h-4 w-4" />
+              Règles de recommandation
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="space-y-6">
         {/* Informations générales */}
