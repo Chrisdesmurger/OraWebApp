@@ -15,7 +15,6 @@ import { resolve } from 'path';
 dotenv.config({ path: resolve(__dirname, '../.env.local') });
 
 import { getFirestore } from '../lib/firebase/admin';
-import { Timestamp } from 'firebase-admin/firestore';
 import type { InformationScreen } from '../types/onboarding';
 
 const informationScreens: Omit<InformationScreen, 'id' | 'createdAt' | 'updatedAt'>[] = [
@@ -271,17 +270,18 @@ async function addInformationScreens() {
     // Add information screens to the config
     console.log('\n📝 Ajout des écrans d\'information...');
 
-    const screensWithIds: InformationScreen[] = informationScreens.map((screen, index) => ({
+    const now = new Date();
+    const screensWithIds = informationScreens.map((screen, index) => ({
       ...screen,
       id: `info_screen_${Date.now()}_${index}`,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
+      createdAt: now,
+      updatedAt: now,
     }));
 
     // Update the config with information screens
     await db.collection('onboarding_configs').doc(configId).update({
       informationScreens: screensWithIds,
-      updatedAt: Timestamp.now(),
+      updatedAt: now,
     });
 
     console.log(`✅ ${screensWithIds.length} écrans d'information ajoutés avec succès !`);
