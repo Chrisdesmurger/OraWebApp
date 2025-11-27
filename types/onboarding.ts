@@ -18,7 +18,32 @@ export type QuestionTypeKind =
   | 'toggle_list'
   | 'slider'
   | 'circular_picker'
-  | 'image_card';
+  | 'image_card'
+  | 'profile_group';
+
+export type ProfileFieldInputType = 'text' | 'date' | 'radio';
+
+export interface ProfileFieldOption {
+  id: string;
+  label: string;
+  labelFr?: string;
+  labelEn?: string;
+  icon?: string;
+  order: number;
+}
+
+export interface ProfileField {
+  id: string;
+  label: string;
+  labelFr?: string;
+  labelEn?: string;
+  inputType: ProfileFieldInputType;
+  placeholder?: string;
+  maxLength?: number;
+  required?: boolean;
+  order: number;
+  options?: ProfileFieldOption[];
+}
 
 export interface QuestionTypeConfig {
   kind: QuestionTypeKind;
@@ -43,6 +68,9 @@ export interface QuestionTypeConfig {
   maxLines?: number; // Number of lines for multiline input
   maxCharacters?: number; // Character limit
   placeholder?: string; // Placeholder text
+
+  // Profile group
+  fields?: ProfileField[]; // For profile_group type
 }
 
 export interface AnswerOption {

@@ -298,6 +298,7 @@ export default function NewOnboardingPage() {
                             {question.type.kind === 'slider' && 'Curseur'}
                             {question.type.kind === 'circular_picker' && 'Sélecteur circulaire'}
                             {question.type.kind === 'image_card' && 'Cartes avec images'}
+                            {question.type.kind === 'profile_group' && 'Profil groupé'}
                           </CardDescription>
                         </div>
                       </div>
@@ -363,6 +364,7 @@ export default function NewOnboardingPage() {
                         <option value="slider">Curseur</option>
                         <option value="circular_picker">Sélecteur circulaire</option>
                         <option value="image_card">Cartes avec images</option>
+                        <option value="profile_group">Profil groupé</option>
                       </select>
                     </div>
 
