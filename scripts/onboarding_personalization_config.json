@@ -1,0 +1,975 @@
+{
+  "id": "personalization-v1",
+  "title": "Onboarding de Personnalisation Ora",
+  "description": "Questionnaire de personnalisation pour adapter l'expérience utilisateur aux besoins et préférences individuels",
+  "status": "active",
+  "version": "1.1",
+  "createdBy": "admin",
+  "informationScreens": [
+    {
+      "position": 0,
+      "order": 0,
+      "title": "Bienvenue sur ORA",
+      "titleFr": "Bienvenue sur ORA",
+      "titleEn": "Welcome to ORA",
+      "subtitle": "ORA est ton espace de bien-être",
+      "subtitleFr": "ORA est ton espace de bien-être",
+      "subtitleEn": "ORA is your wellness space",
+      "content": "2 minutes pour personnaliser ton expérience et découvrir un parcours conçu juste pour toi.",
+      "contentFr": "2 minutes pour personnaliser ton expérience et découvrir un parcours conçu juste pour toi.",
+      "contentEn": "2 minutes to personalize your experience and discover a journey designed just for you.",
+      "bulletPoints": [
+        "✨ Questions simples et adaptées",
+        "⏱️ Moins de 2 minutes",
+        "🎯 Un parcours 100% personnalisé"
+      ],
+      "bulletPointsFr": [
+        "✨ Questions simples et adaptées",
+        "⏱️ Moins de 2 minutes",
+        "🎯 Un parcours 100% personnalisé"
+      ],
+      "bulletPointsEn": [
+        "✨ Simple and tailored questions",
+        "⏱️ Less than 2 minutes",
+        "🎯 A 100% personalized journey"
+      ],
+      "ctaText": "Commencer",
+      "ctaTextFr": "Commencer",
+      "ctaTextEn": "Get Started",
+      "backgroundColor": "#F5EFE6"
+    },
+    {
+      "position": 1,
+      "order": 0,
+      "title": "Construisons ton profil ORA",
+      "titleFr": "Construisons ton profil ORA",
+      "titleEn": "Let's build your ORA profile",
+      "subtitle": "Pour une expérience vraiment adaptée à toi",
+      "subtitleFr": "Pour une expérience vraiment adaptée à toi",
+      "subtitleEn": "For an experience truly tailored to you",
+      "content": "Quelques informations pour personnaliser ton interface, tes notifications et tes recommandations.",
+      "contentFr": "Quelques informations pour personnaliser ton interface, tes notifications et tes recommandations.",
+      "contentEn": "A few details to personalize your interface, notifications and recommendations.",
+      "bulletPoints": [
+        "👤 Profil personnalisé",
+        "🔔 Notifications adaptées",
+        "🎯 Recommandations ciblées"
+      ],
+      "bulletPointsFr": [
+        "👤 Profil personnalisé",
+        "🔔 Notifications adaptées",
+        "🎯 Recommandations ciblées"
+      ],
+      "bulletPointsEn": [
+        "👤 Personalized profile",
+        "🔔 Tailored notifications",
+        "🎯 Targeted recommendations"
+      ],
+      "ctaText": "Continuer",
+      "ctaTextFr": "Continuer",
+      "ctaTextEn": "Continue",
+      "backgroundColor": "#E8F4F8"
+    },
+    {
+      "position": 6,
+      "order": 0,
+      "title": "C'est noté !",
+      "titleFr": "C'est noté !",
+      "titleEn": "Got it!",
+      "subtitle": "Voyons maintenant tes besoins et intentions",
+      "subtitleFr": "Voyons maintenant tes besoins et intentions",
+      "subtitleEn": "Now let's look at your needs and intentions",
+      "content": "Nous allons identifier ce qui compte le plus pour toi afin de te proposer un programme parfaitement adapté.",
+      "contentFr": "Nous allons identifier ce qui compte le plus pour toi afin de te proposer un programme parfaitement adapté.",
+      "contentEn": "We'll identify what matters most to you to offer a perfectly tailored program.",
+      "bulletPoints": [
+        "🧘 Pratiques adaptées à ton niveau",
+        "⏱️ Durées selon ton emploi du temps",
+        "🎯 Objectifs alignés avec tes besoins"
+      ],
+      "bulletPointsFr": [
+        "🧘 Pratiques adaptées à ton niveau",
+        "⏱️ Durées selon ton emploi du temps",
+        "🎯 Objectifs alignés avec tes besoins"
+      ],
+      "bulletPointsEn": [
+        "🧘 Practices adapted to your level",
+        "⏱️ Durations according to your schedule",
+        "🎯 Goals aligned with your needs"
+      ],
+      "ctaText": "Continuons",
+      "ctaTextFr": "Continuons",
+      "ctaTextEn": "Let's continue",
+      "backgroundColor": "#F0F8E8"
+    },
+    {
+      "position": 13,
+      "order": 0,
+      "title": "Merci !",
+      "titleFr": "Merci !",
+      "titleEn": "Thank you!",
+      "subtitle": "Comment te sens-tu à l'heure actuelle ?",
+      "subtitleFr": "Comment te sens-tu à l'heure actuelle ?",
+      "subtitleEn": "How are you feeling right now?",
+      "content": "Nous allons affiner ton programme en fonction de ton état émotionnel et physique du moment.",
+      "contentFr": "Nous allons affiner ton programme en fonction de ton état émotionnel et physique du moment.",
+      "contentEn": "We'll refine your program based on your current emotional and physical state.",
+      "bulletPoints": [
+        "💗 Écoute de ton état émotionnel",
+        "🧘 Adaptation des pratiques",
+        "✨ Recommandations personnalisées"
+      ],
+      "bulletPointsFr": [
+        "💗 Écoute de ton état émotionnel",
+        "🧘 Adaptation des pratiques",
+        "✨ Recommandations personnalisées"
+      ],
+      "bulletPointsEn": [
+        "💗 Listen to your emotional state",
+        "🧘 Practice adaptation",
+        "✨ Personalized recommendations"
+      ],
+      "ctaText": "Presque fini",
+      "ctaTextFr": "Presque fini",
+      "ctaTextEn": "Almost done",
+      "backgroundColor": "#FFF4E6"
+    },
+    {
+      "position": 100,
+      "order": 0,
+      "title": "Ton espace ORA est prêt",
+      "titleFr": "Ton espace ORA est prêt",
+      "titleEn": "Your ORA space is ready",
+      "subtitle": "Bienvenue dans ton parcours personnalisé",
+      "subtitleFr": "Bienvenue dans ton parcours personnalisé",
+      "subtitleEn": "Welcome to your personalized journey",
+      "content": "Ora est conçu pour t'apporter du bien-être au quotidien avec un accès facile depuis chez toi. Tout ce dont tu as besoin, c'est de te laisser guider.",
+      "contentFr": "Ora est conçu pour t'apporter du bien-être au quotidien avec un accès facile depuis chez toi. Tout ce dont tu as besoin, c'est de te laisser guider.",
+      "contentEn": "Ora is designed to bring you daily wellness with easy access from home. All you need is to let yourself be guided.",
+      "bulletPoints": [
+        "✅ Profil personnalisé complété",
+        "🎯 Programme adapté à tes besoins",
+        "🚀 Prêt à commencer ton parcours"
+      ],
+      "bulletPointsFr": [
+        "✅ Profil personnalisé complété",
+        "🎯 Programme adapté à tes besoins",
+        "🚀 Prêt à commencer ton parcours"
+      ],
+      "bulletPointsEn": [
+        "✅ Personalized profile completed",
+        "🎯 Program tailored to your needs",
+        "🚀 Ready to start your journey"
+      ],
+      "ctaText": "Découvrir ORA",
+      "ctaTextFr": "Découvrir ORA",
+      "ctaTextEn": "Discover ORA",
+      "backgroundColor": "#E8FFF0"
+    }
+  ],
+  "questions": [
+    {
+      "id": "user_profile",
+      "category": "personalization",
+      "order": 0,
+      "title": "Construisons ton profil",
+      "titleFr": "Construisons ton profil",
+      "titleEn": "Let's build your profile",
+      "subtitle": "Pour personnaliser ton expérience ORA",
+      "subtitleFr": "Pour personnaliser ton expérience ORA",
+      "subtitleEn": "To personalize your ORA experience",
+      "type": {
+        "kind": "profile_group",
+        "fields": [
+          {
+            "id": "firstName",
+            "label": "Prénom",
+            "labelFr": "Prénom",
+            "labelEn": "First name",
+            "inputType": "text",
+            "placeholder": "Ton prénom",
+            "maxLength": 50,
+            "required": true,
+            "order": 0
+          },
+          {
+            "id": "birthDate",
+            "label": "Date de naissance",
+            "labelFr": "Date de naissance",
+            "labelEn": "Date of birth",
+            "inputType": "date",
+            "placeholder": "JJ/MM/AAAA",
+            "required": true,
+            "order": 1
+          },
+          {
+            "id": "gender",
+            "label": "Genre",
+            "labelFr": "Genre",
+            "labelEn": "Gender",
+            "inputType": "radio",
+            "required": true,
+            "order": 2,
+            "options": [
+              {
+                "id": "female",
+                "label": "Femme",
+                "labelFr": "Femme",
+                "labelEn": "Female",
+                "icon": "♀️",
+                "order": 0
+              },
+              {
+                "id": "male",
+                "label": "Homme",
+                "labelFr": "Homme",
+                "labelEn": "Male",
+                "icon": "♂️",
+                "order": 1
+              },
+              {
+                "id": "non_binary",
+                "label": "Non binaire",
+                "labelFr": "Non binaire",
+                "labelEn": "Non-binary",
+                "icon": "⚧",
+                "order": 2
+              },
+              {
+                "id": "prefer_not_say",
+                "label": "Je préfère ne pas le dire",
+                "labelFr": "Je préfère ne pas le dire",
+                "labelEn": "I prefer not to say",
+                "icon": "🙅",
+                "order": 3
+              }
+            ]
+          }
+        ]
+      },
+      "required": true
+    },
+    {
+      "id": "life_situation",
+      "category": "personalization",
+      "order": 1,
+      "title": "Ta situation du moment",
+      "titleFr": "Ta situation du moment",
+      "titleEn": "Your current situation",
+      "subtitle": "Pour adapter les notifications, la durée et l'énergie des pratiques",
+      "subtitleFr": "Pour adapter les notifications, la durée et l'énergie des pratiques",
+      "subtitleEn": "To adapt notifications, duration and energy of practices",
+      "type": {
+        "kind": "multiple_choice",
+        "allowMultiple": false,
+        "displayMode": "list"
+      },
+      "options": [
+        {
+          "id": "demanding_work",
+          "label": "Travail prenant",
+          "labelFr": "Travail prenant",
+          "labelEn": "Demanding work",
+          "icon": "💼",
+          "order": 0
+        },
+        {
+          "id": "parenthood",
+          "label": "Parentalité",
+          "labelFr": "Parentalité",
+          "labelEn": "Parenthood",
+          "icon": "👶",
+          "order": 1
+        },
+        {
+          "id": "student",
+          "label": "Étudiant(e)",
+          "labelFr": "Étudiant(e)",
+          "labelEn": "Student",
+          "icon": "🎓",
+          "order": 2
+        },
+        {
+          "id": "transition",
+          "label": "Entre deux périodes / transition",
+          "labelFr": "Entre deux périodes / transition",
+          "labelEn": "Between two periods / transition",
+          "icon": "🌊",
+          "order": 3
+        },
+        {
+          "id": "seeking_balance",
+          "label": "Recherche d'équilibre / charge mentale",
+          "labelFr": "Recherche d'équilibre / charge mentale",
+          "labelEn": "Seeking balance / mental load",
+          "icon": "⚖️",
+          "order": 4
+        },
+        {
+          "id": "other",
+          "label": "Autre / Je ne souhaite pas répondre",
+          "labelFr": "Autre / Je ne souhaite pas répondre",
+          "labelEn": "Other / I prefer not to answer",
+          "icon": "🤷",
+          "order": 5
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "movement_relationship",
+      "category": "experience",
+      "order": 2,
+      "title": "Ta relation actuelle avec le mouvement",
+      "titleFr": "Ta relation actuelle avec le mouvement",
+      "titleEn": "Your current relationship with movement",
+      "subtitle": "Pour calibrer l'intensité des pratiques",
+      "subtitleFr": "Pour calibrer l'intensité des pratiques",
+      "subtitleEn": "To calibrate the intensity of practices",
+      "type": {
+        "kind": "multiple_choice",
+        "allowMultiple": false,
+        "displayMode": "list"
+      },
+      "options": [
+        {
+          "id": "almost_never",
+          "label": "Je ne bouge presque jamais",
+          "labelFr": "Je ne bouge presque jamais",
+          "labelEn": "I almost never move",
+          "icon": "🪑",
+          "order": 0
+        },
+        {
+          "id": "irregular",
+          "label": "Je bouge un peu mais irrégulièrement",
+          "labelFr": "Je bouge un peu mais irrégulièrement",
+          "labelEn": "I move a little but irregularly",
+          "icon": "🚶",
+          "order": 1
+        },
+        {
+          "id": "regular",
+          "label": "Je fais du sport / du mouvement régulièrement",
+          "labelFr": "Je fais du sport / du mouvement régulièrement",
+          "labelEn": "I exercise / move regularly",
+          "icon": "🏃",
+          "order": 2
+        },
+        {
+          "id": "very_active",
+          "label": "Je suis très active / intensément sportif(ve)",
+          "labelFr": "Je suis très active / intensément sportif(ve)",
+          "labelEn": "I am very active / intensely athletic",
+          "icon": "💪",
+          "order": 3
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "wellness_relationship",
+      "category": "experience",
+      "order": 3,
+      "title": "Ton rapport au bien-être aujourd'hui",
+      "titleFr": "Ton rapport au bien-être aujourd'hui",
+      "titleEn": "Your relationship with wellness today",
+      "type": {
+        "kind": "multiple_choice",
+        "allowMultiple": false,
+        "displayMode": "list"
+      },
+      "options": [
+        {
+          "id": "beginner",
+          "label": "Je débute totalement",
+          "labelFr": "Je débute totalement",
+          "labelEn": "I'm a complete beginner",
+          "icon": "🌱",
+          "order": 0
+        },
+        {
+          "id": "resuming",
+          "label": "Je suis dans une reprise",
+          "labelFr": "Je suis dans une reprise",
+          "labelEn": "I'm resuming",
+          "icon": "🔄",
+          "order": 1
+        },
+        {
+          "id": "routine",
+          "label": "Je suis déjà dans une routine",
+          "labelFr": "Je suis déjà dans une routine",
+          "labelEn": "I'm already in a routine",
+          "icon": "🌿",
+          "order": 2
+        },
+        {
+          "id": "advanced",
+          "label": "Je veux aller plus loin",
+          "labelFr": "Je veux aller plus loin",
+          "labelEn": "I want to go further",
+          "icon": "🌳",
+          "order": 3
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "intentions",
+      "category": "goals",
+      "order": 4,
+      "title": "Pourquoi es-tu ici ?",
+      "titleFr": "Pourquoi es-tu ici ?",
+      "titleEn": "Why are you here?",
+      "subtitle": "Sélectionne toutes les réponses qui te correspondent",
+      "subtitleFr": "Sélectionne toutes les réponses qui te correspondent",
+      "subtitleEn": "Select all that apply",
+      "type": {
+        "kind": "toggle_list",
+        "allowMultiple": true
+      },
+      "options": [
+        {
+          "id": "feel_serene",
+          "label": "Me sentir plus serein(e)",
+          "labelFr": "Me sentir plus serein(e)",
+          "labelEn": "Feel more serene",
+          "order": 0
+        },
+        {
+          "id": "improve_sleep",
+          "label": "Améliorer mon sommeil",
+          "labelFr": "Améliorer mon sommeil",
+          "labelEn": "Improve my sleep",
+          "order": 1
+        },
+        {
+          "id": "reduce_stress",
+          "label": "Réduire le stress / l'anxiété",
+          "labelFr": "Réduire le stress / l'anxiété",
+          "labelEn": "Reduce stress / anxiety",
+          "order": 2
+        },
+        {
+          "id": "regain_energy",
+          "label": "Retrouver de l'énergie dans mon corps",
+          "labelFr": "Retrouver de l'énergie dans mon corps",
+          "labelEn": "Regain energy in my body",
+          "order": 3
+        },
+        {
+          "id": "relieve_tension",
+          "label": "Soulager des tensions / douleurs",
+          "labelFr": "Soulager des tensions / douleurs",
+          "labelEn": "Relieve tension / pain",
+          "order": 4
+        },
+        {
+          "id": "time_for_self",
+          "label": "Prendre du temps pour moi",
+          "labelFr": "Prendre du temps pour moi",
+          "labelEn": "Take time for myself",
+          "order": 5
+        },
+        {
+          "id": "regain_confidence",
+          "label": "Retrouver confiance et motivation",
+          "labelFr": "Retrouver confiance et motivation",
+          "labelEn": "Regain confidence and motivation",
+          "order": 6
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "practice_levels",
+      "category": "experience",
+      "order": 5,
+      "title": "Dans le yoga / pilates / respiration / méditation, tu te situes où ?",
+      "titleFr": "Dans le yoga / pilates / respiration / méditation, tu te situes où ?",
+      "titleEn": "Where do you stand in yoga / pilates / breathing / meditation?",
+      "subtitle": "Sélectionne ton niveau général",
+      "subtitleFr": "Sélectionne ton niveau général",
+      "subtitleEn": "Select your general level",
+      "type": {
+        "kind": "multiple_choice",
+        "allowMultiple": false,
+        "displayMode": "list"
+      },
+      "options": [
+        {
+          "id": "beginner",
+          "label": "🌱 Débutant(e)",
+          "labelFr": "🌱 Débutant(e)",
+          "labelEn": "🌱 Beginner",
+          "icon": "🌱",
+          "order": 0
+        },
+        {
+          "id": "intermediate",
+          "label": "🌿 Intermédiaire",
+          "labelFr": "🌿 Intermédiaire",
+          "labelEn": "🌿 Intermediate",
+          "icon": "🌿",
+          "order": 1
+        },
+        {
+          "id": "advanced",
+          "label": "🌳 Avancé(e)",
+          "labelFr": "🌳 Avancé(e)",
+          "labelEn": "🌳 Advanced",
+          "icon": "🌳",
+          "order": 2
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "time_commitment",
+      "category": "preferences",
+      "order": 6,
+      "title": "Quel temps peux-tu t'accorder en moyenne ?",
+      "titleFr": "Quel temps peux-tu t'accorder en moyenne ?",
+      "titleEn": "How much time can you dedicate on average?",
+      "type": {
+        "kind": "multiple_choice",
+        "allowMultiple": false,
+        "displayMode": "list"
+      },
+      "options": [
+        {
+          "id": "5_10_min",
+          "label": "5–10 min",
+          "labelFr": "5–10 min",
+          "labelEn": "5–10 min",
+          "icon": "⏱️",
+          "order": 0
+        },
+        {
+          "id": "10_20_min",
+          "label": "10–20 min",
+          "labelFr": "10–20 min",
+          "labelEn": "10–20 min",
+          "icon": "⏰",
+          "order": 1
+        },
+        {
+          "id": "20_40_min",
+          "label": "20–40 min",
+          "labelFr": "20–40 min",
+          "labelEn": "20–40 min",
+          "icon": "⏲️",
+          "order": 2
+        },
+        {
+          "id": "flexible",
+          "label": "Ça dépend des jours",
+          "labelFr": "Ça dépend des jours",
+          "labelEn": "It depends on the day",
+          "icon": "🔄",
+          "order": 3
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "preferred_times",
+      "category": "preferences",
+      "order": 7,
+      "title": "Quand souhaites-tu pratiquer ?",
+      "titleFr": "Quand souhaites-tu pratiquer ?",
+      "titleEn": "When do you want to practice?",
+      "subtitle": "Sélectionne tous les moments qui te conviennent",
+      "subtitleFr": "Sélectionne tous les moments qui te conviennent",
+      "subtitleEn": "Select all the times that suit you",
+      "type": {
+        "kind": "toggle_list",
+        "allowMultiple": true
+      },
+      "options": [
+        {
+          "id": "morning",
+          "label": "Le matin",
+          "labelFr": "Le matin",
+          "labelEn": "In the morning",
+          "order": 0
+        },
+        {
+          "id": "noon",
+          "label": "À midi / au travail",
+          "labelFr": "À midi / au travail",
+          "labelEn": "At noon / at work",
+          "order": 1
+        },
+        {
+          "id": "afternoon",
+          "label": "L'après-midi",
+          "labelFr": "L'après-midi",
+          "labelEn": "In the afternoon",
+          "order": 2
+        },
+        {
+          "id": "evening",
+          "label": "Le soir",
+          "labelFr": "Le soir",
+          "labelEn": "In the evening",
+          "order": 3
+        },
+        {
+          "id": "before_sleep",
+          "label": "Avant de dormir",
+          "labelFr": "Avant de dormir",
+          "labelEn": "Before sleeping",
+          "order": 4
+        },
+        {
+          "id": "flexible",
+          "label": "Quand j'ai le temps (sans horaire)",
+          "labelFr": "Quand j'ai le temps (sans horaire)",
+          "labelEn": "When I have time (no schedule)",
+          "order": 5
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "current_energy",
+      "category": "personalization",
+      "order": 8,
+      "title": "Aujourd'hui tu te sens plutôt…",
+      "titleFr": "Aujourd'hui tu te sens plutôt…",
+      "titleEn": "Today you feel more like…",
+      "subtitle": "Mini scan émotionnel à la ORA",
+      "subtitleFr": "Mini scan émotionnel à la ORA",
+      "subtitleEn": "Mini emotional scan ORA style",
+      "type": {
+        "kind": "grid_selection",
+        "allowMultiple": true,
+        "gridColumns": 2,
+        "minSelections": 1,
+        "maxSelections": 3
+      },
+      "options": [
+        {
+          "id": "stressed",
+          "label": "Stressé(e)",
+          "labelFr": "Stressé(e)",
+          "labelEn": "Stressed",
+          "icon": "☁️",
+          "color": "#9CA3AF",
+          "order": 0
+        },
+        {
+          "id": "tired",
+          "label": "Fatigué(e)",
+          "labelFr": "Fatigué(e)",
+          "labelEn": "Tired",
+          "icon": "🔥",
+          "color": "#EF4444",
+          "order": 1
+        },
+        {
+          "id": "motivated",
+          "label": "Motivé(e)",
+          "labelFr": "Motivé(e)",
+          "labelEn": "Motivated",
+          "icon": "✨",
+          "color": "#FBBF24",
+          "order": 2
+        },
+        {
+          "id": "overwhelmed",
+          "label": "Surchargé(e)",
+          "labelFr": "Surchargé(e)",
+          "labelEn": "Overwhelmed",
+          "icon": "🌊",
+          "color": "#3B82F6",
+          "order": 3
+        },
+        {
+          "id": "calm",
+          "label": "Calme",
+          "labelFr": "Calme",
+          "labelEn": "Calm",
+          "icon": "💗",
+          "color": "#EC4899",
+          "order": 4
+        },
+        {
+          "id": "seeking_balance",
+          "label": "En recherche d'équilibre",
+          "labelFr": "En recherche d'équilibre",
+          "labelEn": "Seeking balance",
+          "icon": "🌱",
+          "color": "#10B981",
+          "order": 5
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "body_zones",
+      "category": "personalization",
+      "order": 9,
+      "title": "Ton corps te parle-t-il ?",
+      "titleFr": "Ton corps te parle-t-il ?",
+      "titleEn": "Is your body speaking to you?",
+      "subtitle": "Zones qui te demandent de l'attention",
+      "subtitleFr": "Zones qui te demandent de l'attention",
+      "subtitleEn": "Areas that need attention",
+      "type": {
+        "kind": "toggle_list",
+        "allowMultiple": true
+      },
+      "options": [
+        {
+          "id": "lower_back",
+          "label": "Bas du dos",
+          "labelFr": "Bas du dos",
+          "labelEn": "Lower back",
+          "order": 0
+        },
+        {
+          "id": "neck_trapezius",
+          "label": "Cou / trapèzes",
+          "labelFr": "Cou / trapèzes",
+          "labelEn": "Neck / trapezius",
+          "order": 1
+        },
+        {
+          "id": "belly_digestion",
+          "label": "Ventre / digestion",
+          "labelFr": "Ventre / digestion",
+          "labelEn": "Belly / digestion",
+          "order": 2
+        },
+        {
+          "id": "shoulders",
+          "label": "Épaules",
+          "labelFr": "Épaules",
+          "labelEn": "Shoulders",
+          "order": 3
+        },
+        {
+          "id": "heavy_legs",
+          "label": "Jambes lourdes",
+          "labelFr": "Jambes lourdes",
+          "labelEn": "Heavy legs",
+          "order": 4
+        },
+        {
+          "id": "headaches",
+          "label": "Maux de tête",
+          "labelFr": "Maux de tête",
+          "labelEn": "Headaches",
+          "order": 5
+        },
+        {
+          "id": "none",
+          "label": "Aucun, je veux juste du bien-être global",
+          "labelFr": "Aucun, je veux juste du bien-être global",
+          "labelEn": "None, I just want overall wellness",
+          "order": 6
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "sleep_quality",
+      "category": "personalization",
+      "order": 10,
+      "title": "Ton sommeil en ce moment",
+      "titleFr": "Ton sommeil en ce moment",
+      "titleEn": "Your sleep right now",
+      "type": {
+        "kind": "multiple_choice",
+        "allowMultiple": false,
+        "displayMode": "list"
+      },
+      "options": [
+        {
+          "id": "very_good",
+          "label": "Très bien, je me réveille plein d'énergie",
+          "labelFr": "Très bien, je me réveille plein d'énergie",
+          "labelEn": "Very good, I wake up full of energy",
+          "icon": "😊",
+          "order": 0
+        },
+        {
+          "id": "average",
+          "label": "Moyen, mes nuits sont irrégulières",
+          "labelFr": "Moyen, mes nuits sont irrégulières",
+          "labelEn": "Average, my nights are irregular",
+          "icon": "😐",
+          "order": 1
+        },
+        {
+          "id": "difficult",
+          "label": "Difficile, j'ai du mal à m'endormir ou je me réveille souvent",
+          "labelFr": "Difficile, j'ai du mal à m'endormir ou je me réveille souvent",
+          "labelEn": "Difficult, I have trouble falling asleep or I wake up often",
+          "icon": "😔",
+          "order": 2
+        },
+        {
+          "id": "insomnia",
+          "label": "Insomnies fréquentes",
+          "labelFr": "Insomnies fréquentes",
+          "labelEn": "Frequent insomnia",
+          "icon": "😰",
+          "order": 3
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "experience_style",
+      "category": "preferences",
+      "order": 11,
+      "title": "Tu préfères des pratiques…",
+      "titleFr": "Tu préfères des pratiques…",
+      "titleEn": "You prefer practices that are…",
+      "subtitle": "Sélectionne tous les styles qui te correspondent",
+      "subtitleFr": "Sélectionne tous les styles qui te correspondent",
+      "subtitleEn": "Select all styles that suit you",
+      "type": {
+        "kind": "toggle_list",
+        "allowMultiple": true
+      },
+      "options": [
+        {
+          "id": "guided_enveloping",
+          "label": "🎧 Plus guidées et enveloppantes",
+          "labelFr": "🎧 Plus guidées et enveloppantes",
+          "labelEn": "🎧 More guided and enveloping",
+          "order": 0
+        },
+        {
+          "id": "short_effective",
+          "label": "🔔 Courtes et efficaces",
+          "labelFr": "🔔 Courtes et efficaces",
+          "labelEn": "🔔 Short and effective",
+          "order": 1
+        },
+        {
+          "id": "breathing_energy",
+          "label": "🌬 Axées sur la respiration et l'énergie",
+          "labelFr": "🌬 Axées sur la respiration et l'énergie",
+          "labelEn": "🌬 Focused on breathing and energy",
+          "order": 2
+        },
+        {
+          "id": "dynamic_boosting",
+          "label": "🤸‍♂️ Dynamiques et boostantes",
+          "labelFr": "🤸‍♂️ Dynamiques et boostantes",
+          "labelEn": "🤸‍♂️ Dynamic and boosting",
+          "order": 3
+        },
+        {
+          "id": "gentle_relaxing",
+          "label": "🕯 Très douces et relaxantes",
+          "labelFr": "🕯 Très douces et relaxantes",
+          "labelEn": "🕯 Very gentle and relaxing",
+          "order": 4
+        },
+        {
+          "id": "ultra_simple",
+          "label": "👶 Ultra simples (pour débuter / reprendre)",
+          "labelFr": "👶 Ultra simples (pour débuter / reprendre)",
+          "labelEn": "👶 Ultra simple (to start / resume)",
+          "order": 5
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "practice_frequency",
+      "category": "preferences",
+      "order": 12,
+      "title": "Tu veux que ORA te propose des pratiques :",
+      "titleFr": "Tu veux que ORA te propose des pratiques :",
+      "titleEn": "You want ORA to offer you practices:",
+      "type": {
+        "kind": "multiple_choice",
+        "allowMultiple": false,
+        "displayMode": "list"
+      },
+      "options": [
+        {
+          "id": "daily",
+          "label": "Tous les jours",
+          "labelFr": "Tous les jours",
+          "labelEn": "Every day",
+          "icon": "📅",
+          "order": 0
+        },
+        {
+          "id": "4_5_times",
+          "label": "4–5 fois par semaine",
+          "labelFr": "4–5 fois par semaine",
+          "labelEn": "4–5 times a week",
+          "icon": "📆",
+          "order": 1
+        },
+        {
+          "id": "2_3_times",
+          "label": "2–3 fois par semaine",
+          "labelFr": "2–3 fois par semaine",
+          "labelEn": "2–3 times a week",
+          "icon": "📋",
+          "order": 2
+        },
+        {
+          "id": "as_needed",
+          "label": "Quand j'en ressens le besoin",
+          "labelFr": "Quand j'en ressens le besoin",
+          "labelEn": "When I feel the need",
+          "icon": "💫",
+          "order": 3
+        }
+      ],
+      "required": true
+    },
+    {
+      "id": "reminder_type",
+      "category": "preferences",
+      "order": 13,
+      "title": "Quel type de rappel préfères-tu ?",
+      "titleFr": "Quel type de rappel préfères-tu ?",
+      "titleEn": "What type of reminder do you prefer?",
+      "type": {
+        "kind": "multiple_choice",
+        "allowMultiple": false,
+        "displayMode": "list"
+      },
+      "options": [
+        {
+          "id": "boost_motivation",
+          "label": "Boost motivation",
+          "labelFr": "Boost motivation",
+          "labelEn": "Motivation boost",
+          "icon": "🚀",
+          "order": 0
+        },
+        {
+          "id": "gentle_reminder",
+          "label": "Rappel doux",
+          "labelFr": "Rappel doux",
+          "labelEn": "Gentle reminder",
+          "icon": "🔔",
+          "order": 1
+        },
+        {
+          "id": "never",
+          "label": "Jamais de rappel",
+          "labelFr": "Jamais de rappel",
+          "labelEn": "Never remind me",
+          "icon": "🔕",
+          "order": 2
+        }
+      ],
+      "required": true
+    }
+  ]
+}

@@ -49,10 +49,11 @@ export async function POST(
         return apiError(`Question at index ${i} is incomplete`, 400);
       }
 
-      // Sliders, circular pickers, and text inputs don't need options
+      // Sliders, circular pickers, text inputs, and profile groups don't need options
       const needsOptions = q.type.kind !== 'slider'
         && q.type.kind !== 'circular_picker'
-        && q.type.kind !== 'text_input';
+        && q.type.kind !== 'text_input'
+        && q.type.kind !== 'profile_group';
       if (needsOptions && (!q.options || q.options.length === 0)) {
         return apiError(`Question at index ${i} must have at least one option`, 400);
       }

@@ -98,6 +98,7 @@ function SortableQuestion({
                 {question.type.kind === 'slider' && 'Curseur'}
                 {question.type.kind === 'circular_picker' && 'Sélecteur circulaire'}
                 {question.type.kind === 'image_card' && 'Cartes avec images'}
+                {question.type.kind === 'profile_group' && 'Profil groupé'}
               </CardDescription>
             </div>
           </div>
@@ -159,6 +160,7 @@ function SortableQuestion({
             <option value="slider">Curseur</option>
             <option value="circular_picker">Sélecteur circulaire</option>
             <option value="image_card">Cartes avec images</option>
+            <option value="profile_group">Profil groupé</option>
           </select>
         </div>
 
@@ -319,8 +321,52 @@ function SortableQuestion({
           </div>
         )}
 
+        {/* Profile group fields */}
+        {question.type.kind === 'profile_group' && (
+          <div className="space-y-2 p-4 bg-muted/50 rounded-md">
+            <Label className="text-sm font-semibold">Champs du profil ({question.type.fields?.length || 0})</Label>
+            <div className="space-y-3 mt-2">
+              {question.type.fields?.sort((a, b) => a.order - b.order).map((field, idx) => (
+                <div key={idx} className="p-3 bg-background rounded border">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="font-medium">ID:</span> {field.id}
+                    </div>
+                    <div>
+                      <span className="font-medium">Type:</span> {field.inputType}
+                    </div>
+                    <div className="col-span-2">
+                      <span className="font-medium">Label:</span> {field.labelFr || field.label}
+                    </div>
+                    {field.placeholder && (
+                      <div className="col-span-2">
+                        <span className="font-medium">Placeholder:</span> {field.placeholder}
+                      </div>
+                    )}
+                    {field.inputType === 'radio' && field.options && (
+                      <div className="col-span-2">
+                        <span className="font-medium">Options:</span>
+                        <div className="ml-4 mt-1 space-y-1">
+                          {field.options.map((opt, i) => (
+                            <div key={i} className="text-xs">
+                              {opt.icon} {opt.labelFr || opt.label}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Note: Les champs du profile_group sont définis dans la configuration JSON et ne peuvent pas être modifiés ici.
+            </p>
+          </div>
+        )}
+
         {/* Options de réponse */}
-        {question.type.kind !== 'slider' && question.type.kind !== 'circular_picker' && question.type.kind !== 'text_input' && (
+        {question.type.kind !== 'slider' && question.type.kind !== 'circular_picker' && question.type.kind !== 'text_input' && question.type.kind !== 'profile_group' && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Options de réponse ({question.options.length})</Label>
