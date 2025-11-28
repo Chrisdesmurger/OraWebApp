@@ -1,0 +1,186 @@
+
+# Ora Admin Web Interface — Multi‑Agent Orchestration
+# Compatible with Claude Code / Crew-like runners.
+
+version: "1.0"
+
+metadata:
+  project: "Ora Admin Web Interface"
+  owner: "Christophe (SmartKiwiTech)"
+  spec: "./ORA_ADMIN_WEB_INTERFACE_SPEC.md"
+  agents_dir: "./agents"
+
+env:
+  FIREBASE_SERVICE_ACCOUNT_JSON: "${FIREBASE_SERVICE_ACCOUNT_JSON}"
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: "${NEXT_PUBLIC_FIREBASE_PROJECT_ID}"
+
+agents:
+  - id: firebase-agent
+    role: "Firebase Platform Engineer"
+    prompt: "./agents/firebase-agent.md"
+    outputs:
+      - "lib/firebase/admin.ts"
+      - "firestore.rules"
+      - "storage.rules"
+      - "firestore.indexes.json"
+    success_criteria:
+      - "Admin SDK initialises server-side only"
+      - "Rules align with RBAC in spec"
+      - "Indexes compile without error"
+
+  - id: auth-agent
+    role: "Auth & RBAC Engineer"
+    prompt: "./agents/auth-agent.md"
+    needs: [firebase-agent]
+    outputs:
+      - "app/login/page.tsx"
+      - "lib/firebase/client.ts"
+      - "auth/require-role.ts"
+      - "tests/e2e/auth.spec.ts"
+    success_criteria:
+      - "Login via Google and Email/Password works"
+      - "Unauthorized redirected to /login"
+      - "E2E auth tests pass"
+
+  - id: rbac-agent
+    role: "Security & Policy Engineer"
+    prompt: "./agents/rbac-agent.md"
+    needs: [auth-agent]
+    outputs:
+      - "lib/rbac.ts"
+      - "tests/unit/rbac.spec.ts"
+    success_criteria:
+      - "RBAC helpers enforce admin/teacher/viewer separation"
+      - "Unit tests pass"
+
+  - id: api-agent
+    role: "Backend API Engineer"
+    prompt: "./agents/api-agent.md"
+    needs: [rbac-agent]
+    outputs:
+      - "app/api/users/route.ts"
+      - "app/api/programs/route.ts"
+      - "app/api/lessons/route.ts"
+      - "app/api/commands/route.ts"
+      - "app/api/stats/route.ts"
+      - "tests/unit/api/*.spec.ts"
+    success_criteria:
+      - "JWT verification + RBAC in all handlers"
+      - "Proper 200/401/403 responses"
+      - "Unit tests pass"
+
+  - id: storage-agent
+    role: "Storage Engineer"
+    prompt: "./agents/storage-agent.md"
+    needs: [api-agent]
+    outputs:
+      - "lib/storage.ts"
+      - "components/upload/file-dropzone.tsx"
+      - "tests/unit/storage.spec.ts"
+    success_criteria:
+      - "Uploads succeed with progress UI"
+      - "MIME/size validation enforced"
+
+  - id: ui-agent
+    role: "Frontend UI Engineer"
+    prompt: "./agents/ui-agent.md"
+    needs: [api-agent, storage-agent]
+    outputs:
+      - "app/admin/layout.tsx"
+      - "app/admin/page.tsx"
+      - "app/admin/users/page.tsx"
+      - "app/admin/content/page.tsx"
+      - "components/kpi-card.tsx"
+      - "components/data-table.tsx"
+    success_criteria:
+      - "Accessible (WCAG AA)"
+      - "Responsive layout (mobile/desktop)"
+
+  - id: commands-agent
+    role: "Admin Tools Engineer"
+    prompt: "./agents/commands-agent.md"
+    needs: [api-agent]
+    outputs:
+      - "app/admin/commands/page.tsx"
+      - "scripts/seed-fake-users.ts"
+      - "scripts/purge-fake-users.ts"
+      - "scripts/seed-sample-content.ts"
+      - "scripts/wipe-demo-data.ts"
+    success_criteria:
+      - "Runs logged in commands/{id}/runs"
+      - "UI shows status and output"
+
+  - id: stats-agent
+    role: "Analytics Engineer"
+    prompt: "./agents/stats-agent.md"
+    needs: [api-agent]
+    outputs:
+      - "components/charts/*"
+      - "tests/unit/stats.spec.ts"
+    success_criteria:
+      - "KPIs match seeded data"
+      - "Charts render without custom colors"
+
+  - id: docs-agent
+    role: "Documentation Engineer"
+    prompt: "./agents/docs-agent.md"
+    needs: [ui-agent, commands-agent, stats-agent]
+    outputs:
+      - "README.md"
+      - ".env.example"
+      - "docs/SETUP_FIREBASE.md"
+      - "docs/DEPLOY_VERSEL.md"
+    success_criteria:
+      - "Developer can run project in < 10 minutes"
+      - "Docs reflect final codebase"
+
+pipeline:
+  # Sequential phases with gates
+  - stage: "Platform & Security"
+    run: [firebase-agent, auth-agent, rbac-agent]
+    gate:
+      require_tests: ["tests/e2e/auth.spec.ts", "tests/unit/rbac.spec.ts"]
+
+  - stage: "Backend APIs"
+    run: [api-agent]
+    gate:
+      require_tests_glob: "tests/unit/api/*.spec.ts"
+
+  - stage: "Storage & Uploads"
+    run: [storage-agent]
+    gate:
+      require_files: ["lib/storage.ts", "components/upload/file-dropzone.tsx"]
+
+  - stage: "UI & Admin Tools"
+    run: [ui-agent, commands-agent]
+    gate:
+      require_pages: ["app/admin/page.tsx", "app/admin/commands/page.tsx"]
+
+  - stage: "Analytics"
+    run: [stats-agent]
+    gate:
+      require_files: ["components/charts"]
+
+  - stage: "Docs & Release"
+    run: [docs-agent]
+    gate:
+      require_files: ["README.md", ".env.example"]
+
+artifacts:
+  export:
+    - "README.md"
+    - ".env.example"
+    - "firestore.rules"
+    - "storage.rules"
+    - "firestore.indexes.json"
+    - "agents/*"
+    - "app/**"
+    - "lib/**"
+    - "components/**"
+    - "scripts/**"
+    - "tests/**"
+
+stop_conditions:
+  - "Build fails"
+  - "Security rules mismatch spec"
+  - "Any stage gate unmet"

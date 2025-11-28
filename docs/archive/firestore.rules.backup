@@ -1,0 +1,256 @@
+rules_version = '2';
+
+// 🔥 Firestore Rules - Ora Platform (Android App + Admin Web)
+// Privacy by design + RBAC for admin interface
+// Supports both mobile app users AND admin/teacher web users
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================
+    // HELPER FUNCTIONS
+    // ==========================================
+
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Get user role from custom claims (defaults to 'user' if not set)
+    function getUserRole() {
+      return request.auth.token.keys().hasAny(['role'])
+        ? request.auth.token.role
+        : 'user';
+    }
+
+    // Check if user has admin role
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+
+    // Check if user has teacher role
+    function isTeacher() {
+      return isAuthenticated() && getUserRole() == 'teacher';
+    }
+
+    // Check if user is a normal app user (no role or role='user')
+    function isAppUser() {
+      return isAuthenticated() && getUserRole() == 'user';
+    }
+
+    // Check if user owns the resource
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // ==========================================
+    // COLLECTION: users/{uid}
+    // Android App: User profiles with snake_case fields
+    // Admin Web: Can read/update all users
+    // ==========================================
+    match /users/{uid} {
+      // Read: Admin can read all, users can read their own
+      allow read: if isAdmin() || isOwner(uid);
+
+      // Create: Users can create their own profile, admin can create any
+      allow create: if (isOwner(uid) || isAdmin()) && validateUserProfile(request.resource.data);
+
+      // Update: Admin can update all, users can update their own (except role/admin fields)
+      allow update: if isAdmin() ||
+                      (isOwner(uid) &&
+                       validateUserProfile(request.resource.data) &&
+                       !request.resource.data.diff(resource.data).affectedKeys()
+                         .hasAny(['role', 'is_admin', 'is_fake']));
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
+
+      // Sub-collection: users/{uid}/sessions - Practice sessions history
+      match /sessions/{sessionId} {
+        allow read: if isAdmin() || isOwner(uid);
+        allow write: if isOwner(uid);
+        allow delete: if isAdmin();
+      }
+
+      // Sub-collection: users/{uid}/practiceStats - Aggregated stats by type
+      match /practiceStats/{practiceType} {
+        allow read: if isAdmin() || isOwner(uid);
+        allow write: if isOwner(uid);
+      }
+
+      // Sub-collection: users/{uid}/dailyJournal - Daily journal entries
+      match /dailyJournal/{date} {
+        allow read: if isAdmin() || isOwner(uid);
+        allow write: if isOwner(uid);
+      }
+    }
+
+    // ==========================================
+    // COLLECTION: stats/{uid}
+    // Android App: User statistics
+    // Admin Web: Read-only for analytics
+    // ==========================================
+    match /stats/{uid} {
+      allow read: if isAdmin() || isOwner(uid);
+      allow write: if isOwner(uid);
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // COLLECTION: gratitudes/{uid}/entries/{date}
+    // Android App: Daily gratitude entries (PRIVATE)
+    // Admin Web: Read-only for admin analytics
+    // ==========================================
+    match /gratitudes/{uid}/entries/{date} {
+      allow read: if isAdmin() || isOwner(uid);
+      allow write: if isOwner(uid);
+      allow delete: if isAdmin() || isOwner(uid);
+    }
+
+    // ==========================================
+    // COLLECTION: programs/{programId}
+    // Android App: Read catalog (published programs for authenticated users)
+    // Admin Web: Full CRUD for admin/teachers
+    // ==========================================
+    match /programs/{programId} {
+      // Read: Published programs for all authenticated users
+      //       Draft/Archived programs only for admin or author
+      allow read: if isAuthenticated() && (
+        resource.data.status == 'published' ||
+        isAdmin() ||
+        (isTeacher() && resource.data.author_id == request.auth.uid)
+      );
+
+      // Create: Admin and teachers can create (must set author_id to self)
+      allow create: if (isAdmin() || isTeacher()) &&
+                      request.resource.data.author_id == request.auth.uid &&
+                      validateProgramData(request.resource.data);
+
+      // Update: Admin can update all, teachers can update their own
+      allow update: if (isAdmin() ||
+                       (isTeacher() && resource.data.author_id == request.auth.uid)) &&
+                      validateProgramData(request.resource.data);
+
+      // Delete: Admin can delete all, teachers can delete their own
+      allow delete: if isAdmin() ||
+                      (isTeacher() && resource.data.author_id == request.auth.uid);
+    }
+
+    // ==========================================
+    // COLLECTION: lessons/{lessonId}
+    // Admin Web: Lesson content management with media transcoding
+    // Android App: Read access for all authenticated users
+    // Teachers: Can create/update own lessons, Admin: Can manage all
+    // FIX: More permissive read rules + graceful handling of missing author_id
+    // ==========================================
+    match /lessons/{lessonId} {
+      // Read: All authenticated users can read lessons
+      // SIMPLIFIED: Just check authentication, no status filter
+      allow read: if isAuthenticated();
+
+      // Create: Admin and teachers can create
+      // FIX: author_id is optional (some lessons may not have it)
+      allow create: if (isAdmin() || isTeacher());
+
+      // Update: Admin can update all, teachers can update own (if author_id exists)
+      // FIX: Check if author_id exists before comparing
+      allow update: if isAdmin() ||
+                      (isTeacher() &&
+                       resource.data.keys().hasAny(['author_id']) &&
+                       resource.data.author_id == request.auth.uid);
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // COLLECTION: user_programs/{uid}/enrolled/{programId}
+    // Android App: User's enrolled programs (PRIVATE)
+    // Admin Web: Read-only for admin analytics
+    // ==========================================
+    match /user_programs/{uid}/enrolled/{programId} {
+      allow read: if isAdmin() || isOwner(uid);
+      allow write: if isOwner(uid);
+      allow delete: if isAdmin() || isOwner(uid);
+    }
+
+    // ==========================================
+    // COLLECTION: content/{contentId}
+    // Android App: Content catalog (videos, audios, etc.)
+    // Admin Web: Full CRUD for admin/teachers
+    // ==========================================
+    match /content/{contentId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() || isTeacher();
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
+    // COLLECTION: media/{mediaId}
+    // Admin Web: Media metadata (Admin/Teacher only)
+    // ==========================================
+    match /media/{mediaId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // ==========================================
+    // COLLECTION: commands/{commandId}
+    // Admin Web: Command execution logs (Admin only)
+    // ==========================================
+    match /commands/{commandId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ==========================================
+    // COLLECTION: audit_logs/{logId}
+    // Admin Web: Audit trail (Admin read-only, server writes)
+    // ==========================================
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false; // Server-side only
+    }
+
+    // ==========================================
+    // VALIDATION FUNCTIONS
+    // ==========================================
+
+    // Validate user profile (snake_case fields from Android app)
+    function validateUserProfile(data) {
+      return data.uid is string
+          && data.uid.size() > 0
+          && (data.keys().hasAny(['first_name']) ? (data.first_name is string && data.first_name.size() <= 50) : true)
+          && (data.keys().hasAny(['photo_url']) ? (data.photo_url == null || data.photo_url is string) : true)
+          && (data.keys().hasAny(['plan_tier']) ? data.plan_tier in ['free', 'FREE', 'premium', 'PREMIUM', 'lifetime', 'LIFETIME'] : true)
+          && data.created_at is timestamp;
+    }
+
+    // Validate program data (snake_case fields)
+    function validateProgramData(data) {
+      return data.title is string
+          && data.title.size() >= 3
+          && data.title.size() <= 100
+          && data.description is string
+          && data.description.size() >= 10
+          && data.description.size() <= 1000
+          && data.category in ['meditation', 'yoga', 'mindfulness', 'wellness']
+          && data.difficulty in ['beginner', 'intermediate', 'advanced']
+          && data.duration_days is int
+          && data.duration_days >= 1
+          && data.duration_days <= 365
+          && data.status in ['draft', 'published', 'archived']
+          && data.author_id is string
+          && data.lessons is list
+          && data.lessons.size() <= 100
+          && data.tags is list
+          && data.tags.size() <= 10;
+    }
+
+    // ==========================================
+    // DEFAULT DENY ALL OTHER COLLECTIONS
+    // ==========================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
