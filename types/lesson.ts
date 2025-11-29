@@ -54,6 +54,7 @@ export interface LessonDocument {
   author_id: string;
   thumbnail_url?: string | null;
   preview_image_url?: string | null;  // High-quality image for featured content
+  preview_storage_path?: string | null;  // Firebase Storage path for preview image
   mime_type?: string | null;
 
   // Scheduling fields (Issue #22)
@@ -86,6 +87,7 @@ export interface Lesson {
   authorId: string;
   thumbnailUrl?: string | null;
   previewImageUrl?: string | null;  // High-quality image for featured content
+  previewStoragePath?: string | null;  // Firebase Storage path for preview image
   mimeType?: string | null;
 
   // Scheduling fields (Issue #22)
@@ -158,6 +160,7 @@ export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson 
     authorId: doc.author_id,
     thumbnailUrl: doc.thumbnail_url,
     previewImageUrl: doc.preview_image_url,
+    previewStoragePath: doc.preview_storage_path,
     mimeType: doc.mime_type,
     scheduledPublishAt: doc.scheduled_publish_at || null,
     scheduledArchiveAt: doc.scheduled_archive_at || null,
@@ -190,6 +193,7 @@ export function mapLessonToFirestore(lesson: Partial<Lesson>): Partial<LessonDoc
   if (lesson.authorId !== undefined) doc.author_id = lesson.authorId;
   if (lesson.thumbnailUrl !== undefined) doc.thumbnail_url = lesson.thumbnailUrl;
   if (lesson.previewImageUrl !== undefined) doc.preview_image_url = lesson.previewImageUrl;
+  if (lesson.previewStoragePath !== undefined) doc.preview_storage_path = lesson.previewStoragePath;
   if (lesson.mimeType !== undefined) doc.mime_type = lesson.mimeType;
   if (lesson.scheduledPublishAt !== undefined) doc.scheduled_publish_at = lesson.scheduledPublishAt;
   if (lesson.scheduledArchiveAt !== undefined) doc.scheduled_archive_at = lesson.scheduledArchiveAt;

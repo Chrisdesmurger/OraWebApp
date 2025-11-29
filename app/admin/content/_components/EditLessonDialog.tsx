@@ -26,6 +26,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { LessonStatusBadge } from './LessonStatusBadge';
+import { LessonPreviewImageUpload } from './LessonPreviewImageUpload';
 import { ExternalLink } from 'lucide-react';
 import type { Lesson, UpdateLessonRequest } from '@/types/lesson';
 
@@ -61,6 +62,26 @@ export function EditLessonDialog({
   onSuccess,
 }: EditLessonDialogProps) {
   const [error, setError] = React.useState<string | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
+
+  // Initialize preview image URL when lesson changes
+  React.useEffect(() => {
+    if (lesson?.previewImageUrl) {
+      setPreviewImageUrl(lesson.previewImageUrl);
+    } else {
+      setPreviewImageUrl(null);
+    }
+  }, [lesson]);
+
+  const handlePreviewImageUpload = (url: string) => {
+    setPreviewImageUrl(url);
+    // Refresh will be handled by onSuccess in parent
+  };
+
+  const handlePreviewImageRemove = () => {
+    setPreviewImageUrl(null);
+    // Refresh will be handled by onSuccess in parent
+  };
 
   const {
     register,
@@ -320,6 +341,15 @@ export function EditLessonDialog({
               </div>
             </div>
           )}
+
+          {/* Preview Image Upload */}
+          <LessonPreviewImageUpload
+            lessonId={lesson.id}
+            currentUrl={previewImageUrl}
+            onUpload={handlePreviewImageUpload}
+            onRemove={handlePreviewImageRemove}
+            disabled={isSubmitting}
+          />
 
           {/* Title */}
           <div className="space-y-2">
