@@ -34,19 +34,27 @@ service firebase.storage {
 
     // Media uploads for programs
     match /media/programs/{programId}/{fileName} {
-      allow read: if isAuthenticated();
+      // Read: Public read for media playback (cover images accessible to all app users)
+      // Security through obscurity: program IDs are random/unpredictable
+      allow read: if true;
+
+      // Write: Only teachers and admins can upload
       allow write: if (isTeacher() || isAdmin()) && isValidMediaType() && isValidFileSize(100);
+
+      // Delete: Admin only
       allow delete: if isAdmin();
     }
 
-    // Media uploads for lessons (with transc oding support)
+    // Media uploads for lessons (with transcoding support)
     // Path structure: media/lessons/{lessonId}/original/{fileName}
     //                 media/lessons/{lessonId}/video/{quality}.mp4
     //                 media/lessons/{lessonId}/audio/{quality}.m4a
     //                 media/lessons/{lessonId}/thumb.jpg
     match /media/lessons/{lessonId}/{allPaths=**} {
-      // Read: All authenticated users can read (for playback)
-      allow read: if isAuthenticated();
+      // Read: Public read for media playback (accessible to anyone with the link)
+      // Security through obscurity: lesson IDs are random/unpredictable
+      // Similar model to YouTube, Spotify, SoundCloud - content is "unlisted"
+      allow read: if true;
 
       // Write: Teachers and admins can upload (2GB max for original)
       allow write: if (isTeacher() || isAdmin()) && isValidMediaType() && isValidFileSize(2048);
