@@ -31,7 +31,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Search, MoreHorizontal, UserPlus, Filter, Trash2 } from 'lucide-react';
+import { Search, MoreHorizontal, UserPlus, Filter, Trash2, Target } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +59,7 @@ interface User {
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   const [users, setUsers] = React.useState<User[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -217,6 +219,10 @@ export default function UsersPage() {
     }
   };
 
+  const handleViewRecommendations = (userId: string) => {
+    router.push(`/admin/users/${userId}/recommendations`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -324,6 +330,13 @@ export default function UsersPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleViewRecommendations(user.id)}
+                            >
+                              <Target className="mr-2 h-4 w-4" />
+                              View Recommendations
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() =>
