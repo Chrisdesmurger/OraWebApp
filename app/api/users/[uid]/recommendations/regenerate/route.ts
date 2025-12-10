@@ -10,7 +10,7 @@ import {
   apiError,
   apiSuccess,
 } from '@/lib/api/auth-middleware';
-import { adminDb } from '@/lib/firebase/admin';
+import { getFirestore } from '@/lib/firebase/admin';
 
 /**
  * POST /api/users/[uid]/recommendations/regenerate
@@ -35,7 +35,7 @@ export async function POST(
     console.log(`[API] Manual recommendation regeneration requested for user: ${uid}`);
 
     // Verify user exists
-    const userDoc = await adminDb.collection('users').doc(uid).get();
+    const userDoc = await getFirestore().collection('users').doc(uid).get();
 
     if (!userDoc.exists) {
       return apiError('User not found', 404);

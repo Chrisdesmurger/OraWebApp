@@ -10,7 +10,7 @@ import {
   apiError,
   apiSuccess,
 } from '@/lib/api/auth-middleware';
-import { adminDb } from '@/lib/firebase/admin';
+import { getFirestore } from '@/lib/firebase/admin';
 import {
   RecommendationDocument,
   RecommendationHistoryItem,
@@ -67,7 +67,7 @@ export async function GET(
     console.log(`[API] Fetching recommendation history for user: ${uid}`);
 
     // Fetch all recommendations (excluding 'latest' as it's a duplicate)
-    const snapshot = await adminDb
+    const snapshot = await getFirestore()
       .collection('users')
       .doc(uid)
       .collection('recommendations')

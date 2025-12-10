@@ -10,7 +10,7 @@ import {
   apiError,
   apiSuccess,
 } from '@/lib/api/auth-middleware';
-import { adminDb } from '@/lib/firebase/admin';
+import { getFirestore } from '@/lib/firebase/admin';
 import {
   Recommendation,
   RecommendationDocument,
@@ -68,7 +68,7 @@ async function enrichRecommendationWithLessons(
     const score = recommendation.scores[lessonId] || 0;
 
     try {
-      const lessonDoc = await adminDb.collection('lessons').doc(lessonId).get();
+      const lessonDoc = await getFirestore().collection('lessons').doc(lessonId).get();
 
       if (lessonDoc.exists) {
         const lessonData = lessonDoc.data();
@@ -141,7 +141,7 @@ export async function GET(
     console.log(`[API] Fetching latest recommendation for user: ${uid}`);
 
     // Fetch latest recommendation
-    const latestDoc = await adminDb
+    const latestDoc = await getFirestore()
       .collection('users')
       .doc(uid)
       .collection('recommendations')

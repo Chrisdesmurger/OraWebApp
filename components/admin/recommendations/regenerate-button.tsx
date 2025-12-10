@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { RefreshCw } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/lib/hooks/use-toast';
 
 interface RegenerateButtonProps {
   uid: string;
