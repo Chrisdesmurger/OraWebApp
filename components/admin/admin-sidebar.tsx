@@ -19,6 +19,7 @@ import {
   X,
   Image,
   ClipboardList,
+  Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
