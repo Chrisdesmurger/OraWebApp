@@ -1,6 +1,9 @@
 /**
  * API Route: GET /api/users/[uid]/recommendations
  * Fetches the latest recommendation for a specific user
+ *
+ * IMPORTANT: Reads from user_onboarding/{uid}/recommendations/latest
+ * (Updated path after Firestore migration - see issue #66)
  */
 
 import { NextRequest } from 'next/server';
@@ -38,7 +41,7 @@ function mapRecommendationDocument(
     generatedAt:
       data.generated_at instanceof Timestamp
         ? data.generated_at.toDate()
-        : new Date(data.generated_at as any),
+        : new Date(data.generated_at as unknown as string),
     algorithmVersion: data.algorithm_version,
     basedOn: {
       intentions: data.based_on.intentions,
@@ -77,7 +80,7 @@ async function enrichRecommendationWithLessons(
           id: lessonId,
           title: lessonData?.title || 'Sans titre',
           discipline: lessonData?.discipline || 'Autre',
-          difficulty: lessonData?.difficulty || 'Débutant',
+          difficulty: lessonData?.difficulty || 'Debutant',
           duration: lessonData?.duration_sec || 0,
           score,
           rank: i + 1, // Rank 1-5
@@ -89,7 +92,7 @@ async function enrichRecommendationWithLessons(
         // Lesson not found, add placeholder
         lessons.push({
           id: lessonId,
-          title: `Leçon introuvable (${lessonId})`,
+          title: `Lecon introuvable (${lessonId})`,
           discipline: 'Inconnu',
           difficulty: 'Inconnu',
           duration: 0,
@@ -140,9 +143,10 @@ export async function GET(
 
     console.log(`[API] Fetching latest recommendation for user: ${uid}`);
 
-    // Fetch latest recommendation
+    // Fetch latest recommendation from NEW path: user_onboarding/{uid}/recommendations/latest
+    // (Updated after Firestore migration - see issue #66)
     const latestDoc = await getFirestore()
-      .collection('users')
+      .collection('user_onboarding')
       .doc(uid)
       .collection('recommendations')
       .doc('latest')
@@ -170,8 +174,10 @@ export async function GET(
     return apiSuccess({
       recommendation: enrichedRecommendation,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Error fetching recommendation:', error);
-    return apiError(error.message || 'Failed to fetch recommendation', 500);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to fetch recommendation';
+    return apiError(errorMessage, 500);
   }
 }
