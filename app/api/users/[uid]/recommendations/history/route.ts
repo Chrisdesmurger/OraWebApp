@@ -1,6 +1,9 @@
 /**
  * API Route: GET /api/users/[uid]/recommendations/history
  * Fetches recommendation history for a specific user
+ *
+ * IMPORTANT: Reads from user_onboarding/{uid}/recommendations/
+ * (Updated path after Firestore migration - see issue #66)
  */
 
 import { NextRequest } from 'next/server';
@@ -32,7 +35,7 @@ function mapToHistoryItem(
   const generatedAt =
     data.generated_at instanceof Timestamp
       ? data.generated_at.toDate()
-      : new Date(data.generated_at as any);
+      : new Date(data.generated_at as unknown as string);
 
   return {
     id: doc.id,
@@ -66,9 +69,11 @@ export async function GET(
 
     console.log(`[API] Fetching recommendation history for user: ${uid}`);
 
-    // Fetch all recommendations (excluding 'latest' as it's a duplicate)
+    // Fetch all recommendations from NEW path: user_onboarding/{uid}/recommendations/
+    // (Updated after Firestore migration - see issue #66)
+    // Excluding 'latest' as it's a duplicate
     const snapshot = await getFirestore()
-      .collection('users')
+      .collection('user_onboarding')
       .doc(uid)
       .collection('recommendations')
       .orderBy('generated_at', 'desc')
@@ -101,11 +106,10 @@ export async function GET(
     console.log(`[API] Found ${limitedHistory.length} recommendation history items`);
 
     return apiSuccess({ history: limitedHistory });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Error fetching recommendation history:', error);
-    return apiError(
-      error.message || 'Failed to fetch recommendation history',
-      500
-    );
+    const errorMessage =
+      error instanceof Error ? error.message : 'Failed to fetch recommendation history';
+    return apiError(errorMessage, 500);
   }
 }

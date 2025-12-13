@@ -1,6 +1,11 @@
 /**
  * API Route: POST /api/users/[uid]/recommendations/regenerate
- * Manually triggers recommendation regeneration via Cloud Function
+ * Manually triggers recommendation regeneration via Cloud Function HTTP endpoint
+ *
+ * This route calls the Firebase Cloud Function `regenerateUserRecommendationsHttp`
+ * which is an HTTP endpoint (onRequest), NOT a callable function (onCall).
+ *
+ * @see https://github.com/Chrisdesmurger/OraWebApp/issues/66
  */
 
 import { NextRequest } from 'next/server';
@@ -11,6 +16,13 @@ import {
   apiSuccess,
 } from '@/lib/api/auth-middleware';
 import { getFirestore } from '@/lib/firebase/admin';
+
+/**
+ * Firebase Cloud Function HTTP endpoint URL
+ * Uses onRequest (HTTP) instead of onCall (Callable) for direct fetch() access
+ */
+const REGENERATE_FUNCTION_URL =
+  'https://us-central1-ora-wellbeing.cloudfunctions.net/regenerateUserRecommendationsHttp';
 
 /**
  * POST /api/users/[uid]/recommendations/regenerate
@@ -34,31 +46,17 @@ export async function POST(
 
     console.log(`[API] Manual recommendation regeneration requested for user: ${uid}`);
 
-    // Verify user exists
+    // Verify user exists in Firestore
     const userDoc = await getFirestore().collection('users').doc(uid).get();
 
     if (!userDoc.exists) {
       return apiError('User not found', 404);
     }
 
-    // OPTION 1: Call Firebase Cloud Function directly via HTTP
-    // This requires the Cloud Function to be deployed with an HTTP trigger
-    // Example: https://us-central1-{projectId}.cloudfunctions.net/regenerateUserRecommendations
+    console.log(`[API] Calling Cloud Function: ${REGENERATE_FUNCTION_URL}`);
 
-    // Get Firebase project ID
-    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-
-    if (!projectId) {
-      return apiError('Firebase project ID not configured', 500);
-    }
-
-    // Construct Cloud Function URL
-    const functionUrl = `https://us-central1-${projectId}.cloudfunctions.net/regenerateUserRecommendations`;
-
-    console.log(`[API] Calling Cloud Function: ${functionUrl}`);
-
-    // Call the Cloud Function
-    const response = await fetch(functionUrl, {
+    // Call the HTTP Cloud Function endpoint
+    const response = await fetch(REGENERATE_FUNCTION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -66,16 +64,19 @@ export async function POST(
       body: JSON.stringify({ uid }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[API] Cloud Function error:', errorText);
-      return apiError(
-        `Failed to regenerate recommendations: ${errorText}`,
-        response.status
-      );
-    }
-
+    // Parse response
     const result = await response.json();
+
+    if (!response.ok) {
+      console.error('[API] Cloud Function error:', result);
+
+      // Return error from Cloud Function with details
+      const errorMessage = result.details
+        ? `${result.error}: ${result.details}`
+        : result.error || 'Failed to regenerate recommendations';
+
+      return apiError(errorMessage, response.status);
+    }
 
     console.log('[API] Recommendations regenerated successfully:', result);
 
@@ -84,20 +85,21 @@ export async function POST(
       uid,
       result,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Error regenerating recommendations:', error);
 
-    // Handle specific error cases
-    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+    // Handle network errors
+    if (error instanceof TypeError && error.message.includes('fetch')) {
       return apiError(
         'Cloud Function not reachable. Make sure the function is deployed.',
         503
       );
     }
 
-    return apiError(
-      error.message || 'Failed to regenerate recommendations',
-      500
-    );
+    // Handle other errors
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error occurred';
+
+    return apiError(errorMessage, 500);
   }
 }
