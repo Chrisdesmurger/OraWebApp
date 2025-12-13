@@ -79,13 +79,17 @@ export const updateLessonSchema = z.object({
 
 /**
  * Lesson filters schema (for list queries)
+ *
+ * IMPORTANT: Default limit increased from 20 to 100 to show all lessons.
+ * The admin Content page needs to display all lessons without pagination.
+ * See Issue #64: Some lessons were not displaying because they exceeded the default limit.
  */
 export const lessonFiltersSchema = z.object({
   programId: z.string().optional(),
   status: lessonStatusSchema.optional(),
   type: lessonTypeSchema.optional(),
   search: z.string().optional(),
-  limit: z.number().int().min(1).max(100).default(20),
+  limit: z.number().int().min(1).max(500).default(100),  // Increased from 20 to 100
   offset: z.number().int().min(0).default(0),
 });
 

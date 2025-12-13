@@ -109,6 +109,13 @@ export async function GET(request: NextRequest) {
         lessonsSnapshot.forEach((doc) => {
           const lessonData = doc.data() as LessonDocument;
           const lesson = mapLessonFromFirestore(doc.id, lessonData);
+
+          // Skip invalid lessons (Issue #64: validation returns null for invalid data)
+          if (lesson === null) {
+            console.warn(`[GET /api/scheduled-content] Skipping invalid lesson ${doc.id}`);
+            return;
+          }
+
           const scheduledItems = lessonToScheduledItems(lesson);
           allScheduledItems.push(...scheduledItems);
         });

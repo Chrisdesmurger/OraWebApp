@@ -8,7 +8,7 @@ import {
   type LessonFiltersInput
 } from '@/lib/validators/lesson';
 import { mapLessonFromFirestore } from '@/types/lesson';
-import type { LessonDocument } from '@/types/lesson';
+import type { LessonDocument, Lesson } from '@/types/lesson';
 import { logCreate } from '@/lib/audit/logger';
 
 /**
@@ -19,7 +19,7 @@ import { logCreate } from '@/lib/audit/logger';
  * - status: 'draft'|'uploading'|'processing'|'ready'|'failed' (optional)
  * - type: 'video'|'audio' (optional)
  * - search: string (optional) - Search in title
- * - limit: number (default 20, max 100)
+ * - limit: number (default 100, max 500) - Increased from 20 to show all lessons (Issue #64)
  * - offset: number (default 0)
  */
 export async function GET(request: NextRequest) {
@@ -34,11 +34,12 @@ export async function GET(request: NextRequest) {
       status: searchParams.get('status') || undefined,
       type: searchParams.get('type') || undefined,
       search: searchParams.get('search') || undefined,
-      limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 20,
+      limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 100,
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0,
     });
 
-    console.log('[GET /api/lessons] Filters:', filters);
+    console.log('[GET /api/lessons] User:', user.uid, 'Role:', user.role);
+    console.log('[GET /api/lessons] Filters:', JSON.stringify(filters));
 
     const firestore = getFirestore();
     let query = firestore.collection('lessons');
@@ -59,6 +60,7 @@ export async function GET(request: NextRequest) {
     // For teachers, only show their own lessons unless admin
     if (user.role === 'teacher') {
       query = query.where('author_id', '==', user.uid) as any;
+      console.log('[GET /api/lessons] Filtering by author_id:', user.uid);
     }
 
     // Order by updated_at descending
@@ -75,26 +77,51 @@ export async function GET(request: NextRequest) {
     query = query.limit(filters.limit) as any;
 
     const snapshot = await query.get();
-    console.log('[GET /api/lessons] Found', snapshot.size, 'lessons');
+    console.log('[GET /api/lessons] Found', snapshot.size, 'lessons in Firestore');
 
-    let lessons = snapshot.docs.map((doc) => {
+    // Map and filter invalid lessons
+    let invalidCount = 0;
+    const lessons: Lesson[] = [];
+
+    snapshot.docs.forEach((doc, index) => {
       const data = doc.data() as LessonDocument;
-      return mapLessonFromFirestore(doc.id, data);
+      const mapped = mapLessonFromFirestore(doc.id, data);
+
+      if (mapped === null) {
+        invalidCount++;
+        console.warn(`[GET /api/lessons] Skipping invalid lesson ${doc.id} (${data.title || 'no title'})`);
+      } else {
+        lessons.push(mapped);
+      }
     });
 
-    // Client-side search filter (if needed)
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      lessons = lessons.filter(lesson =>
-        lesson.title.toLowerCase().includes(searchLower)
-      );
+    if (invalidCount > 0) {
+      console.warn(`[GET /api/lessons] Skipped ${invalidCount} invalid lessons`);
     }
 
+    // Client-side search filter (if needed)
+    let filteredLessons = lessons;
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filteredLessons = lessons.filter(lesson =>
+        lesson.title.toLowerCase().includes(searchLower)
+      );
+      console.log('[GET /api/lessons] After search filter:', filteredLessons.length, 'lessons');
+    }
+
+    console.log('[GET /api/lessons] Returning', filteredLessons.length, 'valid lessons');
+
     return apiSuccess({
-      lessons,
-      total: lessons.length,
+      lessons: filteredLessons,
+      total: filteredLessons.length,
       limit: filters.limit,
       offset: filters.offset,
+      // Include debug info for admin
+      _debug: user.role === 'admin' ? {
+        totalInFirestore: snapshot.size,
+        invalidSkipped: invalidCount,
+        appliedFilters: filters,
+      } : undefined,
     });
   } catch (error: any) {
     console.error('GET /api/lessons error:', error);
@@ -178,7 +205,7 @@ export async function POST(request: NextRequest) {
     };
 
     await lessonRef.set(lessonData);
-    console.log(`✅ Created lesson ${lessonRef.id} in program ${validatedData.programId}`);
+    console.log(`[POST /api/lessons] Created lesson ${lessonRef.id} in program ${validatedData.programId}`);
 
     // Update program media_count (snake_case for Firestore)
     await firestore
@@ -214,4 +241,3 @@ export async function POST(request: NextRequest) {
     return apiError(error.message || 'Failed to create lesson', 500);
   }
 }
-

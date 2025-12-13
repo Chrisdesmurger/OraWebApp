@@ -136,35 +136,96 @@ export interface UploadInitResponse {
 }
 
 /**
- * Map Firestore document to client model
+ * Validation result for lesson data
  */
-export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson {
+export interface LessonValidationResult {
+  isValid: boolean;
+  missingFields: string[];
+  warnings: string[];
+}
+
+/**
+ * Validate lesson data from Firestore
+ * Returns validation result with details about missing or invalid fields
+ */
+export function validateLessonDocument(id: string, doc: Partial<LessonDocument>): LessonValidationResult {
+  const requiredFields = ['title', 'type', 'program_id', 'status', 'author_id', 'created_at', 'updated_at'];
+  const missingFields: string[] = [];
+  const warnings: string[] = [];
+
+  // Check required fields
+  for (const field of requiredFields) {
+    const value = doc[field as keyof LessonDocument];
+    if (value === undefined || value === null || value === '') {
+      missingFields.push(field);
+    }
+  }
+
+  // Check tags is an array
+  if (doc.tags !== undefined && !Array.isArray(doc.tags)) {
+    warnings.push(`tags is not an array (got ${typeof doc.tags})`);
+  }
+
+  // Check type is valid
+  if (doc.type && !['video', 'audio'].includes(doc.type)) {
+    warnings.push(`invalid type: ${doc.type}`);
+  }
+
+  // Check status is valid
+  if (doc.status && !['draft', 'uploading', 'processing', 'ready', 'failed'].includes(doc.status)) {
+    warnings.push(`invalid status: ${doc.status}`);
+  }
+
+  return {
+    isValid: missingFields.length === 0,
+    missingFields,
+    warnings
+  };
+}
+
+/**
+ * Map Firestore document to client model
+ * Returns null if required fields are missing (with console warning)
+ */
+export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson | null {
+  // Validate the document
+  const validation = validateLessonDocument(id, doc);
+
+  if (!validation.isValid) {
+    console.warn(`[mapLessonFromFirestore] Lesson ${id} missing required fields:`, validation.missingFields);
+    return null;
+  }
+
+  if (validation.warnings.length > 0) {
+    console.warn(`[mapLessonFromFirestore] Lesson ${id} has warnings:`, validation.warnings);
+  }
+
   return {
     id,
     title: doc.title,
-    description: doc.description,
+    description: doc.description ?? null,
     type: doc.type,
     programId: doc.program_id,
-    order: doc.order,
-    durationSec: doc.duration_sec,
-    tags: doc.tags,
-    transcript: doc.transcript,
+    order: doc.order ?? 0,
+    durationSec: doc.duration_sec ?? null,
+    tags: Array.isArray(doc.tags) ? doc.tags : [],
+    transcript: doc.transcript ?? null,
     status: doc.status,
-    storagePathOriginal: doc.storage_path_original,
+    storagePathOriginal: doc.storage_path_original ?? null,
     renditions: doc.renditions,
     audioVariants: doc.audio_variants,
-    codec: doc.codec,
-    sizeBytes: doc.size_bytes,
+    codec: doc.codec ?? null,
+    sizeBytes: doc.size_bytes ?? null,
     createdAt: doc.created_at,
     updatedAt: doc.updated_at,
     authorId: doc.author_id,
-    thumbnailUrl: doc.thumbnail_url,
-    previewImageUrl: doc.preview_image_url,
-    previewStoragePath: doc.preview_storage_path,
-    mimeType: doc.mime_type,
-    scheduledPublishAt: doc.scheduled_publish_at || null,
-    scheduledArchiveAt: doc.scheduled_archive_at || null,
-    autoPublishEnabled: doc.auto_publish_enabled || false,
+    thumbnailUrl: doc.thumbnail_url ?? null,
+    previewImageUrl: doc.preview_image_url ?? null,
+    previewStoragePath: doc.preview_storage_path ?? null,
+    mimeType: doc.mime_type ?? null,
+    scheduledPublishAt: doc.scheduled_publish_at ?? null,
+    scheduledArchiveAt: doc.scheduled_archive_at ?? null,
+    autoPublishEnabled: doc.auto_publish_enabled ?? false,
   };
 }
 
