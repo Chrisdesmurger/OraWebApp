@@ -34,6 +34,12 @@ export async function GET(
 
     const lesson = mapLessonFromFirestore(lessonId, lessonData);
 
+    // Return error if lesson data is invalid (Issue #64: validation returns null)
+    if (lesson === null) {
+      console.error(`[GET /api/lessons/${lessonId}] Lesson has invalid data`);
+      return apiError('Lesson data is corrupted or incomplete', 500);
+    }
+
     return apiSuccess({ lesson });
   } catch (error: any) {
     console.error(`GET /api/lessons/[id] error:`, error);
@@ -140,12 +146,18 @@ export async function PATCH(
     });
 
     await lessonRef.update(updateData);
-    console.log(`✅ Updated lesson ${lessonId}`);
+    console.log(`[PATCH /api/lessons/${lessonId}] Updated lesson`);
 
     // Fetch updated lesson
     const updatedDoc = await lessonRef.get();
     const updatedData = updatedDoc.data() as LessonDocument;
     const updatedLesson = mapLessonFromFirestore(lessonId, updatedData);
+
+    // Return error if lesson data is invalid after update (Issue #64: validation returns null)
+    if (updatedLesson === null) {
+      console.error(`[PATCH /api/lessons/${lessonId}] Updated lesson has invalid data`);
+      return apiError('Lesson data became corrupted after update', 500);
+    }
 
     // Log audit event (don't await - fire and forget)
     logUpdate({
@@ -218,15 +230,15 @@ export async function DELETE(
     // Delete all media files from Storage
     try {
       await deleteLessonMedia(lessonId);
-      console.log(`✅ Deleted media files for lesson ${lessonId}`);
+      console.log(`[DELETE /api/lessons/${lessonId}] Deleted media files`);
     } catch (storageError) {
-      console.warn(`⚠️ Failed to delete media files for lesson ${lessonId}:`, storageError);
+      console.warn(`[DELETE /api/lessons/${lessonId}] Failed to delete media files:`, storageError);
       // Continue with Firestore deletion even if storage cleanup fails
     }
 
     // Delete Firestore document
     await lessonRef.delete();
-    console.log(`✅ Deleted lesson ${lessonId}`);
+    console.log(`[DELETE /api/lessons/${lessonId}] Deleted lesson`);
 
     // Log audit event (don't await - fire and forget)
     logDelete({
