@@ -2,9 +2,52 @@
  * Lesson Validators
  *
  * Zod schemas for validating lesson creation, updates, and uploads.
+ *
+ * IMPORTANT - i18n Support (Issue #68):
+ * - All text fields now support multilingual content (FR/EN/ES)
+ * - French (fr) is the primary language and always required
+ * - English (en) and Spanish (es) are optional
+ * - Firestore uses snake_case (title_fr, title_en, title_es)
+ * - TypeScript uses objects ({ fr: string, en?: string, es?: string })
  */
 
 import { z } from 'zod';
+
+// ============================================================================
+// Multilingual Field Schemas
+// ============================================================================
+
+/**
+ * Multilingual text field - French required, others optional
+ */
+export const multilingualTextSchema = z.object({
+  fr: z.string().min(1, 'French translation is required'),
+  en: z.string().optional(),
+  es: z.string().optional(),
+});
+
+/**
+ * Optional multilingual text field
+ */
+export const multilingualTextOptionalSchema = z.object({
+  fr: z.string().optional(),
+  en: z.string().optional(),
+  es: z.string().optional(),
+}).optional();
+
+/**
+ * Multilingual text with max length validation
+ */
+export const multilingualTextWithMaxSchema = (maxLength: number) =>
+  z.object({
+    fr: z.string().min(1, 'French translation is required').max(maxLength, `French text must be less than ${maxLength} characters`),
+    en: z.string().max(maxLength, `English text must be less than ${maxLength} characters`).optional(),
+    es: z.string().max(maxLength, `Spanish text must be less than ${maxLength} characters`).optional(),
+  });
+
+// ============================================================================
+// Lesson Enums
+// ============================================================================
 
 /**
  * Lesson type enum
@@ -15,6 +58,15 @@ export const lessonTypeSchema = z.enum(['video', 'audio']);
  * Lesson status enum
  */
 export const lessonStatusSchema = z.enum(['draft', 'uploading', 'processing', 'ready', 'failed']);
+
+/**
+ * Lesson category enum (for specialized content)
+ */
+export const lessonCategorySchema = z.enum(['meditation', 'yoga', 'massage', 'mindfulness', 'wellness']);
+
+// ============================================================================
+// Video/Audio Rendition Schemas
+// ============================================================================
 
 /**
  * Video rendition schema
@@ -52,30 +104,195 @@ export const audioVariantsSchema = z.object({
   low: audioVariantSchema.optional(),
 });
 
+// ============================================================================
+// Yoga-Specific Schemas (i18n)
+// ============================================================================
+
 /**
- * Create lesson request schema
+ * Yoga instruction schema with multilingual text
+ */
+export const yogaInstructionSchema = z.object({
+  text: multilingualTextSchema,
+  durationSec: z.number().int().min(0),
+  side: z.enum(['left', 'right', 'none']).optional(),
+});
+
+/**
+ * Yoga chapter schema with multilingual name and instructions
+ */
+export const yogaChapterSchema = z.object({
+  id: z.string().min(1),
+  name: multilingualTextSchema,
+  order: z.number().int().min(0),
+  startTimeSec: z.number().int().min(0),
+  endTimeSec: z.number().int().min(0),
+  instructions: z.array(yogaInstructionSchema).default([]),
+}).refine(
+  (data) => data.endTimeSec >= data.startTimeSec,
+  { message: 'End time must be >= start time', path: ['endTimeSec'] }
+);
+
+// ============================================================================
+// Massage-Specific Schemas (i18n)
+// ============================================================================
+
+/**
+ * Massage instruction schema with multilingual text and pressure level
+ */
+export const massageInstructionSchema = z.object({
+  text: multilingualTextSchema,
+  durationSec: z.number().int().min(0),
+  pressureLevel: multilingualTextOptionalSchema,
+});
+
+/**
+ * Massage body zone schema with multilingual name and instructions
+ */
+export const massageBodyZoneSchema = z.object({
+  id: z.string().min(1),
+  name: multilingualTextSchema,
+  order: z.number().int().min(0),
+  startTimeSec: z.number().int().min(0),
+  endTimeSec: z.number().int().min(0),
+  instructions: z.array(massageInstructionSchema).default([]),
+}).refine(
+  (data) => data.endTimeSec >= data.startTimeSec,
+  { message: 'End time must be >= start time', path: ['endTimeSec'] }
+);
+
+// ============================================================================
+// Meditation-Specific Schemas (i18n)
+// ============================================================================
+
+/**
+ * Meditation phase schema with multilingual content
+ */
+export const meditationPhaseSchema = z.object({
+  id: z.string().min(1),
+  name: multilingualTextSchema,
+  order: z.number().int().min(0),
+  startTimeSec: z.number().int().min(0),
+  endTimeSec: z.number().int().min(0),
+  breathingInstruction: multilingualTextOptionalSchema,
+  ambientSoundName: multilingualTextOptionalSchema,
+}).refine(
+  (data) => data.endTimeSec >= data.startTimeSec,
+  { message: 'End time must be >= start time', path: ['endTimeSec'] }
+);
+
+// ============================================================================
+// Create Lesson Schema (with i18n)
+// ============================================================================
+
+/**
+ * Create lesson request schema with multilingual support
  */
 export const createLessonSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(200, 'Title must be less than 200 characters'),
-  description: z.string().max(500, 'Description must be less than 500 characters').nullable().optional(),
+  // Basic fields (multilingual)
+  title: multilingualTextWithMaxSchema(200),
+  description: multilingualTextOptionalSchema.nullable(),
+  category: multilingualTextOptionalSchema.nullable(),
+  transcript: multilingualTextOptionalSchema.nullable(),
+
+  // Non-multilingual fields
   type: lessonTypeSchema,
   programId: z.string().min(1, 'Program ID is required'),
   order: z.number().int().min(0).default(0),
   tags: z.array(z.string()).default([]),
-  transcript: z.string().nullable().optional(),
+
+  // Yoga-specific (optional)
+  chapters: z.array(yogaChapterSchema).optional(),
+
+  // Massage-specific (optional)
+  bodyZones: z.array(massageBodyZoneSchema).optional(),
+
+  // Meditation-specific (optional)
+  phases: z.array(meditationPhaseSchema).optional(),
+  ambientSoundName: multilingualTextOptionalSchema,
+  breathingInstruction: multilingualTextOptionalSchema,
 });
 
 /**
- * Update lesson request schema
+ * Backward-compatible create lesson schema (for existing non-i18n API calls)
+ * Accepts either multilingual objects or plain strings (for French)
+ */
+export const createLessonSchemaCompat = z.object({
+  // Support both string (legacy) and multilingual object
+  title: z.union([
+    z.string().min(1, 'Title is required').max(200, 'Title must be less than 200 characters'),
+    multilingualTextWithMaxSchema(200),
+  ]),
+  description: z.union([
+    z.string().max(500, 'Description must be less than 500 characters').nullable(),
+    multilingualTextOptionalSchema.nullable(),
+  ]).optional(),
+
+  // Non-multilingual fields
+  type: lessonTypeSchema,
+  programId: z.string().min(1, 'Program ID is required'),
+  order: z.number().int().min(0).default(0),
+  tags: z.array(z.string()).default([]),
+  transcript: z.union([
+    z.string().nullable(),
+    multilingualTextOptionalSchema.nullable(),
+  ]).optional(),
+});
+
+// ============================================================================
+// Update Lesson Schema (with i18n)
+// ============================================================================
+
+/**
+ * Update lesson request schema with multilingual support
  */
 export const updateLessonSchema = z.object({
-  title: z.string().min(1).max(200).optional(),
-  description: z.string().max(500, 'Description must be less than 500 characters').nullable().optional(),
+  // Basic fields (multilingual) - all optional for partial updates
+  title: multilingualTextWithMaxSchema(200).optional(),
+  description: multilingualTextOptionalSchema.nullable(),
+  category: multilingualTextOptionalSchema.nullable(),
+  transcript: multilingualTextOptionalSchema.nullable(),
+
+  // Non-multilingual fields
   order: z.number().int().min(0).optional(),
   tags: z.array(z.string()).optional(),
-  transcript: z.string().nullable().optional(),
+  programId: z.string().min(1).optional(),
+
+  // Yoga-specific (optional)
+  chapters: z.array(yogaChapterSchema).optional(),
+
+  // Massage-specific (optional)
+  bodyZones: z.array(massageBodyZoneSchema).optional(),
+
+  // Meditation-specific (optional)
+  phases: z.array(meditationPhaseSchema).optional(),
+  ambientSoundName: multilingualTextOptionalSchema,
+  breathingInstruction: multilingualTextOptionalSchema,
+});
+
+/**
+ * Backward-compatible update lesson schema
+ */
+export const updateLessonSchemaCompat = z.object({
+  title: z.union([
+    z.string().min(1).max(200),
+    multilingualTextWithMaxSchema(200),
+  ]).optional(),
+  description: z.union([
+    z.string().max(500, 'Description must be less than 500 characters').nullable(),
+    multilingualTextOptionalSchema.nullable(),
+  ]).optional(),
+  order: z.number().int().min(0).optional(),
+  tags: z.array(z.string()).optional(),
+  transcript: z.union([
+    z.string().nullable(),
+    multilingualTextOptionalSchema.nullable(),
+  ]).optional(),
   programId: z.string().min(1).optional(),
 });
+
+// ============================================================================
+// Lesson Filters Schema
+// ============================================================================
 
 /**
  * Lesson filters schema (for list queries)
@@ -92,6 +309,10 @@ export const lessonFiltersSchema = z.object({
   limit: z.number().int().min(1).max(500).default(100),  // Increased from 20 to 100
   offset: z.number().int().min(0).default(0),
 });
+
+// ============================================================================
+// File Upload Schema
+// ============================================================================
 
 /**
  * File upload validation schema
@@ -112,6 +333,10 @@ export const fileUploadSchema = z.object({
   ),
   lessonType: lessonTypeSchema,
 });
+
+// ============================================================================
+// Constants
+// ============================================================================
 
 /**
  * Supported video MIME types
@@ -134,6 +359,10 @@ export const SUPPORTED_AUDIO_TYPES = [
  */
 export const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
 
+// ============================================================================
+// Validation Helper Functions
+// ============================================================================
+
 /**
  * Validate file type matches lesson type
  */
@@ -153,9 +382,16 @@ export function getSupportedMimeTypes(lessonType: 'video' | 'audio'): readonly s
 }
 
 /**
- * Validate lesson creation request
+ * Validate lesson creation request (with i18n support)
  */
 export function validateCreateLesson(data: unknown) {
+  return createLessonSchemaCompat.parse(data);
+}
+
+/**
+ * Validate lesson creation request (strict i18n)
+ */
+export function validateCreateLessonI18n(data: unknown) {
   return createLessonSchema.parse(data);
 }
 
@@ -163,6 +399,13 @@ export function validateCreateLesson(data: unknown) {
  * Validate lesson update request
  */
 export function validateUpdateLesson(data: unknown) {
+  return updateLessonSchemaCompat.parse(data);
+}
+
+/**
+ * Validate lesson update request (strict i18n)
+ */
+export function validateUpdateLessonI18n(data: unknown) {
   return updateLessonSchema.parse(data);
 }
 
@@ -180,8 +423,34 @@ export function validateFileUpload(data: unknown) {
   return fileUploadSchema.parse(data);
 }
 
-// Export types inferred from schemas
-export type CreateLessonInput = z.infer<typeof createLessonSchema>;
-export type UpdateLessonInput = z.infer<typeof updateLessonSchema>;
+/**
+ * Safe validation for create lesson (returns success/error)
+ */
+export function safeValidateCreateLesson(data: unknown) {
+  return createLessonSchemaCompat.safeParse(data);
+}
+
+/**
+ * Safe validation for update lesson (returns success/error)
+ */
+export function safeValidateUpdateLesson(data: unknown) {
+  return updateLessonSchemaCompat.safeParse(data);
+}
+
+// ============================================================================
+// Type Exports
+// ============================================================================
+
+export type MultilingualText = z.infer<typeof multilingualTextSchema>;
+export type MultilingualTextOptional = z.infer<typeof multilingualTextOptionalSchema>;
+export type YogaInstruction = z.infer<typeof yogaInstructionSchema>;
+export type YogaChapter = z.infer<typeof yogaChapterSchema>;
+export type MassageInstruction = z.infer<typeof massageInstructionSchema>;
+export type MassageBodyZone = z.infer<typeof massageBodyZoneSchema>;
+export type MeditationPhase = z.infer<typeof meditationPhaseSchema>;
+export type CreateLessonInput = z.infer<typeof createLessonSchemaCompat>;
+export type CreateLessonI18nInput = z.infer<typeof createLessonSchema>;
+export type UpdateLessonInput = z.infer<typeof updateLessonSchemaCompat>;
+export type UpdateLessonI18nInput = z.infer<typeof updateLessonSchema>;
 export type LessonFiltersInput = z.infer<typeof lessonFiltersSchema>;
 export type FileUploadInput = z.infer<typeof fileUploadSchema>;

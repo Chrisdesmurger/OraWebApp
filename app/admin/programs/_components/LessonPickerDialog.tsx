@@ -4,6 +4,7 @@ import * as React from 'react';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { getStorageDownloadURL } from '@/lib/firebase/client';
 import type { Lesson } from '@/types/lesson';
+import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
 import {
   Dialog,
   DialogContent,
@@ -69,8 +70,8 @@ export function LessonPickerDialog({
     const query = searchQuery.toLowerCase();
     return lessons.filter(
       (lesson) =>
-        lesson.title.toLowerCase().includes(query) ||
-        lesson.transcript?.toLowerCase().includes(query)
+        getMultilingualDisplayText(lesson.title).toLowerCase().includes(query) ||
+        getMultilingualDisplayText(lesson.transcript).toLowerCase().includes(query)
     );
   }, [lessons, searchQuery]);
 
@@ -164,7 +165,7 @@ export function LessonPickerDialog({
         return (
           <img
             src={lesson.thumbnailUrl}
-            alt={lesson.title}
+            alt={getMultilingualDisplayText(lesson.title)}
             className="h-12 w-12 rounded-lg object-cover"
           />
         );
@@ -267,7 +268,7 @@ export function LessonPickerDialog({
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <div className="font-medium">{lesson.title}</div>
+                          <div className="font-medium">{getMultilingualDisplayText(lesson.title)}</div>
                           {lesson.type && (
                             <Badge variant="secondary" className="text-xs capitalize">
                               {lesson.type === 'video' && <Video className="h-3 w-3 mr-1" />}
@@ -277,7 +278,7 @@ export function LessonPickerDialog({
                           )}
                         </div>
                         <div className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                          {lesson.transcript ? lesson.transcript.substring(0, 100) + '...' : 'No transcript available'}
+                          {lesson.transcript ? getMultilingualDisplayText(lesson.transcript).substring(0, 100) + '...' : 'No transcript available'}
                         </div>
                         <div className="flex gap-2 mt-2">
                           {lesson.tags && lesson.tags.length > 0 && (
@@ -331,7 +332,7 @@ export function LessonPickerDialog({
     <Dialog open={!!previewLesson} onOpenChange={() => setPreviewLesson(null)}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>{previewLesson?.title}</DialogTitle>
+          <DialogTitle>{previewLesson ? getMultilingualDisplayText(previewLesson.title) : ''}</DialogTitle>
           <DialogDescription>
             {previewLesson?.type === 'video' ? 'Video' : 'Audio'} Preview
           </DialogDescription>
@@ -348,7 +349,7 @@ export function LessonPickerDialog({
               type={previewLesson.type}
               src={previewMediaUrl}
               thumbnailUrl={previewLesson.thumbnailUrl || undefined}
-              title={previewLesson.title}
+              title={getMultilingualDisplayText(previewLesson.title)}
               controls={true}
             />
           )

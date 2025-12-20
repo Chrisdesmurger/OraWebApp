@@ -1,11 +1,38 @@
 /**
  * Lesson TypeScript Types
  * Matches Firestore schema with snake_case field names
+ *
+ * IMPORTANT - i18n Support (Issue #68):
+ * - Text fields support multilingual content (FR/EN/ES)
+ * - Firestore uses snake_case with language suffix (title_fr, title_en, title_es)
+ * - TypeScript uses MultilingualText objects ({ fr: string, en?: string, es?: string })
+ * - French (fr) is the primary language and always required
  */
+
+import type {
+  MultilingualText,
+  YogaChapter,
+  YogaChapterFirestore,
+  MassageBodyZone,
+  MassageBodyZoneFirestore,
+  MeditationPhase,
+  MeditationPhaseFirestore,
+  yogaChapterFromFirestore,
+  yogaChapterToFirestore,
+  massageBodyZoneFromFirestore,
+  massageBodyZoneToFirestore,
+  meditationPhaseFromFirestore,
+  meditationPhaseToFirestore,
+} from '@/lib/firestore/conversions';
+
+// Re-export for convenience
+export type { MultilingualText, YogaChapter, MassageBodyZone, MeditationPhase };
 
 export type LessonType = 'video' | 'audio';
 
 export type LessonStatus = 'draft' | 'uploading' | 'processing' | 'ready' | 'failed';
+
+export type LessonCategory = 'meditation' | 'yoga' | 'massage' | 'mindfulness' | 'wellness';
 
 export interface Rendition {
   path: string;
@@ -31,18 +58,40 @@ export interface AudioVariants {
   low?: AudioVariant;
 }
 
+// ============================================================================
+// Firestore Document Interface (snake_case with i18n)
+// ============================================================================
+
 /**
  * Firestore lesson document (snake_case)
+ * Now with multilingual support for text fields
  */
 export interface LessonDocument {
-  title: string;
-  description: string | null;
+  // Multilingual fields (snake_case with language suffix)
+  title_fr: string;
+  title_en?: string;
+  title_es?: string;
+  description_fr?: string | null;
+  description_en?: string | null;
+  description_es?: string | null;
+  category_fr?: string | null;
+  category_en?: string | null;
+  category_es?: string | null;
+  transcript_fr?: string | null;
+  transcript_en?: string | null;
+  transcript_es?: string | null;
+
+  // Legacy single-language fields (for backward compatibility)
+  title?: string;  // Deprecated - use title_fr
+  description?: string | null;  // Deprecated - use description_fr
+  transcript?: string | null;  // Deprecated - use transcript_fr
+
+  // Non-multilingual fields
   type: LessonType;
   program_id: string;
   order: number;
   duration_sec: number | null;
   tags: string[];
-  transcript: string | null;
   status: LessonStatus;
   storage_path_original: string | null;
   renditions?: Renditions;
@@ -53,22 +102,96 @@ export interface LessonDocument {
   updated_at: string; // ISO timestamp
   author_id: string;
   thumbnail_url?: string | null;
-  preview_image_url?: string | null;  // High-quality image for featured content
-  preview_storage_path?: string | null;  // Firebase Storage path for preview image
+  preview_image_url?: string | null;
+  preview_storage_path?: string | null;
   mime_type?: string | null;
 
   // Scheduling fields (Issue #22)
-  scheduled_publish_at: string | null;  // ISO timestamp
-  scheduled_archive_at: string | null;  // ISO timestamp
+  scheduled_publish_at: string | null;
+  scheduled_archive_at: string | null;
   auto_publish_enabled: boolean;
+
+  // Yoga-specific (snake_case)
+  chapters?: YogaChapterFirestore[];
+
+  // Massage-specific (snake_case)
+  body_zones?: MassageBodyZoneFirestore[];
+
+  // Meditation-specific (snake_case)
+  phases?: MeditationPhaseFirestore[];
+  ambient_sound_name_fr?: string | null;
+  ambient_sound_name_en?: string | null;
+  ambient_sound_name_es?: string | null;
+  breathing_instruction_fr?: string | null;
+  breathing_instruction_en?: string | null;
+  breathing_instruction_es?: string | null;
 }
+
+// ============================================================================
+// Client-side Interface (camelCase with i18n)
+// ============================================================================
 
 /**
  * Client-side lesson model (camelCase for frontend)
+ * Uses MultilingualText for text fields
  */
 export interface Lesson {
   id: string;
-  title: string;
+
+  // Multilingual fields
+  title: MultilingualText;
+  description?: MultilingualText | null;
+  category?: MultilingualText | null;
+  transcript?: MultilingualText | null;
+
+  // Non-multilingual fields
+  type: LessonType;
+  programId: string;
+  order: number;
+  durationSec: number | null;
+  tags: string[];
+  status: LessonStatus;
+  storagePathOriginal: string | null;
+  renditions?: Renditions;
+  audioVariants?: AudioVariants;
+  codec: string | null;
+  sizeBytes: number | null;
+  createdAt: string;
+  updatedAt: string;
+  authorId: string;
+  thumbnailUrl?: string | null;
+  previewImageUrl?: string | null;
+  previewStoragePath?: string | null;
+  mimeType?: string | null;
+
+  // Scheduling fields (Issue #22)
+  scheduledPublishAt: string | null;
+  scheduledArchiveAt: string | null;
+  autoPublishEnabled: boolean;
+
+  // Yoga-specific
+  chapters?: YogaChapter[];
+
+  // Massage-specific
+  bodyZones?: MassageBodyZone[];
+
+  // Meditation-specific
+  phases?: MeditationPhase[];
+  ambientSoundName?: MultilingualText | null;
+  breathingInstruction?: MultilingualText | null;
+}
+
+// ============================================================================
+// Legacy Lesson Interface (for backward compatibility)
+// ============================================================================
+
+/**
+ * Legacy lesson interface with string title/description
+ * Used for backward compatibility with existing code
+ */
+export interface LessonLegacy {
+  id: string;
+  title: string;  // French only
   description: string | null;
   type: LessonType;
   programId: string;
@@ -86,44 +209,68 @@ export interface Lesson {
   updatedAt: string;
   authorId: string;
   thumbnailUrl?: string | null;
-  previewImageUrl?: string | null;  // High-quality image for featured content
-  previewStoragePath?: string | null;  // Firebase Storage path for preview image
+  previewImageUrl?: string | null;
+  previewStoragePath?: string | null;
   mimeType?: string | null;
-
-  // Scheduling fields (Issue #22)
-  scheduledPublishAt: string | null;  // ISO timestamp
-  scheduledArchiveAt: string | null;  // ISO timestamp
+  scheduledPublishAt: string | null;
+  scheduledArchiveAt: string | null;
   autoPublishEnabled: boolean;
 }
 
+// ============================================================================
+// API Request/Response Interfaces
+// ============================================================================
+
 /**
- * Lesson creation request
+ * Lesson creation request (with i18n)
  */
 export interface CreateLessonRequest {
-  title: string;
-  description?: string;
+  title: MultilingualText | string;  // Accept both for backward compat
+  description?: MultilingualText | string;
   type: LessonType;
   programId: string;
   order?: number;
   tags?: string[];
-  transcript?: string;
-  scheduledPublishAt?: string | null;  // ISO timestamp
-  scheduledArchiveAt?: string | null;  // ISO timestamp
+  transcript?: MultilingualText | string;
+  scheduledPublishAt?: string | null;
+  scheduledArchiveAt?: string | null;
   autoPublishEnabled?: boolean;
+
+  // Yoga-specific
+  chapters?: YogaChapter[];
+
+  // Massage-specific
+  bodyZones?: MassageBodyZone[];
+
+  // Meditation-specific
+  phases?: MeditationPhase[];
+  ambientSoundName?: MultilingualText;
+  breathingInstruction?: MultilingualText;
 }
 
 /**
- * Lesson update request
+ * Lesson update request (with i18n)
  */
 export interface UpdateLessonRequest {
-  title?: string;
-  description?: string;
+  title?: MultilingualText | string;
+  description?: MultilingualText | string;
   order?: number;
   tags?: string[];
-  transcript?: string;
-  scheduledPublishAt?: string | null;  // ISO timestamp
-  scheduledArchiveAt?: string | null;  // ISO timestamp
+  transcript?: MultilingualText | string;
+  scheduledPublishAt?: string | null;
+  scheduledArchiveAt?: string | null;
   autoPublishEnabled?: boolean;
+
+  // Yoga-specific
+  chapters?: YogaChapter[];
+
+  // Massage-specific
+  bodyZones?: MassageBodyZone[];
+
+  // Meditation-specific
+  phases?: MeditationPhase[];
+  ambientSoundName?: MultilingualText;
+  breathingInstruction?: MultilingualText;
 }
 
 /**
@@ -142,23 +289,52 @@ export interface LessonValidationResult {
   isValid: boolean;
   missingFields: string[];
   warnings: string[];
+  i18nCoverage?: {
+    title: { fr: boolean; en: boolean; es: boolean };
+    description: { fr: boolean; en: boolean; es: boolean };
+  };
 }
+
+// ============================================================================
+// Validation & Mapping Functions
+// ============================================================================
 
 /**
  * Validate lesson data from Firestore
  * Returns validation result with details about missing or invalid fields
  */
 export function validateLessonDocument(id: string, doc: Partial<LessonDocument>): LessonValidationResult {
-  const requiredFields = ['title', 'type', 'program_id', 'status', 'author_id', 'created_at', 'updated_at'];
   const missingFields: string[] = [];
   const warnings: string[] = [];
 
-  // Check required fields
-  for (const field of requiredFields) {
-    const value = doc[field as keyof LessonDocument];
-    if (value === undefined || value === null || value === '') {
-      missingFields.push(field);
-    }
+  // Check required fields - now supports both legacy and i18n
+  const hasTitle = doc.title_fr || doc.title;
+  if (!hasTitle) {
+    missingFields.push('title (title_fr or title)');
+  }
+
+  if (!doc.type) {
+    missingFields.push('type');
+  }
+
+  if (!doc.program_id) {
+    missingFields.push('program_id');
+  }
+
+  if (!doc.status) {
+    missingFields.push('status');
+  }
+
+  if (!doc.author_id) {
+    missingFields.push('author_id');
+  }
+
+  if (!doc.created_at) {
+    missingFields.push('created_at');
+  }
+
+  if (!doc.updated_at) {
+    missingFields.push('updated_at');
   }
 
   // Check tags is an array
@@ -176,15 +352,35 @@ export function validateLessonDocument(id: string, doc: Partial<LessonDocument>)
     warnings.push(`invalid status: ${doc.status}`);
   }
 
+  // i18n coverage
+  const i18nCoverage = {
+    title: {
+      fr: !!(doc.title_fr || doc.title),
+      en: !!doc.title_en,
+      es: !!doc.title_es,
+    },
+    description: {
+      fr: !!(doc.description_fr || doc.description),
+      en: !!doc.description_en,
+      es: !!doc.description_es,
+    },
+  };
+
+  // Warn if legacy fields are used without i18n
+  if (doc.title && !doc.title_fr) {
+    warnings.push('Using legacy title field - consider migrating to title_fr/en/es');
+  }
+
   return {
     isValid: missingFields.length === 0,
     missingFields,
-    warnings
+    warnings,
+    i18nCoverage,
   };
 }
 
 /**
- * Map Firestore document to client model
+ * Map Firestore document to client model (with i18n support)
  * Returns null if required fields are missing (with console warning)
  */
 export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson | null {
@@ -200,16 +396,116 @@ export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson 
     console.warn(`[mapLessonFromFirestore] Lesson ${id} has warnings:`, validation.warnings);
   }
 
+  // Build multilingual title
+  const title: MultilingualText = {
+    fr: doc.title_fr || doc.title || '',
+    en: doc.title_en,
+    es: doc.title_es,
+  };
+
+  // Build multilingual description
+  const description: MultilingualText | null = doc.description_fr || doc.description_en || doc.description_es || doc.description
+    ? {
+        fr: doc.description_fr ?? doc.description ?? '',
+        en: doc.description_en ?? undefined,
+        es: doc.description_es ?? undefined,
+      }
+    : null;
+
+  // Build multilingual category
+  const category: MultilingualText | null = doc.category_fr || doc.category_en || doc.category_es
+    ? {
+        fr: doc.category_fr ?? '',
+        en: doc.category_en ?? undefined,
+        es: doc.category_es ?? undefined,
+      }
+    : null;
+
+  // Build multilingual transcript
+  const transcript: MultilingualText | null = doc.transcript_fr || doc.transcript_en || doc.transcript_es || doc.transcript
+    ? {
+        fr: doc.transcript_fr ?? doc.transcript ?? '',
+        en: doc.transcript_en ?? undefined,
+        es: doc.transcript_es ?? undefined,
+      }
+    : null;
+
+  // Build multilingual ambient sound name (meditation)
+  const ambientSoundName: MultilingualText | null = doc.ambient_sound_name_fr || doc.ambient_sound_name_en || doc.ambient_sound_name_es
+    ? {
+        fr: doc.ambient_sound_name_fr ?? '',
+        en: doc.ambient_sound_name_en ?? undefined,
+        es: doc.ambient_sound_name_es ?? undefined,
+      }
+    : null;
+
+  // Build multilingual breathing instruction (meditation)
+  const breathingInstruction: MultilingualText | null = doc.breathing_instruction_fr || doc.breathing_instruction_en || doc.breathing_instruction_es
+    ? {
+        fr: doc.breathing_instruction_fr ?? '',
+        en: doc.breathing_instruction_en ?? undefined,
+        es: doc.breathing_instruction_es ?? undefined,
+      }
+    : null;
+
   return {
     id,
-    title: doc.title,
-    description: doc.description ?? null,
+    title,
+    description,
+    category,
+    transcript,
     type: doc.type,
     programId: doc.program_id,
     order: doc.order ?? 0,
     durationSec: doc.duration_sec ?? null,
     tags: Array.isArray(doc.tags) ? doc.tags : [],
-    transcript: doc.transcript ?? null,
+    status: doc.status,
+    storagePathOriginal: doc.storage_path_original ?? null,
+    renditions: doc.renditions,
+    audioVariants: doc.audio_variants,
+    codec: doc.codec ?? null,
+    sizeBytes: doc.size_bytes ?? null,
+    createdAt: doc.created_at,
+    updatedAt: doc.updated_at,
+    authorId: doc.author_id,
+    thumbnailUrl: doc.thumbnail_url ?? null,
+    previewImageUrl: doc.preview_image_url ?? null,
+    previewStoragePath: doc.preview_storage_path ?? null,
+    mimeType: doc.mime_type ?? null,
+    scheduledPublishAt: doc.scheduled_publish_at ?? null,
+    scheduledArchiveAt: doc.scheduled_archive_at ?? null,
+    autoPublishEnabled: doc.auto_publish_enabled ?? false,
+    // Specialized content - would need the conversion functions imported
+    chapters: undefined, // TODO: map if present
+    bodyZones: undefined, // TODO: map if present
+    phases: undefined, // TODO: map if present
+    ambientSoundName,
+    breathingInstruction,
+  };
+}
+
+/**
+ * Map Firestore document to legacy client model (string fields, French only)
+ * For backward compatibility with existing code
+ */
+export function mapLessonFromFirestoreLegacy(id: string, doc: LessonDocument): LessonLegacy | null {
+  const validation = validateLessonDocument(id, doc);
+
+  if (!validation.isValid) {
+    console.warn(`[mapLessonFromFirestoreLegacy] Lesson ${id} missing required fields:`, validation.missingFields);
+    return null;
+  }
+
+  return {
+    id,
+    title: doc.title_fr || doc.title || '',
+    description: doc.description_fr ?? doc.description ?? null,
+    type: doc.type,
+    programId: doc.program_id,
+    order: doc.order ?? 0,
+    durationSec: doc.duration_sec ?? null,
+    tags: Array.isArray(doc.tags) ? doc.tags : [],
+    transcript: doc.transcript_fr ?? doc.transcript ?? null,
     status: doc.status,
     storagePathOriginal: doc.storage_path_original ?? null,
     renditions: doc.renditions,
@@ -230,19 +526,71 @@ export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson 
 }
 
 /**
- * Map client model to Firestore document
+ * Map client model to Firestore document (with i18n support)
  */
 export function mapLessonToFirestore(lesson: Partial<Lesson>): Partial<LessonDocument> {
   const doc: Partial<LessonDocument> = {};
 
-  if (lesson.title !== undefined) doc.title = lesson.title;
-  if (lesson.description !== undefined) doc.description = lesson.description;
+  // Map multilingual title
+  if (lesson.title !== undefined) {
+    if (typeof lesson.title === 'string') {
+      doc.title_fr = lesson.title;
+    } else {
+      doc.title_fr = lesson.title.fr;
+      if (lesson.title.en) doc.title_en = lesson.title.en;
+      if (lesson.title.es) doc.title_es = lesson.title.es;
+    }
+  }
+
+  // Map multilingual description
+  if (lesson.description !== undefined) {
+    if (lesson.description === null) {
+      doc.description_fr = null;
+      doc.description_en = null;
+      doc.description_es = null;
+    } else if (typeof lesson.description === 'string') {
+      doc.description_fr = lesson.description;
+    } else {
+      doc.description_fr = lesson.description.fr || null;
+      doc.description_en = lesson.description.en || null;
+      doc.description_es = lesson.description.es || null;
+    }
+  }
+
+  // Map multilingual category
+  if (lesson.category !== undefined) {
+    if (lesson.category === null) {
+      doc.category_fr = null;
+      doc.category_en = null;
+      doc.category_es = null;
+    } else {
+      doc.category_fr = lesson.category.fr || null;
+      doc.category_en = lesson.category.en || null;
+      doc.category_es = lesson.category.es || null;
+    }
+  }
+
+  // Map multilingual transcript
+  if (lesson.transcript !== undefined) {
+    if (lesson.transcript === null) {
+      doc.transcript_fr = null;
+      doc.transcript_en = null;
+      doc.transcript_es = null;
+    } else if (typeof lesson.transcript === 'string') {
+      doc.transcript_fr = lesson.transcript;
+    } else {
+      doc.transcript_fr = lesson.transcript.fr || null;
+      doc.transcript_en = lesson.transcript.en || null;
+      doc.transcript_es = lesson.transcript.es || null;
+    }
+  }
+
+  // Map non-multilingual fields
   if (lesson.type !== undefined) doc.type = lesson.type;
   if (lesson.programId !== undefined) doc.program_id = lesson.programId;
   if (lesson.order !== undefined) doc.order = lesson.order;
   if (lesson.durationSec !== undefined) doc.duration_sec = lesson.durationSec;
   if (lesson.tags !== undefined) doc.tags = lesson.tags;
-  if (lesson.transcript !== undefined) doc.transcript = lesson.transcript;
   if (lesson.status !== undefined) doc.status = lesson.status;
   if (lesson.storagePathOriginal !== undefined) doc.storage_path_original = lesson.storagePathOriginal;
   if (lesson.renditions !== undefined) doc.renditions = lesson.renditions;
@@ -260,5 +608,53 @@ export function mapLessonToFirestore(lesson: Partial<Lesson>): Partial<LessonDoc
   if (lesson.scheduledArchiveAt !== undefined) doc.scheduled_archive_at = lesson.scheduledArchiveAt;
   if (lesson.autoPublishEnabled !== undefined) doc.auto_publish_enabled = lesson.autoPublishEnabled;
 
+  // Map meditation-specific multilingual fields
+  if (lesson.ambientSoundName !== undefined) {
+    if (lesson.ambientSoundName === null) {
+      doc.ambient_sound_name_fr = null;
+      doc.ambient_sound_name_en = null;
+      doc.ambient_sound_name_es = null;
+    } else {
+      doc.ambient_sound_name_fr = lesson.ambientSoundName.fr || null;
+      doc.ambient_sound_name_en = lesson.ambientSoundName.en || null;
+      doc.ambient_sound_name_es = lesson.ambientSoundName.es || null;
+    }
+  }
+
+  if (lesson.breathingInstruction !== undefined) {
+    if (lesson.breathingInstruction === null) {
+      doc.breathing_instruction_fr = null;
+      doc.breathing_instruction_en = null;
+      doc.breathing_instruction_es = null;
+    } else {
+      doc.breathing_instruction_fr = lesson.breathingInstruction.fr || null;
+      doc.breathing_instruction_en = lesson.breathingInstruction.en || null;
+      doc.breathing_instruction_es = lesson.breathingInstruction.es || null;
+    }
+  }
+
   return doc;
+}
+
+/**
+ * Get French text from a multilingual field (for display)
+ */
+export function getFrenchText(text: MultilingualText | string | null | undefined): string {
+  if (!text) return '';
+  if (typeof text === 'string') return text;
+  return text.fr || '';
+}
+
+/**
+ * Get localized text with fallback to French
+ */
+export function getLocalizedText(
+  text: MultilingualText | string | null | undefined,
+  lang: 'fr' | 'en' | 'es' = 'fr'
+): string {
+  if (!text) return '';
+  if (typeof text === 'string') return text;
+
+  // Try requested language, fallback to French
+  return text[lang] || text.fr || '';
 }

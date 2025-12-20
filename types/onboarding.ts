@@ -1,6 +1,12 @@
 /**
  * Onboarding Type Definitions
  * Admin Portal - Onboarding Management Interface
+ *
+ * IMPORTANT - i18n Support (Issue #68):
+ * - All text fields now support multilingual content (FR/EN/ES)
+ * - French (fr) is the primary language and always required
+ * - English (en) and Spanish (es) are optional
+ * - Fields follow the pattern: title, titleFr, titleEn, titleEs
  */
 
 import { Timestamp } from 'firebase/firestore';
@@ -23,22 +29,33 @@ export type QuestionTypeKind =
 
 export type ProfileFieldInputType = 'text' | 'date' | 'radio';
 
+/**
+ * Profile field option with multilingual labels (FR/EN/ES)
+ */
 export interface ProfileFieldOption {
   id: string;
-  label: string;
-  labelFr?: string;
-  labelEn?: string;
+  label: string;        // Default/legacy label
+  labelFr?: string;     // French translation
+  labelEn?: string;     // English translation
+  labelEs?: string;     // Spanish translation (NEW - Issue #68)
   icon?: string;
   order: number;
 }
 
+/**
+ * Profile field with multilingual labels and placeholders (FR/EN/ES)
+ */
 export interface ProfileField {
   id: string;
-  label: string;
-  labelFr?: string;
-  labelEn?: string;
+  label: string;            // Default/legacy label
+  labelFr?: string;         // French translation
+  labelEn?: string;         // English translation
+  labelEs?: string;         // Spanish translation (NEW - Issue #68)
   inputType: ProfileFieldInputType;
-  placeholder?: string;
+  placeholder?: string;         // Default/legacy placeholder
+  placeholderFr?: string;       // French placeholder (NEW - Issue #68)
+  placeholderEn?: string;       // English placeholder (NEW - Issue #68)
+  placeholderEs?: string;       // Spanish placeholder (NEW - Issue #68)
   maxLength?: number;
   required?: boolean;
   order: number;
@@ -68,19 +85,30 @@ export interface QuestionTypeConfig {
   maxLines?: number; // Number of lines for multiline input
   maxCharacters?: number; // Character limit
   placeholder?: string; // Placeholder text
+  placeholderFr?: string; // French placeholder (NEW - Issue #68)
+  placeholderEn?: string; // English placeholder (NEW - Issue #68)
+  placeholderEs?: string; // Spanish placeholder (NEW - Issue #68)
 
   // Profile group
   fields?: ProfileField[]; // For profile_group type
 }
 
+/**
+ * Answer option with multilingual labels and descriptions (FR/EN/ES)
+ */
 export interface AnswerOption {
   id: string;
-  label: string;
-  labelFr?: string; // French translation
-  labelEn?: string; // English translation
-  icon?: string; // Emoji or icon name
-  color?: string; // Hex color for visual distinction
-  imageUrl?: string; // Optional illustration URL
+  label: string;            // Default/legacy label
+  labelFr?: string;         // French translation
+  labelEn?: string;         // English translation
+  labelEs?: string;         // Spanish translation (NEW - Issue #68)
+  description?: string;     // Default/legacy description (NEW - Issue #68)
+  descriptionFr?: string;   // French description (NEW - Issue #68)
+  descriptionEn?: string;   // English description (NEW - Issue #68)
+  descriptionEs?: string;   // Spanish description (NEW - Issue #68)
+  icon?: string;            // Emoji or icon name
+  color?: string;           // Hex color for visual distinction
+  imageUrl?: string;        // Optional illustration URL
   order: number;
 
   // For slider and circular picker types
@@ -104,16 +132,25 @@ export interface SkipLogic {
 
 export type QuestionCategory = 'goals' | 'experience' | 'preferences' | 'personalization';
 
+/**
+ * Onboarding question with multilingual support (FR/EN/ES)
+ */
 export interface OnboardingQuestion {
   id: string;
   category: QuestionCategory;
   order: number;
-  title: string;
-  titleFr?: string;
-  titleEn?: string;
-  subtitle?: string;
-  subtitleFr?: string;
-  subtitleEn?: string;
+  title: string;            // Default/legacy title
+  titleFr?: string;         // French translation
+  titleEn?: string;         // English translation
+  titleEs?: string;         // Spanish translation (NEW - Issue #68)
+  subtitle?: string;        // Default/legacy subtitle
+  subtitleFr?: string;      // French subtitle
+  subtitleEn?: string;      // English subtitle
+  subtitleEs?: string;      // Spanish subtitle (NEW - Issue #68)
+  hint?: string;            // Default/legacy hint (NEW - Issue #68)
+  hintFr?: string;          // French hint (NEW - Issue #68)
+  hintEn?: string;          // English hint (NEW - Issue #68)
+  hintEs?: string;          // Spanish hint (NEW - Issue #68)
   type: QuestionTypeConfig;
   options: AnswerOption[];
   required: boolean;
@@ -162,7 +199,7 @@ export interface UserOnboardingResponse {
     deviceType?: string;
     appVersion?: string;
     totalTimeSeconds?: number;
-    locale?: 'fr' | 'en';
+    locale?: 'fr' | 'en' | 'es'; // Added 'es' for Spanish (Issue #68)
   };
   // Parsed responses for easy access
   goals?: string[];
@@ -321,29 +358,53 @@ export interface DisplayConditions {
 }
 
 /**
+ * Bullet point with multilingual text (FR/EN/ES)
+ * For structured content in information screens
+ */
+export interface BulletPoint {
+  id?: string;          // Optional ID for tracking
+  order: number;        // Display order
+  text: string;         // Default/legacy text
+  textFr?: string;      // French translation (NEW - Issue #68)
+  textEn?: string;      // English translation (NEW - Issue #68)
+  textEs?: string;      // Spanish translation (NEW - Issue #68)
+  icon?: string;        // Optional icon/emoji
+}
+
+/**
  * Information Screen
  * Dynamic screens shown between onboarding questions
  * Provides contextual information, tips, or encouragement
+ *
+ * Now with full multilingual support (FR/EN/ES) - Issue #68
  */
 export interface InformationScreen {
   id: string;
   position: number; // Position in onboarding flow (0 = before first question)
-  title: string;
-  titleFr?: string;
-  titleEn?: string;
-  subtitle?: string;
-  subtitleFr?: string;
-  subtitleEn?: string;
-  content?: string; // Rich content (markdown or HTML)
-  contentFr?: string;
-  contentEn?: string;
-  bulletPoints?: string[]; // Key points to highlight
-  bulletPointsFr?: string[];
-  bulletPointsEn?: string[];
-  imageUrl?: string; // Optional illustration
-  ctaText?: string; // Call-to-action button text
-  ctaTextFr?: string;
-  ctaTextEn?: string;
+  title: string;            // Default/legacy title
+  titleFr?: string;         // French translation
+  titleEn?: string;         // English translation
+  titleEs?: string;         // Spanish translation (NEW - Issue #68)
+  subtitle?: string;        // Default/legacy subtitle
+  subtitleFr?: string;      // French subtitle
+  subtitleEn?: string;      // English subtitle
+  subtitleEs?: string;      // Spanish subtitle (NEW - Issue #68)
+  content?: string;         // Default/legacy content (markdown or HTML)
+  contentFr?: string;       // French content
+  contentEn?: string;       // English content
+  contentEs?: string;       // Spanish content (NEW - Issue #68)
+  // Legacy bullet points (simple string arrays)
+  bulletPoints?: string[];      // Default/legacy bullet points
+  bulletPointsFr?: string[];    // French bullet points
+  bulletPointsEn?: string[];    // English bullet points
+  bulletPointsEs?: string[];    // Spanish bullet points (NEW - Issue #68)
+  // New structured bullet points with individual translations
+  bulletPointsStructured?: BulletPoint[];  // Structured bullet points with i18n (NEW - Issue #68)
+  imageUrl?: string;        // Optional illustration
+  ctaText?: string;         // Default/legacy CTA button text
+  ctaTextFr?: string;       // French CTA text
+  ctaTextEn?: string;       // English CTA text
+  ctaTextEs?: string;       // Spanish CTA text (NEW - Issue #68)
   backgroundColor?: string; // Hex color
   displayConditions?: DisplayConditions;
   order: number; // Order if multiple screens at same position
@@ -401,11 +462,25 @@ export interface CreateInformationScreenRequest {
   title: string;
   titleFr?: string;
   titleEn?: string;
+  titleEs?: string;         // Spanish (NEW - Issue #68)
   subtitle?: string;
+  subtitleFr?: string;
+  subtitleEn?: string;
+  subtitleEs?: string;      // Spanish (NEW - Issue #68)
   content?: string;
+  contentFr?: string;
+  contentEn?: string;
+  contentEs?: string;       // Spanish (NEW - Issue #68)
   bulletPoints?: string[];
+  bulletPointsFr?: string[];
+  bulletPointsEn?: string[];
+  bulletPointsEs?: string[];  // Spanish (NEW - Issue #68)
+  bulletPointsStructured?: BulletPoint[];  // Structured with i18n (NEW - Issue #68)
   imageUrl?: string;
   ctaText?: string;
+  ctaTextFr?: string;
+  ctaTextEn?: string;
+  ctaTextEs?: string;       // Spanish (NEW - Issue #68)
   backgroundColor?: string;
   displayConditions?: DisplayConditions;
   order: number;
@@ -416,11 +491,25 @@ export interface UpdateInformationScreenRequest {
   title?: string;
   titleFr?: string;
   titleEn?: string;
+  titleEs?: string;         // Spanish (NEW - Issue #68)
   subtitle?: string;
+  subtitleFr?: string;
+  subtitleEn?: string;
+  subtitleEs?: string;      // Spanish (NEW - Issue #68)
   content?: string;
+  contentFr?: string;
+  contentEn?: string;
+  contentEs?: string;       // Spanish (NEW - Issue #68)
   bulletPoints?: string[];
+  bulletPointsFr?: string[];
+  bulletPointsEn?: string[];
+  bulletPointsEs?: string[];  // Spanish (NEW - Issue #68)
+  bulletPointsStructured?: BulletPoint[];  // Structured with i18n (NEW - Issue #68)
   imageUrl?: string;
   ctaText?: string;
+  ctaTextFr?: string;
+  ctaTextEn?: string;
+  ctaTextEs?: string;       // Spanish (NEW - Issue #68)
   backgroundColor?: string;
   displayConditions?: DisplayConditions;
   order?: number;
@@ -439,6 +528,33 @@ export interface UpdateRecommendationRuleRequest {
   priority?: number;
   active?: boolean;
   description?: string;
+}
+
+// ============================================================================
+// i18n Helper Types (NEW - Issue #68)
+// ============================================================================
+
+/**
+ * Supported languages for onboarding content
+ */
+export type OnboardingLanguage = 'fr' | 'en' | 'es';
+
+/**
+ * Translation coverage for a single item
+ */
+export interface TranslationCoverage {
+  fr: boolean;  // Always true (required)
+  en: boolean;
+  es: boolean;
+}
+
+/**
+ * i18n validation result for onboarding content
+ */
+export interface OnboardingI18nValidation {
+  isComplete: boolean;       // All languages have translations
+  missingLanguages: OnboardingLanguage[];
+  fieldsCoverage: Record<string, TranslationCoverage>;
 }
 
 // ============================================================================
@@ -473,9 +589,14 @@ export function validateInformationScreen(screen: Partial<InformationScreen>): O
     }
   }
 
-  // Localization warnings
-  if (!screen.titleFr && !screen.titleEn) {
-    warnings.push({ field: 'title', message: 'Consider adding French or English translations' });
+  // Localization warnings - now checks for Spanish too (Issue #68)
+  if (!screen.titleFr && !screen.titleEn && !screen.titleEs) {
+    warnings.push({ field: 'title', message: 'Consider adding French, English, or Spanish translations' });
+  }
+
+  // Check for incomplete Spanish translations (Issue #68)
+  if ((screen.titleFr || screen.titleEn) && !screen.titleEs) {
+    warnings.push({ field: 'titleEs', message: 'Spanish translation is missing for title' });
   }
 
   return {
@@ -581,4 +702,143 @@ export function evaluateRule(rule: RecommendationRule, userResponses: Record<str
     if (userAnswer === undefined) return false;
     return matchesCondition(condition, userAnswer);
   });
+}
+
+// ============================================================================
+// i18n Helper Functions (NEW - Issue #68)
+// ============================================================================
+
+/**
+ * Get localized text for a field with fallback chain: requested -> fr -> default
+ */
+export function getLocalizedOnboardingText(
+  defaultText: string | undefined,
+  textFr: string | undefined,
+  textEn: string | undefined,
+  textEs: string | undefined,
+  lang: OnboardingLanguage
+): string {
+  switch (lang) {
+    case 'es':
+      return textEs || textFr || defaultText || '';
+    case 'en':
+      return textEn || textFr || defaultText || '';
+    case 'fr':
+    default:
+      return textFr || defaultText || '';
+  }
+}
+
+/**
+ * Check translation coverage for a question
+ */
+export function getQuestionTranslationCoverage(question: OnboardingQuestion): OnboardingI18nValidation {
+  const fieldsCoverage: Record<string, TranslationCoverage> = {
+    title: {
+      fr: !!(question.titleFr || question.title),
+      en: !!question.titleEn,
+      es: !!question.titleEs,
+    },
+    subtitle: {
+      fr: !!(question.subtitleFr || question.subtitle),
+      en: !!question.subtitleEn,
+      es: !!question.subtitleEs,
+    },
+    hint: {
+      fr: !!(question.hintFr || question.hint),
+      en: !!question.hintEn,
+      es: !!question.hintEs,
+    },
+  };
+
+  // Check options
+  question.options.forEach((option, index) => {
+    fieldsCoverage[`option_${index}_label`] = {
+      fr: !!(option.labelFr || option.label),
+      en: !!option.labelEn,
+      es: !!option.labelEs,
+    };
+    if (option.description || option.descriptionFr || option.descriptionEn || option.descriptionEs) {
+      fieldsCoverage[`option_${index}_description`] = {
+        fr: !!(option.descriptionFr || option.description),
+        en: !!option.descriptionEn,
+        es: !!option.descriptionEs,
+      };
+    }
+  });
+
+  const missingLanguages: OnboardingLanguage[] = [];
+  let hasAllEn = true;
+  let hasAllEs = true;
+
+  Object.values(fieldsCoverage).forEach(coverage => {
+    if (!coverage.en) hasAllEn = false;
+    if (!coverage.es) hasAllEs = false;
+  });
+
+  if (!hasAllEn) missingLanguages.push('en');
+  if (!hasAllEs) missingLanguages.push('es');
+
+  return {
+    isComplete: missingLanguages.length === 0,
+    missingLanguages,
+    fieldsCoverage,
+  };
+}
+
+/**
+ * Check translation coverage for an information screen
+ */
+export function getInformationScreenTranslationCoverage(screen: InformationScreen): OnboardingI18nValidation {
+  const fieldsCoverage: Record<string, TranslationCoverage> = {
+    title: {
+      fr: !!(screen.titleFr || screen.title),
+      en: !!screen.titleEn,
+      es: !!screen.titleEs,
+    },
+    subtitle: {
+      fr: !!(screen.subtitleFr || screen.subtitle),
+      en: !!screen.subtitleEn,
+      es: !!screen.subtitleEs,
+    },
+    content: {
+      fr: !!(screen.contentFr || screen.content),
+      en: !!screen.contentEn,
+      es: !!screen.contentEs,
+    },
+    ctaText: {
+      fr: !!(screen.ctaTextFr || screen.ctaText),
+      en: !!screen.ctaTextEn,
+      es: !!screen.ctaTextEs,
+    },
+  };
+
+  // Check structured bullet points if present
+  if (screen.bulletPointsStructured) {
+    screen.bulletPointsStructured.forEach((bp, index) => {
+      fieldsCoverage[`bulletPoint_${index}`] = {
+        fr: !!(bp.textFr || bp.text),
+        en: !!bp.textEn,
+        es: !!bp.textEs,
+      };
+    });
+  }
+
+  const missingLanguages: OnboardingLanguage[] = [];
+  let hasAllEn = true;
+  let hasAllEs = true;
+
+  Object.values(fieldsCoverage).forEach(coverage => {
+    if (!coverage.en) hasAllEn = false;
+    if (!coverage.es) hasAllEs = false;
+  });
+
+  if (!hasAllEn) missingLanguages.push('en');
+  if (!hasAllEs) missingLanguages.push('es');
+
+  return {
+    isComplete: missingLanguages.length === 0,
+    missingLanguages,
+    fieldsCoverage,
+  };
 }

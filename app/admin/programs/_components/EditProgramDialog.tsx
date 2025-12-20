@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { TranslationFields } from '@/components/ui/translation-fields';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -164,12 +164,19 @@ export function EditProgramDialog({
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Title</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="e.g., 7-Day Meditation Starter"
-                      {...field}
+                    <TranslationFields
+                      label="Title"
+                      value={field.value}
+                      onChange={field.onChange}
                       disabled={isSubmitting}
+                      required
+                      placeholder={{
+                        fr: 'e.g., 7 Jours de Méditation',
+                        en: 'e.g., 7 Days of Meditation',
+                        es: 'e.g., 7 Días de Meditación'
+                      }}
+                      maxLength={100}
                     />
                   </FormControl>
                   <FormMessage />
@@ -183,13 +190,21 @@ export function EditProgramDialog({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
                   <FormControl>
-                    <Textarea
-                      placeholder="Begin your meditation journey..."
-                      className="min-h-[100px]"
-                      {...field}
+                    <TranslationFields
+                      type="textarea"
+                      label="Description"
+                      value={field.value}
+                      onChange={field.onChange}
                       disabled={isSubmitting}
+                      required
+                      placeholder={{
+                        fr: 'Commencez votre voyage de méditation...',
+                        en: 'Start your meditation journey...',
+                        es: 'Comienza tu viaje de meditación...'
+                      }}
+                      rows={4}
+                      maxLength={1000}
                     />
                   </FormControl>
                   <FormMessage />

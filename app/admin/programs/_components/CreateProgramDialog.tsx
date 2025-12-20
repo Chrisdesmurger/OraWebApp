@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { TranslationFields } from '@/components/ui/translation-fields';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -58,8 +58,8 @@ export function CreateProgramDialog({
   const form = useForm<CreateProgramInput>({
     resolver: zodResolver(createProgramSchema),
     defaultValues: {
-      title: '',
-      description: '',
+      title: { fr: '', en: '', es: '' },
+      description: { fr: '', en: '', es: '' },
       category: 'meditation',
       difficulty: 'beginner',
       durationDays: 7,
@@ -140,17 +140,22 @@ export function CreateProgramDialog({
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Title *</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="e.g., 7-Day Meditation Starter"
-                      {...field}
+                    <TranslationFields
+                      label="Title"
+                      value={field.value}
+                      onChange={field.onChange}
                       disabled={isSubmitting}
+                      required
+                      description="A clear, descriptive title for your program (3-100 characters)"
+                      placeholder={{
+                        fr: 'e.g., 7 Jours de Méditation',
+                        en: 'e.g., 7 Days of Meditation',
+                        es: 'e.g., 7 Días de Meditación'
+                      }}
+                      maxLength={100}
                     />
                   </FormControl>
-                  <FormDescription>
-                    A clear, descriptive title for your program (3-100 characters)
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -162,18 +167,24 @@ export function CreateProgramDialog({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description *</FormLabel>
                   <FormControl>
-                    <Textarea
-                      placeholder="Begin your meditation journey with guided sessions..."
-                      className="min-h-[100px]"
-                      {...field}
+                    <TranslationFields
+                      type="textarea"
+                      label="Description"
+                      value={field.value}
+                      onChange={field.onChange}
                       disabled={isSubmitting}
+                      required
+                      description="Describe what users will learn and achieve (10-1000 characters)"
+                      placeholder={{
+                        fr: 'Commencez votre voyage de méditation...',
+                        en: 'Start your meditation journey...',
+                        es: 'Comienza tu viaje de meditación...'
+                      }}
+                      rows={4}
+                      maxLength={1000}
                     />
                   </FormControl>
-                  <FormDescription>
-                    Describe what users will learn and achieve (10-1000 characters)
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

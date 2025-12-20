@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { TranslationFields, type MultilingualText } from '@/components/ui/translation-fields';
 import {
   Select,
   SelectContent,
@@ -26,11 +27,12 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { Upload, X } from 'lucide-react';
+import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
 import type { LessonType, CreateLessonRequest, UploadInitResponse } from '@/types/lesson';
 
 interface Program {
   id: string;
-  title: string;
+  title: string | MultilingualText;
 }
 
 interface CreateLessonDialogProps {
@@ -40,14 +42,24 @@ interface CreateLessonDialogProps {
   onSuccess: () => void;
 }
 
+// Multilingual text schema (accepts both string and MultilingualText for backward compatibility)
+const multilingualTextSchema = z.union([
+  z.string(),
+  z.object({
+    fr: z.string(),
+    en: z.string().optional(),
+    es: z.string().optional(),
+  }),
+]);
+
 const createLessonSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(200, 'Title is too long'),
-  description: z.string().max(500, 'Description is too long').optional(),
+  title: multilingualTextSchema,
+  description: multilingualTextSchema.optional(),
   type: z.enum(['video', 'audio']),
   programId: z.string().min(1, 'Program is required'),
   order: z.number().int().min(0).optional(),
   tags: z.string().optional(),
-  transcript: z.string().optional(),
+  transcript: multilingualTextSchema.optional(),
 });
 
 type CreateLessonFormData = z.infer<typeof createLessonSchema>;
@@ -78,6 +90,9 @@ export function CreateLessonDialog({
   } = useForm<CreateLessonFormData>({
     resolver: zodResolver(createLessonSchema),
     defaultValues: {
+      title: { fr: '', en: '', es: '' },
+      description: { fr: '', en: '', es: '' },
+      transcript: { fr: '', en: '', es: '' },
       type: 'video',
       order: 0,
     },
@@ -261,35 +276,42 @@ export function CreateLessonDialog({
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">
-              Title <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="title"
-              placeholder="Enter lesson title"
-              {...register('title')}
-              disabled={uploading}
-            />
-            {errors.title && (
-              <p className="text-sm text-red-500">{errors.title.message}</p>
-            )}
-          </div>
+          <TranslationFields
+            label="Title"
+            value={watch('title')}
+            onChange={(value) => setValue('title', value)}
+            disabled={uploading}
+            required
+            description="A clear, descriptive title for the lesson"
+            placeholder={{
+              fr: 'e.g., Introduction à la méditation',
+              en: 'e.g., Introduction to meditation',
+              es: 'e.g., Introducción a la meditación'
+            }}
+            maxLength={200}
+          />
+          {errors.title && (
+            <p className="text-sm text-red-500">{errors.title.message}</p>
+          )}
 
           {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Brief description of the lesson (optional)"
-              rows={3}
-              {...register('description')}
-              disabled={uploading}
-            />
-            {errors.description && (
-              <p className="text-sm text-red-500">{errors.description.message}</p>
-            )}
-          </div>
+          <TranslationFields
+            type="textarea"
+            label="Description"
+            value={watch('description')}
+            onChange={(value) => setValue('description', value)}
+            disabled={uploading}
+            placeholder={{
+              fr: 'Brève description de la leçon...',
+              en: 'Brief description of the lesson...',
+              es: 'Breve descripción de la lección...'
+            }}
+            rows={3}
+            maxLength={500}
+          />
+          {errors.description && (
+            <p className="text-sm text-red-500">{errors.description.message}</p>
+          )}
 
           {/* Type */}
           <div className="space-y-2">
@@ -331,7 +353,7 @@ export function CreateLessonDialog({
               <SelectContent>
                 {programs.map((program) => (
                   <SelectItem key={program.id} value={program.id}>
-                    {program.title}
+                    {getMultilingualDisplayText(program.title)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -367,16 +389,20 @@ export function CreateLessonDialog({
           </div>
 
           {/* Transcript */}
-          <div className="space-y-2">
-            <Label htmlFor="transcript">Transcript</Label>
-            <Textarea
-              id="transcript"
-              placeholder="Enter lesson transcript (optional)"
-              rows={4}
-              {...register('transcript')}
-              disabled={uploading}
-            />
-          </div>
+          <TranslationFields
+            type="textarea"
+            label="Transcript"
+            value={watch('transcript')}
+            onChange={(value) => setValue('transcript', value)}
+            disabled={uploading}
+            placeholder={{
+              fr: 'Transcription de la leçon...',
+              en: 'Lesson transcript...',
+              es: 'Transcripción de la lección...'
+            }}
+            rows={4}
+            maxLength={10000}
+          />
 
           {/* File Upload */}
           <div className="space-y-2">

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { TranslationFields } from '@/components/ui/translation-fields';
 import {
   Select,
   SelectContent,
@@ -28,11 +29,12 @@ import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { LessonStatusBadge } from './LessonStatusBadge';
 import { LessonPreviewImageUpload } from './LessonPreviewImageUpload';
 import { ExternalLink } from 'lucide-react';
-import type { Lesson, UpdateLessonRequest } from '@/types/lesson';
+import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
+import type { Lesson, UpdateLessonRequest, MultilingualText } from '@/types/lesson';
 
 interface Program {
   id: string;
-  title: string;
+  title: string | MultilingualText;
 }
 
 interface EditLessonDialogProps {
@@ -43,13 +45,32 @@ interface EditLessonDialogProps {
   onSuccess: () => void;
 }
 
+/**
+ * Helper to get display text from multilingual field
+ */
+function getDisplayText(text: MultilingualText | string | null | undefined): string {
+  if (!text) return '';
+  if (typeof text === 'string') return text;
+  return text.fr || text.en || text.es || '';
+}
+
+// Multilingual text schema (accepts both string and MultilingualText for backward compatibility)
+const multilingualTextSchema = z.union([
+  z.string(),
+  z.object({
+    fr: z.string(),
+    en: z.string().optional(),
+    es: z.string().optional(),
+  }),
+]);
+
 const editLessonSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(200, 'Title is too long'),
-  description: z.string().max(500, 'Description is too long').optional(),
+  title: multilingualTextSchema,
+  description: multilingualTextSchema.optional(),
   programId: z.string().min(1, 'Program is required'),
   order: z.number().int().min(0).optional(),
   tags: z.string().optional(),
-  transcript: z.string().optional(),
+  transcript: multilingualTextSchema.optional(),
 });
 
 type EditLessonFormData = z.infer<typeof editLessonSchema>;
@@ -97,13 +118,24 @@ export function EditLessonDialog({
   // Reset form when lesson changes
   React.useEffect(() => {
     if (lesson) {
+      // Convert to MultilingualText format
+      const toMultilingual = (text: MultilingualText | string | null | undefined): MultilingualText => {
+        if (!text) return { fr: '', en: '', es: '' };
+        if (typeof text === 'string') return { fr: text, en: '', es: '' };
+        return {
+          fr: text.fr || '',
+          en: text.en || '',
+          es: text.es || '',
+        };
+      };
+
       reset({
-        title: lesson.title,
-        description: lesson.description || '',
+        title: toMultilingual(lesson.title),
+        description: toMultilingual(lesson.description),
         programId: lesson.programId,
         order: lesson.order,
         tags: lesson.tags.join(', '),
-        transcript: lesson.transcript || '',
+        transcript: toMultilingual(lesson.transcript),
       });
     }
   }, [lesson, reset]);
@@ -122,9 +154,10 @@ export function EditLessonDialog({
             .filter(Boolean)
         : [];
 
-      // Update lesson
+      // Update lesson - now sending as multilingual format
+      // The backend accepts both string and multilingual object
       const updateRequest: UpdateLessonRequest = {
-        title: data.title,
+        title: data.title,  // Backend accepts string or MultilingualText
         description: data.description,
         order: data.order,
         tags,
@@ -159,6 +192,9 @@ export function EditLessonDialog({
   };
 
   if (!lesson) return null;
+
+  // Get display values for lesson info
+  const lessonTitle = getDisplayText(lesson.title);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -352,35 +388,42 @@ export function EditLessonDialog({
           />
 
           {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">
-              Title <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="title"
-              placeholder="Enter lesson title"
-              {...register('title')}
-              disabled={isSubmitting}
-            />
-            {errors.title && (
-              <p className="text-sm text-red-500">{errors.title.message}</p>
-            )}
-          </div>
+          <TranslationFields
+            label="Title"
+            value={watch('title')}
+            onChange={(value) => setValue('title', value)}
+            disabled={isSubmitting}
+            required
+            description="A clear, descriptive title for the lesson"
+            placeholder={{
+              fr: 'e.g., Introduction à la méditation',
+              en: 'e.g., Introduction to meditation',
+              es: 'e.g., Introducción a la meditación'
+            }}
+            maxLength={200}
+          />
+          {errors.title && (
+            <p className="text-sm text-red-500">{errors.title.message}</p>
+          )}
 
           {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Brief description of the lesson (optional)"
-              rows={3}
-              {...register('description')}
-              disabled={isSubmitting}
-            />
-            {errors.description && (
-              <p className="text-sm text-red-500">{errors.description.message}</p>
-            )}
-          </div>
+          <TranslationFields
+            type="textarea"
+            label="Description"
+            value={watch('description')}
+            onChange={(value) => setValue('description', value)}
+            disabled={isSubmitting}
+            placeholder={{
+              fr: 'Brève description de la leçon...',
+              en: 'Brief description of the lesson...',
+              es: 'Breve descripción de la lección...'
+            }}
+            rows={3}
+            maxLength={500}
+          />
+          {errors.description && (
+            <p className="text-sm text-red-500">{errors.description.message}</p>
+          )}
 
           {/* Program */}
           <div className="space-y-2">
@@ -398,7 +441,7 @@ export function EditLessonDialog({
               <SelectContent>
                 {programs.map((program) => (
                   <SelectItem key={program.id} value={program.id}>
-                    {program.title}
+                    {getMultilingualDisplayText(program.title)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -434,16 +477,20 @@ export function EditLessonDialog({
           </div>
 
           {/* Transcript */}
-          <div className="space-y-2">
-            <Label htmlFor="transcript">Transcript</Label>
-            <Textarea
-              id="transcript"
-              placeholder="Enter lesson transcript (optional)"
-              rows={6}
-              {...register('transcript')}
-              disabled={isSubmitting}
-            />
-          </div>
+          <TranslationFields
+            type="textarea"
+            label="Transcript"
+            value={watch('transcript')}
+            onChange={(value) => setValue('transcript', value)}
+            disabled={isSubmitting}
+            placeholder={{
+              fr: 'Transcription de la leçon...',
+              en: 'Lesson transcript...',
+              es: 'Transcripción de la lección...'
+            }}
+            rows={6}
+            maxLength={10000}
+          />
 
           {/* Error Message */}
           {error && (

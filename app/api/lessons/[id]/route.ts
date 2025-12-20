@@ -3,7 +3,7 @@ import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/ap
 import { getFirestore } from '@/lib/firebase/admin';
 import { validateUpdateLesson, type UpdateLessonInput } from '@/lib/validators/lesson';
 import { mapLessonFromFirestore, mapLessonToFirestore } from '@/types/lesson';
-import type { LessonDocument } from '@/types/lesson';
+import type { LessonDocument, Lesson } from '@/types/lesson';
 import { deleteLessonMedia } from '@/lib/storage';
 import { logUpdate, logDelete } from '@/lib/audit/logger';
 
@@ -127,14 +127,7 @@ export async function PATCH(
 
     // Prepare update data
     const updateData: Partial<LessonDocument> = {
-      ...mapLessonToFirestore({
-        title: validatedData.title,
-        description: validatedData.description,
-        order: validatedData.order,
-        tags: validatedData.tags,
-        transcript: validatedData.transcript,
-        programId: validatedData.programId,
-      }),
+      ...mapLessonToFirestore(validatedData as Partial<Lesson>),
       updated_at: new Date().toISOString(),
     };
 

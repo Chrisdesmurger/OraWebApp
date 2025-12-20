@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { GripVertical, X, Video, Music, FileText, Eye } from 'lucide-react';
 import type { Lesson } from '@/types/lesson';
+import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
 
 interface DraggableLessonListProps {
   lessons: Lesson[];
@@ -67,7 +68,7 @@ function SortableItem({ lesson, index, onRemove, onPreview }: SortableItemProps)
         return (
           <img
             src={lesson.thumbnailUrl}
-            alt={lesson.title}
+            alt={getMultilingualDisplayText(lesson.title)}
             className="h-10 w-10 rounded-lg object-cover"
           />
         );
@@ -132,7 +133,7 @@ function SortableItem({ lesson, index, onRemove, onPreview }: SortableItemProps)
       {/* Lesson Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <div className="font-medium">{lesson.title}</div>
+          <div className="font-medium">{getMultilingualDisplayText(lesson.title)}</div>
           {lesson.type && (
             <Badge variant="secondary" className="text-xs capitalize">
               {lesson.type === 'video' && <Video className="h-3 w-3 mr-1" />}
@@ -142,7 +143,7 @@ function SortableItem({ lesson, index, onRemove, onPreview }: SortableItemProps)
           )}
         </div>
         <div className="text-sm text-muted-foreground line-clamp-1">
-          {lesson.transcript ? lesson.transcript.substring(0, 80) + '...' : 'No transcript available'}
+          {lesson.transcript ? getMultilingualDisplayText(lesson.transcript).substring(0, 80) + '...' : 'No transcript available'}
         </div>
         <div className="flex gap-2 mt-1">
           {lesson.tags && lesson.tags.length > 0 && (
