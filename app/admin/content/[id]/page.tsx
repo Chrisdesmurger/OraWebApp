@@ -9,7 +9,17 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Calendar, Clock, User, Tag, Video, Music, FileText, Loader2 } from 'lucide-react';
 import { getStorageDownloadURL } from '@/lib/firebase/client';
-import type { Lesson } from '@/types/lesson';
+import type { Lesson, MultilingualText } from '@/types/lesson';
+
+/**
+ * Get French text from a multilingual field
+ * Used for admin portal display (always shows French as primary)
+ */
+function getDisplayText(text: MultilingualText | string | null | undefined): string {
+  if (!text) return '';
+  if (typeof text === 'string') return text;
+  return text.fr || text.en || text.es || '';
+}
 
 export default function LessonDetailsPage() {
   const params = useParams();
@@ -161,6 +171,11 @@ export default function LessonDetailsPage() {
     );
   }
 
+  // Get display text for lesson fields (now multilingual)
+  const lessonTitle = getDisplayText(lesson.title);
+  const lessonDescription = getDisplayText(lesson.description);
+  const lessonTranscript = getDisplayText(lesson.transcript);
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -174,7 +189,7 @@ export default function LessonDetailsPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{lesson.title}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{lessonTitle}</h1>
             <p className="text-muted-foreground">Lesson Details</p>
           </div>
         </div>
@@ -204,7 +219,7 @@ export default function LessonDetailsPage() {
                 type={lesson.type}
                 src={mediaUrl}
                 thumbnailUrl={lesson.thumbnailUrl || undefined}
-                title={lesson.title}
+                title={lessonTitle}
                 controls={true}
                 className="max-w-4xl mx-auto"
               />
@@ -254,6 +269,14 @@ export default function LessonDetailsPage() {
             </div>
           </div>
 
+          {/* Description */}
+          {lessonDescription && (
+            <div className="space-y-1">
+              <div className="text-sm text-muted-foreground">Description</div>
+              <div className="text-sm">{lessonDescription}</div>
+            </div>
+          )}
+
           {lesson.tags && lesson.tags.length > 0 && (
             <div className="space-y-2">
               <div className="text-sm text-muted-foreground flex items-center gap-2">
@@ -269,6 +292,36 @@ export default function LessonDetailsPage() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* i18n Translation Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Translation Status</CardTitle>
+          <CardDescription>Multilingual content availability</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <div className="text-sm text-muted-foreground">French (FR)</div>
+              <Badge variant={lesson.title?.fr ? 'default' : 'secondary'}>
+                {lesson.title?.fr ? 'Complete' : 'Missing'}
+              </Badge>
+            </div>
+            <div className="space-y-1">
+              <div className="text-sm text-muted-foreground">English (EN)</div>
+              <Badge variant={lesson.title?.en ? 'default' : 'outline'}>
+                {lesson.title?.en ? 'Complete' : 'Not translated'}
+              </Badge>
+            </div>
+            <div className="space-y-1">
+              <div className="text-sm text-muted-foreground">Spanish (ES)</div>
+              <Badge variant={lesson.title?.es ? 'default' : 'outline'}>
+                {lesson.title?.es ? 'Complete' : 'Not translated'}
+              </Badge>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -382,7 +435,7 @@ export default function LessonDetailsPage() {
       </Card>
 
       {/* Transcript */}
-      {lesson.transcript && (
+      {lessonTranscript && (
         <Card>
           <CardHeader>
             <CardTitle>Transcript</CardTitle>
@@ -390,7 +443,7 @@ export default function LessonDetailsPage() {
           </CardHeader>
           <CardContent>
             <div className="prose prose-sm max-w-none">
-              <p className="whitespace-pre-wrap">{lesson.transcript}</p>
+              <p className="whitespace-pre-wrap">{lessonTranscript}</p>
             </div>
           </CardContent>
         </Card>

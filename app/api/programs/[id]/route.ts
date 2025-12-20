@@ -9,7 +9,7 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
 import { getFirestore } from '@/lib/firebase/admin';
-import { mapProgramFromFirestore, type ProgramDocument } from '@/types/program';
+import { mapProgramFromFirestore, mapProgramToFirestore, type ProgramDocument, type Program } from '@/types/program';
 import { safeValidateUpdateProgram } from '@/lib/validators/program';
 import { logUpdate, logDelete, logStatusChange } from '@/lib/audit/logger';
 
@@ -137,36 +137,16 @@ export async function PATCH(
     // Save before state for audit log
     const beforeState = { ...programData };
 
-    // Build update object with snake_case fields
-    const updateData: Partial<ProgramDocument> = {
-      updated_at: new Date().toISOString(),
-    };
+    // Build update object with snake_case fields using mapper
+    const mappedData = mapProgramToFirestore(validation.data as any);
 
-    const {
-      title,
-      description,
-      category,
-      difficulty,
-      durationDays,
-      coverImageUrl,
-      status,
-      tags,
-      scheduledPublishAt,
-      scheduledArchiveAt,
-      autoPublishEnabled,
-    } = validation.data;
-
-    if (title !== undefined) updateData.title = title;
-    if (description !== undefined) updateData.description = description;
-    if (category !== undefined) updateData.category = category;
-    if (difficulty !== undefined) updateData.difficulty = difficulty;
-    if (durationDays !== undefined) updateData.duration_days = durationDays;
-    if (coverImageUrl !== undefined) updateData.cover_image_url = coverImageUrl;
-    if (status !== undefined) updateData.status = status;
-    if (tags !== undefined) updateData.tags = tags;
-    if (scheduledPublishAt !== undefined) updateData.scheduled_publish_at = scheduledPublishAt;
-    if (scheduledArchiveAt !== undefined) updateData.scheduled_archive_at = scheduledArchiveAt;
-    if (autoPublishEnabled !== undefined) updateData.auto_publish_enabled = autoPublishEnabled;
+    // Remove undefined values (Firestore doesn't allow undefined)
+    const updateData: Partial<ProgramDocument> = Object.fromEntries(
+      Object.entries({
+        ...mappedData,
+        updated_at: new Date().toISOString(),
+      }).filter(([_, value]) => value !== undefined)
+    ) as Partial<ProgramDocument>;
 
     await programRef.update(updateData);
 
@@ -176,13 +156,13 @@ export async function PATCH(
     const program = mapProgramFromFirestore(id, updatedData);
 
     // Log audit event (don't await - fire and forget)
-    const isStatusChange = status !== undefined && status !== beforeState.status;
+    const isStatusChange = validation.data.status !== undefined && validation.data.status !== beforeState.status;
 
     // Check if scheduling fields actually changed (compare values, not just presence)
     const schedulingFieldsChanged =
-      (scheduledPublishAt !== undefined && scheduledPublishAt !== beforeState.scheduled_publish_at) ||
-      (scheduledArchiveAt !== undefined && scheduledArchiveAt !== beforeState.scheduled_archive_at) ||
-      (autoPublishEnabled !== undefined && autoPublishEnabled !== beforeState.auto_publish_enabled);
+      (validation.data.scheduledPublishAt !== undefined && validation.data.scheduledPublishAt !== beforeState.scheduled_publish_at) ||
+      (validation.data.scheduledArchiveAt !== undefined && validation.data.scheduledArchiveAt !== beforeState.scheduled_archive_at) ||
+      (validation.data.autoPublishEnabled !== undefined && validation.data.autoPublishEnabled !== beforeState.auto_publish_enabled);
 
     // Log status changes
     if (isStatusChange) {

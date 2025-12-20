@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
 import { getFirestore } from '@/lib/firebase/admin';
-import { mapProgramFromFirestore, type ProgramDocument } from '@/types/program';
+import { mapProgramFromFirestore, mapProgramToFirestore, type ProgramDocument, type Program } from '@/types/program';
 import { safeValidateGetProgramsQuery } from '@/lib/validators/program';
 import { logCreate } from '@/lib/audit/logger';
 
@@ -154,24 +154,14 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString();
 
-    // Create Firestore document with snake_case fields
+    // Create Firestore document using mapper (handles i18n conversion)
     const programDocument: ProgramDocument = {
-      title,
-      description,
-      category,
-      difficulty,
-      duration_days: durationDays,
-      lessons,
-      cover_image_url: coverImageUrl,
+      ...mapProgramToFirestore(validation.data as any),
       cover_storage_path: null,
       status: 'draft',
       author_id: user.uid,
-      tags,
       created_at: now,
       updated_at: now,
-      scheduled_publish_at: scheduledPublishAt,
-      scheduled_archive_at: scheduledArchiveAt,
-      auto_publish_enabled: autoPublishEnabled,
     };
 
     await programRef.set(programDocument);

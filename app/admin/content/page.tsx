@@ -22,11 +22,30 @@ import { CreateLessonDialog } from './_components/CreateLessonDialog';
 import { EditLessonDialog } from './_components/EditLessonDialog';
 import { Plus, RefreshCw } from 'lucide-react';
 import { toast } from '@/lib/hooks/use-toast';
-import type { Lesson, LessonStatus, LessonType } from '@/types/lesson';
+import type { Lesson, LessonStatus, LessonType, MultilingualText } from '@/types/lesson';
 
 interface Program {
   id: string;
   title: string;
+}
+
+/**
+ * Helper to get display text from multilingual field for search
+ */
+function getSearchableText(text: MultilingualText | string | null | undefined): string {
+  if (!text) return '';
+  if (typeof text === 'string') return text;
+  // Search in all languages
+  return [text.fr, text.en, text.es].filter(Boolean).join(' ');
+}
+
+/**
+ * Helper to get display text from multilingual field
+ */
+function getDisplayText(text: MultilingualText | string | null | undefined): string {
+  if (!text) return '';
+  if (typeof text === 'string') return text;
+  return text.fr || text.en || text.es || '';
 }
 
 export default function ContentPage() {
@@ -131,7 +150,9 @@ export default function ContentPage() {
   // Filter lessons
   const filteredLessons = React.useMemo(() => {
     return lessons.filter((lesson) => {
-      const matchesSearch = lesson.title.toLowerCase().includes(search.toLowerCase()) ||
+      // Search in all language variants of title
+      const searchableTitle = getSearchableText(lesson.title).toLowerCase();
+      const matchesSearch = searchableTitle.includes(search.toLowerCase()) ||
         lesson.tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase()));
       const matchesStatus = statusFilter === 'all' || lesson.status === statusFilter;
       const matchesType = typeFilter === 'all' || lesson.type === typeFilter;
@@ -199,15 +220,17 @@ export default function ContentPage() {
   // Handle duplicate
   const handleDuplicate = async (lesson: Lesson) => {
     try {
+      // Get the French title for the duplicate name
+      const originalTitle = getDisplayText(lesson.title);
       const response = await fetchWithAuth('/api/lessons', {
         method: 'POST',
         body: JSON.stringify({
-          title: `${lesson.title} (Copy)`,
+          title: `${originalTitle} (Copy)`,
           type: lesson.type,
           programId: lesson.programId,
           order: lesson.order,
           tags: lesson.tags,
-          transcript: lesson.transcript,
+          transcript: getDisplayText(lesson.transcript),
         }),
       });
 

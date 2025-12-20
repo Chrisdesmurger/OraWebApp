@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { getStorageDownloadURL } from '@/lib/firebase/client';
+import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Dialog,
@@ -375,7 +376,7 @@ export function ManageLessonsDialog({
       <Dialog open={!!previewLesson} onOpenChange={() => setPreviewLesson(null)}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{previewLesson?.title}</DialogTitle>
+            <DialogTitle>{previewLesson ? getMultilingualDisplayText(previewLesson.title) : ''}</DialogTitle>
             <DialogDescription>
               {previewLesson?.type === 'video' ? 'Video' : 'Audio'} Preview
             </DialogDescription>
@@ -392,7 +393,7 @@ export function ManageLessonsDialog({
                 type={previewLesson.type}
                 src={previewMediaUrl}
                 thumbnailUrl={previewLesson.thumbnailUrl || undefined}
-                title={previewLesson.title}
+                title={getMultilingualDisplayText(previewLesson.title)}
                 controls={true}
               />
             )

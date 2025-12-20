@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Search, X } from 'lucide-react';
+import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
 import type { LessonStatus, LessonType } from '@/types/lesson';
 
 interface LessonFiltersProps {
@@ -11,7 +12,7 @@ interface LessonFiltersProps {
   status: LessonStatus | 'all';
   type: LessonType | 'all';
   programId: string | 'all';
-  programs: Array<{ id: string; title: string }>;
+  programs: Array<{ id: string; title: string | { fr: string; en?: string; es?: string } }>;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: LessonStatus | 'all') => void;
   onTypeChange: (value: LessonType | 'all') => void;
@@ -83,7 +84,7 @@ export function LessonFilters({
             <SelectItem value="all">All Programs</SelectItem>
             {programs.map((program) => (
               <SelectItem key={program.id} value={program.id}>
-                {program.title}
+                {getMultilingualDisplayText(program.title)}
               </SelectItem>
             ))}
           </SelectContent>

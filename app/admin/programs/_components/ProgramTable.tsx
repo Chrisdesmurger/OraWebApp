@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Brain, User, Sparkles, Heart } from 'lucide-react';
+import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
 
 interface ProgramTableProps {
   programs: Program[];
@@ -141,7 +142,7 @@ export function ProgramTable({
                     <div className="h-12 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                       <img
                         src={program.coverImageUrl}
-                        alt={program.title}
+                        alt={getMultilingualDisplayText(program.title)}
                         className="h-full w-full object-cover"
                       />
                     </div>
@@ -151,9 +152,9 @@ export function ProgramTable({
                     </div>
                   )}
                   <div className="max-w-md">
-                    <div className="font-medium">{program.title}</div>
+                    <div className="font-medium">{getMultilingualDisplayText(program.title)}</div>
                     <div className="text-sm text-muted-foreground line-clamp-1">
-                      {program.description}
+                      {getMultilingualDisplayText(program.description)}
                     </div>
                     {program.tags && program.tags.length > 0 && (
                       <div className="flex gap-1 mt-1">

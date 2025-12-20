@@ -7,7 +7,7 @@ import {
   type CreateLessonInput,
   type LessonFiltersInput
 } from '@/lib/validators/lesson';
-import { mapLessonFromFirestore } from '@/types/lesson';
+import { mapLessonFromFirestore, mapLessonToFirestore } from '@/types/lesson';
 import type { LessonDocument, Lesson } from '@/types/lesson';
 import { logCreate } from '@/lib/audit/logger';
 
@@ -103,9 +103,13 @@ export async function GET(request: NextRequest) {
     let filteredLessons = lessons;
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      filteredLessons = lessons.filter(lesson =>
-        lesson.title.toLowerCase().includes(searchLower)
-      );
+      filteredLessons = lessons.filter(lesson => {
+        const titleMatch =
+          lesson.title.fr?.toLowerCase().includes(searchLower) ||
+          lesson.title.en?.toLowerCase().includes(searchLower) ||
+          lesson.title.es?.toLowerCase().includes(searchLower);
+        return titleMatch;
+      });
       console.log('[GET /api/lessons] After search filter:', filteredLessons.length, 'lessons');
     }
 
@@ -172,15 +176,16 @@ export async function POST(request: NextRequest) {
     const lessonRef = firestore.collection('lessons').doc();
     const now = new Date().toISOString();
 
+    // Map validated data to Firestore format (handles i18n conversion)
+    const mappedData = mapLessonToFirestore(validatedData as Partial<Lesson>);
+
     const lessonData: LessonDocument = {
-      title: validatedData.title,
-      description: validatedData.description || null,
+      ...mappedData,
       type: validatedData.type,
       program_id: validatedData.programId,
       order: validatedData.order || 0,
       duration_sec: null,
       tags: validatedData.tags || [],
-      transcript: validatedData.transcript || null,
 
       // Upload & processing status
       status: 'draft', // Will become 'uploading' when file upload starts
@@ -202,7 +207,7 @@ export async function POST(request: NextRequest) {
       author_id: user.uid,
       created_at: now,
       updated_at: now,
-    };
+    } as LessonDocument;
 
     await lessonRef.set(lessonData);
     console.log(`[POST /api/lessons] Created lesson ${lessonRef.id} in program ${validatedData.programId}`);

@@ -68,32 +68,35 @@ export interface GetScheduledContentResponse {
  */
 export function programToScheduledItems(program: Program): ScheduledContentItem[] {
   const items: ScheduledContentItem[] = [];
+  // Extract title and category (handle both string and MultilingualText)
+  const title = program.title;  // Program.title is currently string type
+  const category = program.category;  // Program.category is currently Category enum
 
   if (program.scheduledPublishAt) {
     items.push({
       id: program.id,
-      title: program.title,
+      title,
       type: 'program',
       scheduleType: 'publish',
       scheduledAt: program.scheduledPublishAt,
       autoPublishEnabled: program.autoPublishEnabled,
       currentStatus: program.status,
       authorId: program.authorId,
-      category: program.category,
+      category,
     });
   }
 
   if (program.scheduledArchiveAt) {
     items.push({
       id: program.id,
-      title: program.title,
+      title,
       type: 'program',
       scheduleType: 'archive',
       scheduledAt: program.scheduledArchiveAt,
       autoPublishEnabled: program.autoPublishEnabled,
       currentStatus: program.status,
       authorId: program.authorId,
-      category: program.category,
+      category,
     });
   }
 
@@ -105,11 +108,13 @@ export function programToScheduledItems(program: Program): ScheduledContentItem[
  */
 export function lessonToScheduledItems(lesson: Lesson): ScheduledContentItem[] {
   const items: ScheduledContentItem[] = [];
+  // Extract French title (primary language)
+  const title = typeof lesson.title === 'string' ? lesson.title : lesson.title.fr;
 
   if (lesson.scheduledPublishAt) {
     items.push({
       id: lesson.id,
-      title: lesson.title,
+      title,
       type: 'lesson',
       scheduleType: 'publish',
       scheduledAt: lesson.scheduledPublishAt,
@@ -123,7 +128,7 @@ export function lessonToScheduledItems(lesson: Lesson): ScheduledContentItem[] {
   if (lesson.scheduledArchiveAt) {
     items.push({
       id: lesson.id,
-      title: lesson.title,
+      title,
       type: 'lesson',
       scheduleType: 'archive',
       scheduledAt: lesson.scheduledArchiveAt,
