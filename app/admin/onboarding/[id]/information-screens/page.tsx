@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { TranslationFields } from '@/components/ui/translation-fields';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Plus, Trash2, GripVertical, Save, Eye, EyeOff, Info, Brain } from 'lucide-react';
 import Link from 'next/link';
@@ -139,70 +140,125 @@ function SortableInformationScreen({
         </div>
 
         {/* Titre */}
-        <div className="space-y-2">
-          <Label>Titre de l&apos;écran *</Label>
-          <Input
-            value={screen.title}
-            onChange={(e) => onUpdate(screen.tempId, { title: e.target.value })}
-            placeholder="Ex: Bienvenue dans votre parcours de bien-être"
-            required
-          />
-        </div>
-
-        {/* Traductions du titre */}
-        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Titre (Français)</Label>
-            <Input
-              value={screen.titleFr || ''}
-              onChange={(e) => onUpdate(screen.tempId, { titleFr: e.target.value })}
-              placeholder="Titre en français"
+            <Label className="text-sm text-muted-foreground">
+              Remarque: le champ "title" est conservé pour compatibilité, mais la source i18n est titleFr/titleEn/titleEs.
+            </Label>
+          </div>
+
+        {/* i18n - Titre */}
+        <TranslationFields
+          label="Titre"
+          required
+          value={{
+            fr: screen.titleFr || screen.title || '',
+            en: screen.titleEn || '',
+            es: screen.titleEs || '',
+          }}
+          onChange={(value) =>
+            onUpdate(screen.tempId, {
+              title: value.fr,
+              titleFr: value.fr,
+              titleEn: value.en,
+              titleEs: value.es,
+            })
+          }
+          placeholder={{
+            fr: "Titre en français",
+            en: "Title in English",
+            es: "Título en español",
+          }}
+        />
+
+        {/* i18n - Sous-titre */}
+        <TranslationFields
+          label="Sous-titre"
+          value={{
+            fr: screen.subtitleFr || screen.subtitle || '',
+            en: screen.subtitleEn || '',
+            es: screen.subtitleEs || '',
+          }}
+          onChange={(value) =>
+            onUpdate(screen.tempId, {
+              subtitle: value.fr,
+              subtitleFr: value.fr,
+              subtitleEn: value.en,
+              subtitleEs: value.es,
+            })
+          }
+          placeholder={{
+            fr: 'Sous-titre en français',
+            en: 'Subtitle in English',
+            es: 'Subtítulo en español',
+          }}
+        />
+
+        {/* i18n - Contenu */}
+        <TranslationFields
+          type="textarea"
+          label="Contenu"
+          value={{
+            fr: screen.contentFr || screen.content || '',
+            en: screen.contentEn || '',
+            es: screen.contentEs || '',
+          }}
+          onChange={(value) =>
+            onUpdate(screen.tempId, {
+              content: value.fr,
+              contentFr: value.fr,
+              contentEn: value.en,
+              contentEs: value.es,
+            })
+          }
+          placeholder={{
+            fr: 'Texte en français (markdown supporté)...',
+            en: 'Text in English (markdown supported)...',
+            es: 'Texto en español (markdown soportado)...',
+          }}
+        />
+
+        {/* i18n - Points clés (legacy arrays) */}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Points clés (FR) - un par ligne</Label>
+            <Textarea
+              value={(screen.bulletPointsFr || screen.bulletPoints || []).join('\n')}
+              onChange={(e) =>
+                onUpdate(screen.tempId, {
+                  bulletPoints: e.target.value.split('\n').filter((line) => line.trim() !== ''),
+                  bulletPointsFr: e.target.value.split('\n').filter((line) => line.trim() !== ''),
+                })
+              }
+              placeholder="✓ Premier point\n✓ Deuxième point\n✓ Troisième point"
+              rows={3}
             />
           </div>
           <div className="space-y-2">
-            <Label>Titre (Anglais)</Label>
-            <Input
-              value={screen.titleEn || ''}
-              onChange={(e) => onUpdate(screen.tempId, { titleEn: e.target.value })}
-              placeholder="Title in English"
+            <Label>Points clés (EN) - one per line</Label>
+            <Textarea
+              value={(screen.bulletPointsEn || []).join('\n')}
+              onChange={(e) =>
+                onUpdate(screen.tempId, {
+                  bulletPointsEn: e.target.value.split('\n').filter((line) => line.trim() !== ''),
+                })
+              }
+              placeholder="• First point\n• Second point\n• Third point"
+              rows={3}
             />
           </div>
-        </div>
-
-        {/* Sous-titre */}
-        <div className="space-y-2">
-          <Label>Sous-titre</Label>
-          <Input
-            value={screen.subtitle || ''}
-            onChange={(e) => onUpdate(screen.tempId, { subtitle: e.target.value })}
-            placeholder="Description courte..."
-          />
-        </div>
-
-        {/* Contenu */}
-        <div className="space-y-2">
-          <Label>Contenu</Label>
-          <Textarea
-            value={screen.content || ''}
-            onChange={(e) => onUpdate(screen.tempId, { content: e.target.value })}
-            placeholder="Texte enrichi (markdown supporté)..."
-            rows={4}
-          />
-        </div>
-
-        {/* Points clés */}
-        <div className="space-y-2">
-          <Label>Points clés (un par ligne)</Label>
-          <Textarea
-            value={screen.bulletPoints?.join('\n') || ''}
-            onChange={(e) =>
-              onUpdate(screen.tempId, {
-                bulletPoints: e.target.value.split('\n').filter(line => line.trim() !== ''),
-              })
-            }
-            placeholder="✓ Premier point&#10;✓ Deuxième point&#10;✓ Troisième point"
-            rows={3}
-          />
+          <div className="space-y-2">
+            <Label>Points clés (ES) - uno por línea</Label>
+            <Textarea
+              value={(screen.bulletPointsEs || []).join('\n')}
+              onChange={(e) =>
+                onUpdate(screen.tempId, {
+                  bulletPointsEs: e.target.value.split('\n').filter((line) => line.trim() !== ''),
+                })
+              }
+              placeholder="• Primer punto\n• Segundo punto\n• Tercer punto"
+              rows={3}
+            />
+          </div>
         </div>
 
         {/* URL d'image et couleur de fond */}
@@ -234,15 +290,28 @@ function SortableInformationScreen({
           </div>
         </div>
 
-        {/* Texte du bouton CTA */}
-        <div className="space-y-2">
-          <Label>Texte du bouton</Label>
-          <Input
-            value={screen.ctaText || ''}
-            onChange={(e) => onUpdate(screen.tempId, { ctaText: e.target.value })}
-            placeholder="Continuer"
-          />
-        </div>
+        {/* i18n - Texte du bouton CTA */}
+        <TranslationFields
+          label="Texte du bouton"
+          value={{
+            fr: screen.ctaTextFr || screen.ctaText || '',
+            en: screen.ctaTextEn || '',
+            es: screen.ctaTextEs || '',
+          }}
+          onChange={(value) =>
+            onUpdate(screen.tempId, {
+              ctaText: value.fr,
+              ctaTextFr: value.fr,
+              ctaTextEn: value.en,
+              ctaTextEs: value.es,
+            })
+          }
+          placeholder={{
+            fr: 'Continuer',
+            en: 'Continue',
+            es: 'Continuar',
+          }}
+        />
 
         {/* Conditions d'affichage */}
         <div className="space-y-2 p-4 bg-muted/50 rounded-md">
@@ -384,10 +453,14 @@ export default function InformationScreensPage() {
           const data = await response.json();
           setConfigTitle(data.title);
           setQuestions(data.questions || []);
+
+          // Prefer snake_case stored screens (Android-aligned), but accept camelCase as legacy.
+          const infoScreens = data.informationScreens || data.information_screens || [];
+
           setScreens(
-            (data.informationScreens || []).map((s: InformationScreen) => ({
+            (infoScreens as InformationScreen[]).map((s: InformationScreen) => ({
               ...s,
-              tempId: s.id || `temp_${Date.now()}_${Math.random()}`,
+              tempId: (s as any).tempId || s.id || `temp_${Date.now()}_${Math.random()}`,
             }))
           );
         } else {
@@ -420,6 +493,25 @@ export default function InformationScreensPage() {
       id: '',
       position: 0,
       title: '',
+      titleFr: '',
+      titleEn: '',
+      titleEs: '',
+      subtitle: '',
+      subtitleFr: '',
+      subtitleEn: '',
+      subtitleEs: '',
+      content: '',
+      contentFr: '',
+      contentEn: '',
+      contentEs: '',
+      bulletPoints: [],
+      bulletPointsFr: [],
+      bulletPointsEn: [],
+      bulletPointsEs: [],
+      ctaText: '',
+      ctaTextFr: '',
+      ctaTextEn: '',
+      ctaTextEs: '',
       order: screens.length,
     };
     setScreens([...screens, newScreen]);
@@ -487,19 +579,24 @@ export default function InformationScreensPage() {
             title: s.title,
             titleFr: s.titleFr,
             titleEn: s.titleEn,
+            titleEs: s.titleEs,
             subtitle: s.subtitle,
             subtitleFr: s.subtitleFr,
             subtitleEn: s.subtitleEn,
+            subtitleEs: s.subtitleEs,
             content: s.content,
             contentFr: s.contentFr,
             contentEn: s.contentEn,
+            contentEs: s.contentEs,
             bulletPoints: s.bulletPoints,
             bulletPointsFr: s.bulletPointsFr,
             bulletPointsEn: s.bulletPointsEn,
+            bulletPointsEs: s.bulletPointsEs,
             imageUrl: s.imageUrl,
             ctaText: s.ctaText,
             ctaTextFr: s.ctaTextFr,
             ctaTextEn: s.ctaTextEn,
+            ctaTextEs: s.ctaTextEs,
             backgroundColor: s.backgroundColor,
             displayConditions: s.displayConditions,
             order: index,

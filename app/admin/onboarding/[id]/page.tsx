@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { TranslationFields } from '@/components/ui/translation-fields';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Plus, Trash2, GripVertical, Rocket, Archive, Save, Info, Brain } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, GripVertical, Rocket, Archive, Save, Info, Brain, Languages, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import type { OnboardingConfig, OnboardingQuestion, AnswerOption } from '@/types/onboarding';
 import {
@@ -40,9 +41,132 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 interface QuestionForm extends Omit<OnboardingQuestion, 'order'> {
   tempId: string;
+}
+
+// Composant pour une option avec i18n
+function OptionEditor({
+  option,
+  questionType,
+  onUpdate,
+  onRemove,
+}: {
+  option: AnswerOption;
+  questionType: string;
+  onUpdate: (updates: Partial<AnswerOption>) => void;
+  onRemove: () => void;
+}) {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+
+  return (
+    <div className="border rounded-md p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 flex-1">
+          <Input
+            value={option.icon || ''}
+            onChange={(e) => onUpdate({ icon: e.target.value })}
+            placeholder="Emoji"
+            className="w-16"
+          />
+          <span className="text-sm text-muted-foreground">|</span>
+          <Input
+            value={option.labelFr || option.label || ''}
+            onChange={(e) => onUpdate({ label: e.target.value, labelFr: e.target.value })}
+            placeholder="Label FR"
+            className="flex-1"
+          />
+          {questionType === 'grid_selection' && (
+            <Input
+              value={option.color || ''}
+              onChange={(e) => onUpdate({ color: e.target.value })}
+              placeholder="#FF5733"
+              className="w-24"
+              type="color"
+            />
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            title="Traductions"
+          >
+            <Languages className="h-4 w-4" />
+            {isExpanded ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onRemove}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div className="space-y-3 pt-2 border-t">
+          {/* Label translations */}
+          <TranslationFields
+            label="Label de l'option"
+            required
+            value={{
+              fr: option.labelFr || option.label || '',
+              en: option.labelEn || '',
+              es: option.labelEs || '',
+            }}
+            onChange={(value) =>
+              onUpdate({
+                label: value.fr,
+                labelFr: value.fr,
+                labelEn: value.en,
+                labelEs: value.es,
+              })
+            }
+            placeholder={{
+              fr: 'Label en francais',
+              en: 'Label in English',
+              es: 'Etiqueta en espanol',
+            }}
+          />
+
+          {/* Description translations (optional) */}
+          <TranslationFields
+            type="textarea"
+            label="Description (optionnel)"
+            value={{
+              fr: option.descriptionFr || option.description || '',
+              en: option.descriptionEn || '',
+              es: option.descriptionEs || '',
+            }}
+            onChange={(value) =>
+              onUpdate({
+                description: value.fr,
+                descriptionFr: value.fr,
+                descriptionEn: value.en,
+                descriptionEs: value.es,
+              })
+            }
+            placeholder={{
+              fr: 'Description en francais',
+              en: 'Description in English',
+              es: 'Descripcion en espanol',
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Composant pour une question sortable
@@ -78,6 +202,8 @@ function SortableQuestion({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const [isI18nExpanded, setIsI18nExpanded] = React.useState(false);
+
   return (
     <Card ref={setNodeRef} style={style} className="border-2">
       <CardHeader>
@@ -92,13 +218,13 @@ function SortableQuestion({
                 {question.type.kind === 'multiple_choice' && 'Choix multiples'}
                 {question.type.kind === 'rating' && 'Notation'}
                 {question.type.kind === 'text_input' && 'Texte libre'}
-                {question.type.kind === 'time_selection' && 'Sélection de temps'}
-                {question.type.kind === 'grid_selection' && 'Grille de sélection'}
-                {question.type.kind === 'toggle_list' && 'Liste à bascule'}
+                {question.type.kind === 'time_selection' && 'Selection de temps'}
+                {question.type.kind === 'grid_selection' && 'Grille de selection'}
+                {question.type.kind === 'toggle_list' && 'Liste a bascule'}
                 {question.type.kind === 'slider' && 'Curseur'}
-                {question.type.kind === 'circular_picker' && 'Sélecteur circulaire'}
+                {question.type.kind === 'circular_picker' && 'Selecteur circulaire'}
                 {question.type.kind === 'image_card' && 'Cartes avec images'}
-                {question.type.kind === 'profile_group' && 'Profil groupé'}
+                {question.type.kind === 'profile_group' && 'Profil groupe'}
               </CardDescription>
             </div>
           </div>
@@ -113,28 +239,98 @@ function SortableQuestion({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Titre de la question */}
-        <div className="space-y-2">
-          <Label>Titre de la question *</Label>
-          <Input
-            value={question.title}
-            onChange={(e) => onUpdate(question.tempId, { title: e.target.value })}
-            placeholder="Ex: Quels sont vos objectifs ?"
-            required
-          />
-        </div>
+        {/* i18n - Question Title */}
+        <TranslationFields
+          label="Titre de la question"
+          required
+          value={{
+            fr: question.titleFr || question.title || '',
+            en: question.titleEn || '',
+            es: question.titleEs || '',
+          }}
+          onChange={(value) =>
+            onUpdate(question.tempId, {
+              title: value.fr,
+              titleFr: value.fr,
+              titleEn: value.en,
+              titleEs: value.es,
+            })
+          }
+          placeholder={{
+            fr: 'Ex: Quels sont vos objectifs ?',
+            en: 'Ex: What are your goals?',
+            es: 'Ej: Cuales son tus objetivos?',
+          }}
+        />
 
-        {/* Catégorie */}
+        {/* i18n - Question Subtitle */}
+        <TranslationFields
+          label="Sous-titre (optionnel)"
+          value={{
+            fr: question.subtitleFr || question.subtitle || '',
+            en: question.subtitleEn || '',
+            es: question.subtitleEs || '',
+          }}
+          onChange={(value) =>
+            onUpdate(question.tempId, {
+              subtitle: value.fr,
+              subtitleFr: value.fr,
+              subtitleEn: value.en,
+              subtitleEs: value.es,
+            })
+          }
+          placeholder={{
+            fr: 'Sous-titre explicatif',
+            en: 'Explanatory subtitle',
+            es: 'Subtitulo explicativo',
+          }}
+        />
+
+        {/* i18n - Question Hint */}
+        <Collapsible open={isI18nExpanded} onOpenChange={setIsI18nExpanded}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
+              <Languages className="h-4 w-4 mr-2" />
+              {isI18nExpanded ? 'Masquer' : 'Afficher'} les champs i18n supplementaires
+              {isI18nExpanded ? <ChevronUp className="h-4 w-4 ml-auto" /> : <ChevronDown className="h-4 w-4 ml-auto" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-4 pt-4">
+            <TranslationFields
+              label="Indice / Hint (optionnel)"
+              value={{
+                fr: question.hintFr || question.hint || '',
+                en: question.hintEn || '',
+                es: question.hintEs || '',
+              }}
+              onChange={(value) =>
+                onUpdate(question.tempId, {
+                  hint: value.fr,
+                  hintFr: value.fr,
+                  hintEn: value.en,
+                  hintEs: value.es,
+                })
+              }
+              placeholder={{
+                fr: 'Texte d aide pour l utilisateur',
+                en: 'Help text for the user',
+                es: 'Texto de ayuda para el usuario',
+              }}
+            />
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* Categorie */}
         <div className="space-y-2">
-          <Label>Catégorie</Label>
+          <Label>Categorie</Label>
           <select
             className="w-full px-3 py-2 border rounded-md"
             value={question.category}
             onChange={(e) => onUpdate(question.tempId, { category: e.target.value as any })}
           >
             <option value="goals">Objectifs</option>
-            <option value="experience">Expérience</option>
-            <option value="preferences">Préférences</option>
+            <option value="experience">Experience</option>
+            <option value="preferences">Preferences</option>
             <option value="personalization">Personnalisation</option>
           </select>
         </div>
@@ -154,17 +350,17 @@ function SortableQuestion({
             <option value="multiple_choice">Choix multiples</option>
             <option value="rating">Notation</option>
             <option value="text_input">Texte libre</option>
-            <option value="time_selection">Sélection de temps</option>
-            <option value="grid_selection">Grille de sélection</option>
-            <option value="toggle_list">Liste à bascule</option>
+            <option value="time_selection">Selection de temps</option>
+            <option value="grid_selection">Grille de selection</option>
+            <option value="toggle_list">Liste a bascule</option>
             <option value="slider">Curseur</option>
-            <option value="circular_picker">Sélecteur circulaire</option>
+            <option value="circular_picker">Selecteur circulaire</option>
             <option value="image_card">Cartes avec images</option>
-            <option value="profile_group">Profil groupé</option>
+            <option value="profile_group">Profil groupe</option>
           </select>
         </div>
 
-        {/* Configuration spécifique par type */}
+        {/* Configuration specifique par type */}
         {question.type.kind === 'multiple_choice' && (
           <div className="space-y-2 p-4 bg-muted/50 rounded-md">
             <Label>Mode d&apos;affichage</Label>
@@ -213,7 +409,7 @@ function SortableQuestion({
                   })
                 }
               />
-              <Label htmlFor={`showLabels_${question.tempId}`}>Afficher les labels sous les icônes</Label>
+              <Label htmlFor={`showLabels_${question.tempId}`}>Afficher les labels sous les icones</Label>
             </div>
           </div>
         )}
@@ -235,7 +431,7 @@ function SortableQuestion({
               />
             </div>
             <div className="space-y-2">
-              <Label>Nombre maximum de caractères</Label>
+              <Label>Nombre maximum de caracteres</Label>
               <Input
                 type="number"
                 min="1"
@@ -248,18 +444,31 @@ function SortableQuestion({
                 }
               />
             </div>
-            <div className="space-y-2">
-              <Label>Placeholder</Label>
-              <Input
-                value={question.type.placeholder || ''}
-                onChange={(e) =>
-                  onUpdate(question.tempId, {
-                    type: { ...question.type, placeholder: e.target.value },
-                  })
-                }
-                placeholder="Texte d'aide..."
-              />
-            </div>
+            {/* i18n - Placeholder */}
+            <TranslationFields
+              label="Placeholder"
+              value={{
+                fr: question.type.placeholderFr || question.type.placeholder || '',
+                en: question.type.placeholderEn || '',
+                es: question.type.placeholderEs || '',
+              }}
+              onChange={(value) =>
+                onUpdate(question.tempId, {
+                  type: {
+                    ...question.type,
+                    placeholder: value.fr,
+                    placeholderFr: value.fr,
+                    placeholderEn: value.en,
+                    placeholderEs: value.es,
+                  },
+                })
+              }
+              placeholder={{
+                fr: 'Texte d aide...',
+                en: 'Help text...',
+                es: 'Texto de ayuda...',
+              }}
+            />
           </div>
         )}
 
@@ -306,7 +515,7 @@ function SortableQuestion({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Unité</Label>
+                <Label>Unite</Label>
                 <Input
                   value={question.type.sliderUnit || ''}
                   onChange={(e) =>
@@ -360,16 +569,16 @@ function SortableQuestion({
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Note: Les champs du profile_group sont définis dans la configuration JSON et ne peuvent pas être modifiés ici.
+              Note: Les champs du profile_group sont definis dans la configuration JSON et ne peuvent pas etre modifies ici.
             </p>
           </div>
         )}
 
-        {/* Options de réponse */}
+        {/* Options de reponse avec i18n */}
         {question.type.kind !== 'slider' && question.type.kind !== 'circular_picker' && question.type.kind !== 'text_input' && question.type.kind !== 'profile_group' && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Options de réponse ({question.options.length})</Label>
+              <Label>Options de reponse ({question.options.length})</Label>
               <Button
                 type="button"
                 onClick={() => onAddOption(question.tempId)}
@@ -381,45 +590,17 @@ function SortableQuestion({
               </Button>
             </div>
 
-            {question.options.map((option) => (
-              <div key={option.id} className="flex gap-2">
-                <Input
-                  value={option.label}
-                  onChange={(e) =>
-                    onUpdateOption(question.tempId, option.id, { label: e.target.value })
-                  }
-                  placeholder="Label de l'option"
-                  className="flex-1"
+            <div className="space-y-2">
+              {question.options.map((option) => (
+                <OptionEditor
+                  key={option.id}
+                  option={option}
+                  questionType={question.type.kind}
+                  onUpdate={(updates) => onUpdateOption(question.tempId, option.id, updates)}
+                  onRemove={() => onRemoveOption(question.tempId, option.id)}
                 />
-                <Input
-                  value={option.icon || ''}
-                  onChange={(e) =>
-                    onUpdateOption(question.tempId, option.id, { icon: e.target.value })
-                  }
-                  placeholder="Emoji"
-                  className="w-20"
-                />
-                {question.type.kind === 'grid_selection' && (
-                  <Input
-                    value={option.color || ''}
-                    onChange={(e) =>
-                      onUpdateOption(question.tempId, option.id, { color: e.target.value })
-                    }
-                    placeholder="#FF5733"
-                    className="w-24"
-                    type="color"
-                  />
-                )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onRemoveOption(question.tempId, option.id)}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </CardContent>
@@ -503,7 +684,15 @@ export default function EditOnboardingPage() {
       title: '',
       titleFr: '',
       titleEn: '',
+      titleEs: '',
       subtitle: '',
+      subtitleFr: '',
+      subtitleEn: '',
+      subtitleEs: '',
+      hint: '',
+      hintFr: '',
+      hintEn: '',
+      hintEs: '',
       type: {
         kind: 'multiple_choice',
         allowMultiple: false,
@@ -531,6 +720,11 @@ export default function EditOnboardingPage() {
       label: '',
       labelFr: '',
       labelEn: '',
+      labelEs: '',
+      description: '',
+      descriptionFr: '',
+      descriptionEn: '',
+      descriptionEs: '',
       icon: '',
       order: question.options.length,
     };
@@ -597,12 +791,50 @@ export default function EditOnboardingPage() {
           questions: questions.map((q, index) => ({
             id: q.id || `q_${Date.now()}_${index}`,
             category: q.category,
-            title: q.title,
+            // Title with i18n
+            title: q.title || q.titleFr,
             titleFr: q.titleFr || q.title,
-            titleEn: q.titleEn || q.title,
-            subtitle: q.subtitle,
-            type: q.type,
-            options: q.options,
+            titleEn: q.titleEn,
+            titleEs: q.titleEs,
+            // Subtitle with i18n
+            subtitle: q.subtitle || q.subtitleFr,
+            subtitleFr: q.subtitleFr || q.subtitle,
+            subtitleEn: q.subtitleEn,
+            subtitleEs: q.subtitleEs,
+            // Hint with i18n
+            hint: q.hint || q.hintFr,
+            hintFr: q.hintFr || q.hint,
+            hintEn: q.hintEn,
+            hintEs: q.hintEs,
+            // Type config with i18n placeholders
+            type: {
+              ...q.type,
+              placeholder: q.type.placeholder || q.type.placeholderFr,
+              placeholderFr: q.type.placeholderFr || q.type.placeholder,
+              placeholderEn: q.type.placeholderEn,
+              placeholderEs: q.type.placeholderEs,
+            },
+            // Options with i18n
+            options: q.options.map((opt, optIndex) => ({
+              id: opt.id || `opt_${Date.now()}_${optIndex}`,
+              label: opt.label || opt.labelFr,
+              labelFr: opt.labelFr || opt.label,
+              labelEn: opt.labelEn,
+              labelEs: opt.labelEs,
+              description: opt.description || opt.descriptionFr,
+              descriptionFr: opt.descriptionFr || opt.description,
+              descriptionEn: opt.descriptionEn,
+              descriptionEs: opt.descriptionEs,
+              icon: opt.icon,
+              color: opt.color,
+              imageUrl: opt.imageUrl,
+              order: optIndex,
+              minValue: opt.minValue,
+              maxValue: opt.maxValue,
+              step: opt.step,
+              unit: opt.unit,
+              value: opt.value,
+            })),
             required: q.required,
             order: index,
           })),
@@ -611,8 +843,8 @@ export default function EditOnboardingPage() {
 
       if (response.ok) {
         toast({
-          title: 'Succès',
-          description: 'Configuration mise à jour',
+          title: 'Succes',
+          description: 'Configuration mise a jour',
         });
         router.refresh();
       } else {
@@ -642,8 +874,8 @@ export default function EditOnboardingPage() {
 
       if (response.ok) {
         toast({
-          title: 'Succès',
-          description: 'Configuration publiée avec succès',
+          title: 'Succes',
+          description: 'Configuration publiee avec succes',
         });
         router.push('/admin/onboarding');
       } else {
@@ -674,8 +906,8 @@ export default function EditOnboardingPage() {
 
       if (response.ok) {
         toast({
-          title: 'Succès',
-          description: 'Configuration archivée',
+          title: 'Succes',
+          description: 'Configuration archivee',
         });
         router.push('/admin/onboarding');
       } else {
@@ -719,9 +951,9 @@ export default function EditOnboardingPage() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Édition Onboarding</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Edition Onboarding</h1>
             <p className="text-muted-foreground">
-              v{config.version} • {config.status}
+              v{config.version} - {config.status}
             </p>
           </div>
         </div>
@@ -763,24 +995,36 @@ export default function EditOnboardingPage() {
               className="flex-1 py-3 px-4 text-center border-b-2 border-transparent hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-2"
             >
               <Info className="h-4 w-4" />
-              Écrans d&apos;information
+              Ecrans d&apos;information
             </Link>
             <Link
               href="/admin/onboarding/recommendation-rules"
               className="flex-1 py-3 px-4 text-center border-b-2 border-transparent hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-2"
             >
               <Brain className="h-4 w-4" />
-              Règles de recommandation
+              Regles de recommandation
             </Link>
           </div>
         </CardContent>
       </Card>
 
+      {/* i18n Info Banner */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+        <Languages className="h-5 w-5 text-blue-600 mt-0.5" />
+        <div>
+          <h3 className="font-medium text-blue-900">Support multilingue (FR/EN/ES)</h3>
+          <p className="text-sm text-blue-700 mt-1">
+            Toutes les questions et options supportent maintenant les traductions francais, anglais et espagnol.
+            Le francais est la langue principale (obligatoire), l&apos;anglais et l&apos;espagnol sont optionnels.
+          </p>
+        </div>
+      </div>
+
       <div className="space-y-6">
-        {/* Informations générales */}
+        {/* Informations generales */}
         <Card>
           <CardHeader>
-            <CardTitle>Informations générales</CardTitle>
+            <CardTitle>Informations generales</CardTitle>
             <CardDescription>Titre et description du questionnaire</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -801,7 +1045,7 @@ export default function EditOnboardingPage() {
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Décrivez l'objectif de ce questionnaire..."
+                placeholder="Decrivez l'objectif de ce questionnaire..."
                 rows={3}
                 required
               />
@@ -816,7 +1060,7 @@ export default function EditOnboardingPage() {
               <div>
                 <CardTitle>Questions</CardTitle>
                 <CardDescription>
-                  {questions.length} question{questions.length !== 1 ? 's' : ''} • Glisser-déposer pour réorganiser
+                  {questions.length} question{questions.length !== 1 ? 's' : ''} - Glisser-deposer pour reorganiser
                 </CardDescription>
               </div>
               <Button type="button" onClick={addQuestion} variant="outline">
@@ -829,7 +1073,7 @@ export default function EditOnboardingPage() {
             {questions.length === 0 ? (
               <div className="text-center p-12 border-2 border-dashed rounded-lg">
                 <p className="text-muted-foreground">
-                  Aucune question. Cliquez sur "Ajouter une question" pour commencer.
+                  Aucune question. Cliquez sur &quot;Ajouter une question&quot; pour commencer.
                 </p>
               </div>
             ) : (

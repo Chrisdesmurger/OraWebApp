@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
 import { getFirestore } from '@/lib/firebase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { mapOnboardingConfigFromFirestore, mapOnboardingConfigToFirestore } from '@/lib/onboarding/firestore-mappers';
 import type { OnboardingConfig, UpdateOnboardingRequest } from '@/types/onboarding';
 
 /**
@@ -31,9 +32,12 @@ export async function GET(
       return apiError('Onboarding configuration not found', 404);
     }
 
+    const raw = doc.data() ?? {};
+    const mapped = mapOnboardingConfigFromFirestore<OnboardingConfig>(raw);
+
     const config: OnboardingConfig = {
       id: doc.id,
-      ...doc.data(),
+      ...(mapped.value as any),
     } as OnboardingConfig;
 
     return apiSuccess(config);
@@ -82,9 +86,12 @@ export async function PUT(
       return apiError('Cannot modify active configuration. Archive it first or create a new version.', 400);
     }
 
+    const now = new Date();
+
     // Build update object
-    const updates: Partial<OnboardingConfig> = {
-      updatedAt: new Date(),
+    const updates: Record<string, unknown> = {
+      updatedAt: now,
+      updated_at: now,
     };
 
     if (title !== undefined) {
@@ -123,7 +130,11 @@ export async function PUT(
         }
       }
 
-      updates.questions = questions;
+      const mappedQuestions = mapOnboardingConfigToFirestore({ questions }).value;
+
+      // Store questions array with snake_case keys inside each question/option
+      // while keeping the API request/response camelCase.
+      updates.questions = (mappedQuestions as any).questions ?? questions;
     }
 
     if (status !== undefined) {
@@ -150,10 +161,12 @@ export async function PUT(
     });
 
     const updatedDoc = await docRef.get();
+    const updatedRaw = updatedDoc.data() ?? {};
+    const updatedMapped = mapOnboardingConfigFromFirestore<OnboardingConfig>(updatedRaw);
 
     return apiSuccess({
       id: updatedDoc.id,
-      ...updatedDoc.data(),
+      ...(updatedMapped.value as any),
       message: 'Onboarding configuration updated successfully',
     });
 
