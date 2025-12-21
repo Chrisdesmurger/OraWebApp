@@ -1,0 +1,334 @@
+{
+  "Bienvenue sur ORA": {
+    "en": "Welcome to ORA",
+    "es": "Bienvenido a ORA"
+  },
+  "ORA est ton espace de bien-être": {
+    "en": "ORA is your wellness space",
+    "es": "ORA es tu espacio de bienestar"
+  },
+  "Construisons ton profil ORA": {
+    "en": "Let's build your ORA profile",
+    "es": "Construyamos tu perfil ORA"
+  },
+  "Pour une expérience vraiment adaptée à toi": {
+    "en": "For an experience truly tailored to you",
+    "es": "Para una experiencia realmente adaptada a ti"
+  },
+  "Continuer": {
+    "en": "Continue",
+    "es": "Continuar"
+  },
+  "C'est noté !": {
+    "en": "Got it!",
+    "es": "¡Entendido!"
+  },
+  "Voyons maintenant tes besoins et intentions": {
+    "en": "Let's now see your needs and intentions",
+    "es": "Veamos ahora tus necesidades e intenciones"
+  },
+  "Continuons": {
+    "en": "Let's continue",
+    "es": "Continuemos"
+  },
+  "Merci !": {
+    "en": "Thank you!",
+    "es": "¡Gracias!"
+  },
+  "Comment te sens-tu à l'heure actuelle ?": {
+    "en": "How do you feel right now?",
+    "es": "¿Cómo te sientes en este momento?"
+  },
+  "Presque fini": {
+    "en": "Almost done",
+    "es": "Casi terminado"
+  },
+  "Ton espace ORA est prêt": {
+    "en": "Your ORA space is ready",
+    "es": "Tu espacio ORA está listo"
+  },
+  "Bienvenue dans ton parcours personnalisé": {
+    "en": "Welcome to your personalized journey",
+    "es": "Bienvenido a tu viaje personalizado"
+  },
+  "Découvrir ORA": {
+    "en": "Discover ORA",
+    "es": "Descubrir ORA"
+  },
+  "Construisons ton profil ": {
+    "en": "Let's build your profile",
+    "es": "Construyamos tu perfil"
+  },
+  "Recherche d'équilibre / charge mentale": {
+    "en": "Seeking balance / mental load",
+    "es": "Buscando equilibrio / carga mental"
+  },
+  "Autre / Je ne souhaite pas répondre": {
+    "en": "Other / I prefer not to answer",
+    "es": "Otro / Prefiero no responder"
+  },
+  "Pour calibrer l'intensité des pratiques": {
+    "en": "To calibrate practice intensity",
+    "es": "Para calibrar la intensidad de las prácticas"
+  },
+  "Je ne bouge presque jamais": {
+    "en": "I almost never move",
+    "es": "Casi nunca me muevo"
+  },
+  "Je bouge un peu mais irrégulièrement": {
+    "en": "I move a bit but irregularly",
+    "es": "Me muevo un poco pero irregularmente"
+  },
+  "Je fais du sport / du mouvement régulièrement": {
+    "en": "I exercise / move regularly",
+    "es": "Hago deporte / me muevo regularmente"
+  },
+  "Je suis très active / intensément sportif(ve)": {
+    "en": "I'm very active / intensely athletic",
+    "es": "Soy muy activo / intensamente deportista"
+  },
+  "Pourquoi es-tu ici ?": {
+    "en": "Why are you here?",
+    "es": "¿Por qué estás aquí?"
+  },
+  "Sélectionne toutes les réponses qui te correspondent": {
+    "en": "Select all answers that apply to you",
+    "es": "Selecciona todas las respuestas que se apliquen a ti"
+  },
+  "Me sentir plus serein(e)": {
+    "en": "Feel more peaceful",
+    "es": "Sentirme más sereno"
+  },
+  "Améliorer mon sommeil": {
+    "en": "Improve my sleep",
+    "es": "Mejorar mi sueño"
+  },
+  "Réduire le stress / l'anxiété": {
+    "en": "Reduce stress / anxiety",
+    "es": "Reducir el estrés / la ansiedad"
+  },
+  "Retrouver de l'énergie dans mon corps": {
+    "en": "Regain energy in my body",
+    "es": "Recuperar energía en mi cuerpo"
+  },
+  "Soulager des tensions / douleurs": {
+    "en": "Relieve tensions / pain",
+    "es": "Aliviar tensiones / dolores"
+  },
+  "Prendre du temps pour moi": {
+    "en": "Take time for myself",
+    "es": "Tomarme tiempo para mí"
+  },
+  "Retrouver confiance et motivation": {
+    "en": "Regain confidence and motivation",
+    "es": "Recuperar confianza y motivación"
+  },
+  "Dans le yoga / pilates / respiration / méditation, tu te situes où ?": {
+    "en": "In yoga / pilates / breathing / meditation, where do you stand?",
+    "es": "En yoga / pilates / respiración / meditación, ¿dónde te sitúas?"
+  },
+  "Sélectionne ton niveau général": {
+    "en": "Select your overall level",
+    "es": "Selecciona tu nivel general"
+  },
+  "🌱 Débutant(e)": {
+    "en": "🌱 Beginner",
+    "es": "🌱 Principiante"
+  },
+  "🌿 Intermédiaire": {
+    "en": "🌿 Intermediate",
+    "es": "🌿 Intermedio"
+  },
+  "🌳 Avancé(e)": {
+    "en": "🌳 Advanced",
+    "es": "🌳 Avanzado"
+  },
+  "Quel temps peux-tu t'accorder en moyenne ?": {
+    "en": "How much time can you dedicate on average?",
+    "es": "¿Cuánto tiempo puedes dedicar en promedio?"
+  },
+  "5–10 min": {
+    "en": "5–10 min",
+    "es": "5–10 min"
+  },
+  "10–20 min": {
+    "en": "10–20 min",
+    "es": "10–20 min"
+  },
+  "20–40 min": {
+    "en": "20–40 min",
+    "es": "20–40 min"
+  },
+  "Quand souhaites-tu pratiquer ?": {
+    "en": "When do you want to practice?",
+    "es": "¿Cuándo quieres practicar?"
+  },
+  "Sélectionne tous les moments qui te conviennent": {
+    "en": "Select all times that suit you",
+    "es": "Selecciona todos los momentos que te convengan"
+  },
+  "À midi / au travail": {
+    "en": "At noon / at work",
+    "es": "Al mediodía / en el trabajo"
+  },
+  "L'après-midi": {
+    "en": "Afternoon",
+    "es": "Por la tarde"
+  },
+  "Quand j'ai le temps (sans horaire)": {
+    "en": "When I have time (no schedule)",
+    "es": "Cuando tengo tiempo (sin horario)"
+  },
+  "Aujourd'hui tu te sens plutôt…": {
+    "en": "Today you feel more like…",
+    "es": "Hoy te sientes más…"
+  },
+  "Mini scan émotionnel à la ORA": {
+    "en": "ORA mini emotional scan",
+    "es": "Mini escaneo emocional ORA"
+  },
+  "Stressé(e)": {
+    "en": "Stressed",
+    "es": "Estresado"
+  },
+  "Fatigué(e)": {
+    "en": "Tired",
+    "es": "Cansado"
+  },
+  "Motivé(e)": {
+    "en": "Motivated",
+    "es": "Motivado"
+  },
+  "Surchargé(e)": {
+    "en": "Overloaded",
+    "es": "Sobrecargado"
+  },
+  "Calme": {
+    "en": "Calm",
+    "es": "Tranquilo"
+  },
+  "En recherche d'équilibre": {
+    "en": "Seeking balance",
+    "es": "Buscando equilibrio"
+  },
+  "Ton corps te parle-t-il ?": {
+    "en": "Is your body talking to you?",
+    "es": "¿Tu cuerpo te habla?"
+  },
+  "Zones qui te demandent de l'attention": {
+    "en": "Areas needing attention",
+    "es": "Zonas que necesitan atención"
+  },
+  "Bas du dos": {
+    "en": "Lower back",
+    "es": "Parte baja de la espalda"
+  },
+  "Cou / trapèzes": {
+    "en": "Neck / trapezius",
+    "es": "Cuello / trapecios"
+  },
+  "Ventre / digestion": {
+    "en": "Belly / digestion",
+    "es": "Vientre / digestión"
+  },
+  "Épaules": {
+    "en": "Shoulders",
+    "es": "Hombros"
+  },
+  "Jambes lourdes": {
+    "en": "Heavy legs",
+    "es": "Piernas pesadas"
+  },
+  "Maux de tête": {
+    "en": "Headaches",
+    "es": "Dolores de cabeza"
+  },
+  "Aucun, je veux juste du bien-être global": {
+    "en": "None, I just want overall well-being",
+    "es": "Ninguno, solo quiero bienestar general"
+  },
+  "Ton sommeil en ce moment": {
+    "en": "Your sleep right now",
+    "es": "Tu sueño en este momento"
+  },
+  "Très bien, je me réveille plein d'énergie": {
+    "en": "Very good, I wake up full of energy",
+    "es": "Muy bien, me despierto lleno de energía"
+  },
+  "Moyen, mes nuits sont irrégulières": {
+    "en": "Average, my nights are irregular",
+    "es": "Regular, mis noches son irregulares"
+  },
+  "Difficile, j'ai du mal à m'endormir ou je me réveille souvent": {
+    "en": "Difficult, I have trouble falling asleep or wake up often",
+    "es": "Difícil, me cuesta dormir o me despierto a menudo"
+  },
+  "Insomnies fréquentes": {
+    "en": "Frequent insomnia",
+    "es": "Insomnio frecuente"
+  },
+  "Tu préfères des pratiques…": {
+    "en": "You prefer practices…",
+    "es": "Prefieres prácticas…"
+  },
+  "Sélectionne tous les styles qui te correspondent": {
+    "en": "Select all styles that suit you",
+    "es": "Selecciona todos los estilos que te convengan"
+  },
+  "🎧 Plus guidées et enveloppantes": {
+    "en": "🎧 More guided and immersive",
+    "es": "🎧 Más guiadas e inmersivas"
+  },
+  "🔔 Courtes et efficaces": {
+    "en": "🔔 Short and effective",
+    "es": "🔔 Cortas y efectivas"
+  },
+  "🌬 Axées sur la respiration et l'énergie": {
+    "en": "🌬 Focused on breathing and energy",
+    "es": "🌬 Centradas en respiración y energía"
+  },
+  "🤸‍♂️ Dynamiques et boostantes": {
+    "en": "🤸‍♂️ Dynamic and energizing",
+    "es": "🤸‍♂️ Dinámicas y energizantes"
+  },
+  "🕯 Très douces et relaxantes": {
+    "en": "🕯 Very gentle and relaxing",
+    "es": "🕯 Muy suaves y relajantes"
+  },
+  "👶 Ultra simples (pour débuter / reprendre)": {
+    "en": "👶 Ultra simple (to start / resume)",
+    "es": "👶 Ultra simples (para empezar / retomar)"
+  },
+  "Tu veux que ORA te propose des pratiques :": {
+    "en": "You want ORA to offer you practices:",
+    "es": "Quieres que ORA te proponga prácticas:"
+  },
+  "4–5 fois par semaine": {
+    "en": "4–5 times per week",
+    "es": "4–5 veces por semana"
+  },
+  "2–3 fois par semaine": {
+    "en": "2–3 times per week",
+    "es": "2–3 veces por semana"
+  },
+  "Quand j'en ressens le besoin": {
+    "en": "When I feel the need",
+    "es": "Cuando lo necesito"
+  },
+  "Quel type de rappel préfères-tu ?": {
+    "en": "What type of reminder do you prefer?",
+    "es": "¿Qué tipo de recordatorio prefieres?"
+  },
+  "Boost motivation": {
+    "en": "Motivation boost",
+    "es": "Impulso de motivación"
+  },
+  "Rappel doux": {
+    "en": "Gentle reminder",
+    "es": "Recordatorio suave"
+  },
+  "Jamais de rappel": {
+    "en": "Never remind me",
+    "es": "Nunca recordarme"
+  }
+}
