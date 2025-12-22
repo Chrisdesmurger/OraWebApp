@@ -39,3 +39,8 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /playwright/.cache/
+# Temporary onboarding JSON files
+onboarding-*.json
+
+# Translation output files
+scripts/onboarding-*.json

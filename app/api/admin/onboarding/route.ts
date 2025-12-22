@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
 import { getFirestore } from '@/lib/firebase/admin';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { mapOnboardingConfigToFirestore } from '@/lib/onboarding/firestore-mappers';
 import type { OnboardingConfig, CreateOnboardingRequest } from '@/types/onboarding';
 
 /**
@@ -128,7 +129,17 @@ export async function POST(request: NextRequest) {
       createdBy: currentUser.uid,
     };
 
-    const docRef = await db.collection('onboarding_configs').add(newConfig);
+    const mapped = mapOnboardingConfigToFirestore(newConfig as any);
+
+    // Ensure Android-compatible timestamps exist
+    const firestorePayload = {
+      ...mapped.value,
+      created_at: now,
+      updated_at: now,
+      created_by: currentUser.uid,
+    };
+
+    const docRef = await db.collection('onboarding_configs').add(firestorePayload);
 
     // Log audit event
     logAuditEvent({
