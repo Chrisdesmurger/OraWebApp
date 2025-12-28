@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { TranslationFields } from '@/components/ui/translation-fields';
+import { TranslationFieldsWithAutoTranslate } from '@/components/ui/translation-fields-with-auto-translate';
 import {
   Select,
   SelectContent,
@@ -388,7 +388,7 @@ export function EditLessonDialog({
           />
 
           {/* Title */}
-          <TranslationFields
+          <TranslationFieldsWithAutoTranslate
             label="Title"
             value={watch('title')}
             onChange={(value) => setValue('title', value)}
@@ -407,7 +407,7 @@ export function EditLessonDialog({
           )}
 
           {/* Description */}
-          <TranslationFields
+          <TranslationFieldsWithAutoTranslate
             type="textarea"
             label="Description"
             value={watch('description')}
@@ -477,7 +477,7 @@ export function EditLessonDialog({
           </div>
 
           {/* Transcript */}
-          <TranslationFields
+          <TranslationFieldsWithAutoTranslate
             type="textarea"
             label="Transcript"
             value={watch('transcript')}
