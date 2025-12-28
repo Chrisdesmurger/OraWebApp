@@ -18,6 +18,7 @@ import { Badge } from './badge';
 import { Button } from './button';
 import { CheckCircle2, AlertCircle, Languages, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 
 export interface MultilingualText {
   fr: string;
@@ -97,11 +98,8 @@ function getCompletionPercentage(status: TranslationStatus): number {
  */
 async function autoTranslate(text: string): Promise<{ en: string; es: string } | null> {
   try {
-    const response = await fetch('/api/translate', {
+    const response = await fetchWithAuth('/api/translate', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         text,
         sourceLang: 'fr',
