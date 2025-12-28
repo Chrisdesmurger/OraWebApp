@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { TranslationFields } from '@/components/ui/translation-fields';
+import { TranslationFieldsWithAutoTranslate } from '@/components/ui/translation-fields-with-auto-translate';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -165,7 +165,7 @@ export function EditProgramDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormControl>
-                    <TranslationFields
+                    <TranslationFieldsWithAutoTranslate
                       label="Title"
                       value={field.value}
                       onChange={field.onChange}
@@ -191,7 +191,7 @@ export function EditProgramDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormControl>
-                    <TranslationFields
+                    <TranslationFieldsWithAutoTranslate
                       type="textarea"
                       label="Description"
                       value={field.value}

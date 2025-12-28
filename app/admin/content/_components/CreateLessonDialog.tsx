@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { TranslationFields, type MultilingualText } from '@/components/ui/translation-fields';
+import { TranslationFieldsWithAutoTranslate, type MultilingualText } from '@/components/ui/translation-fields-with-auto-translate';
 import {
   Select,
   SelectContent,
@@ -276,7 +276,7 @@ export function CreateLessonDialog({
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Title */}
-          <TranslationFields
+          <TranslationFieldsWithAutoTranslate
             label="Title"
             value={watch('title')}
             onChange={(value) => setValue('title', value)}
@@ -295,7 +295,7 @@ export function CreateLessonDialog({
           )}
 
           {/* Description */}
-          <TranslationFields
+          <TranslationFieldsWithAutoTranslate
             type="textarea"
             label="Description"
             value={watch('description')}
@@ -389,7 +389,7 @@ export function CreateLessonDialog({
           </div>
 
           {/* Transcript */}
-          <TranslationFields
+          <TranslationFieldsWithAutoTranslate
             type="textarea"
             label="Transcript"
             value={watch('transcript')}
