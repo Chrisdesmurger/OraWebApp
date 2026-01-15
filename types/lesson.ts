@@ -334,9 +334,8 @@ export function validateLessonDocument(id: string, doc: Partial<LessonDocument>)
     missingFields.push('type');
   }
 
-  if (!doc.program_id) {
-    missingFields.push('program_id');
-  }
+  // program_id is now optional (can be empty string)
+  // No validation needed for program_id
 
   if (!doc.status) {
     missingFields.push('status');
