@@ -213,11 +213,27 @@ export function CreateLessonDialog({
     }
   };
 
+  // Delete lesson if upload fails (cleanup)
+  const deleteLesson = async (lessonId: string) => {
+    try {
+      console.log('Cleaning up lesson after failed upload:', lessonId);
+      await fetchWithAuth(`/api/lessons/${lessonId}`, {
+        method: 'DELETE',
+      });
+      console.log('Lesson deleted successfully');
+    } catch (deleteError) {
+      console.error('Failed to delete lesson after upload failure:', deleteError);
+      // Don't throw - this is just cleanup
+    }
+  };
+
   const onSubmit = async (data: CreateLessonFormData) => {
     if (!file) {
       setError('Please select a file to upload');
       return;
     }
+
+    let createdLessonId: string | null = null;
 
     try {
       setUploading(true);
@@ -255,17 +271,24 @@ export function CreateLessonDialog({
       }
 
       const { lesson } = await createResponse.json();
+      createdLessonId = lesson.id;
 
       // Upload file
       await uploadFile(lesson.id, file, lesson.type);
 
-      // Success
+      // Success - clear the lessonId so we don't delete it
+      createdLessonId = null;
       setUploadProgress(100);
       onSuccess();
       handleClose();
     } catch (error) {
       console.error('Error creating lesson:', error);
       setError(error instanceof Error ? error.message : 'Failed to create lesson');
+
+      // If lesson was created but upload failed, delete the lesson
+      if (createdLessonId) {
+        await deleteLesson(createdLessonId);
+      }
     } finally {
       setUploading(false);
     }
