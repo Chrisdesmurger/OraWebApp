@@ -28,7 +28,8 @@ import { Progress } from '@/components/ui/progress';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { Upload, X } from 'lucide-react';
 import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
-import type { LessonType, CreateLessonRequest, UploadInitResponse } from '@/types/lesson';
+import type { LessonType, LessonCategory, CreateLessonRequest, UploadInitResponse } from '@/types/lesson';
+import { LESSON_CATEGORY_LABELS } from '@/types/lesson';
 
 interface Program {
   id: string;
@@ -55,8 +56,11 @@ const multilingualTextSchema = z.union([
 const createLessonSchema = z.object({
   title: multilingualTextSchema,
   description: multilingualTextSchema.optional(),
+  category: z.enum(['yoga', 'meditation', 'pilates', 'respiration', 'auto-massage'], {
+    required_error: 'Category is required',
+  }),
   type: z.enum(['video', 'audio']),
-  programId: z.string().min(1, 'Program is required'),
+  programId: z.string().optional(),  // Program is now optional
   order: z.number().int().min(0).optional(),
   tags: z.string().optional(),
   transcript: multilingualTextSchema.optional(),
@@ -220,6 +224,7 @@ export function CreateLessonDialog({
       const createRequest: CreateLessonRequest = {
         title: data.title,
         description: data.description,
+        category: data.category,
         type: data.type,
         programId: data.programId,
         order: data.order,
@@ -337,13 +342,35 @@ export function CreateLessonDialog({
             {errors.type && <p className="text-sm text-red-500">{errors.type.message}</p>}
           </div>
 
-          {/* Program */}
+          {/* Category */}
           <div className="space-y-2">
-            <Label htmlFor="programId">
-              Program <span className="text-red-500">*</span>
+            <Label htmlFor="category">
+              Category <span className="text-red-500">*</span>
             </Label>
             <Select
-              value={watch('programId')}
+              value={watch('category') || ''}
+              onValueChange={(value) => setValue('category', value as LessonCategory)}
+              disabled={uploading}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(LESSON_CATEGORY_LABELS) as LessonCategory[]).map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {LESSON_CATEGORY_LABELS[cat]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.category && <p className="text-sm text-red-500">{errors.category.message}</p>}
+          </div>
+
+          {/* Program */}
+          <div className="space-y-2">
+            <Label htmlFor="programId">Program</Label>
+            <Select
+              value={watch('programId') || ''}
               onValueChange={(value) => setValue('programId', value)}
               disabled={uploading}
             >

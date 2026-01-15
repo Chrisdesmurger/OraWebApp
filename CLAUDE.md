@@ -4,140 +4,202 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-OraWebApp is a Next.js admin portal for managing the Ora wellbeing platform. It provides administrative interfaces for managing users, programs, lessons, content, and analytics with Firebase Authentication and Firestore backend.
+OraWebApp is a Next.js admin portal for the **Ora wellbeing platform** (yoga, meditation, wellness). It provides administrative interfaces for managing users, programs, lessons, content, onboarding flows, and analytics with Firebase Authentication and Firestore backend.
+
+**Target audience**: Administrators and teachers managing content for the Ora mobile app (Android).
 
 ## Tech Stack
 
-- **Framework**: Next.js 15.5.6 (App Router)
-- **Language**: TypeScript
-- **UI**: React with Tailwind CSS + shadcn/ui components
+- **Framework**: Next.js 16+ (App Router)
+- **Language**: TypeScript (strict mode)
+- **UI**: React 18 + Tailwind CSS + shadcn/ui (Radix UI primitives)
 - **Authentication**: Firebase Auth (Email/Password + Google Sign-In)
 - **Database**: Cloud Firestore
-- **Backend**: Firebase Admin SDK (server-side)
-- **Authorization**: Role-Based Access Control (RBAC) with custom claims
-- **Package Manager**: pnpm
+- **Storage**: Firebase Cloud Storage (media files)
+- **Backend**: Firebase Admin SDK (server-side via Next.js Route Handlers)
+- **Authorization**: Role-Based Access Control (RBAC) with Firebase custom claims
+- **Forms**: React Hook Form + Zod validation
+- **Drag & Drop**: @dnd-kit (lesson reordering)
+- **Charts**: Recharts
+- **Testing**: Vitest (unit) + Playwright (E2E)
+
+## Commands
+
+```bash
+# Development
+pnpm dev              # Start dev server at localhost:3000
+pnpm build            # Production build
+pnpm start            # Start production server
+pnpm lint             # Run ESLint
+pnpm type-check       # TypeScript type checking
+
+# Testing
+pnpm test             # Run Vitest unit tests
+pnpm test:e2e         # Run Playwright E2E tests
+
+# Firebase Admin Scripts (require .env.local with FIREBASE_SERVICE_ACCOUNT_JSON)
+pnpm set-role <email> <role>     # Set user role: admin | teacher | viewer
+pnpm list-admins                  # List all users with custom roles
+pnpm remove-role <email>          # Remove user's custom role
+
+# Seeding/Migration Scripts
+pnpm seed-onboarding              # Seed onboarding flow data
+pnpm add-info-screens             # Add information screens
+pnpm import-personalization       # Import personalization config
+
+# Firebase CLI
+firebase deploy --only firestore:rules    # Deploy Firestore rules
+firebase deploy --only storage:rules      # Deploy Storage rules
+```
 
 ## Architecture
 
-### Frontend (Client-side)
-- **App Router** structure with layouts and route groups
-- **Client Components** (`'use client'`) for interactive UI
-- **Server Components** for static content
-- **Authentication Context** (`lib/auth/auth-context.tsx`) provides user state globally
-- **Custom Hooks** for data fetching with authentication
+### Data Flow
+```
+Client Components → fetchWithAuth() → API Routes → Firebase Admin SDK → Firestore
+                          ↓
+              Includes Firebase ID token
+```
 
-### Backend (Server-side)
-- **API Routes** in `app/api/` using Next.js Route Handlers
-- **Firebase Admin SDK** for server-side operations
-- **Middleware** (`lib/api/auth-middleware.ts`) for request authentication
-- **RBAC** (`lib/rbac.ts`) for permission management
+### Key Files
+- [lib/api/fetch-with-auth.ts](lib/api/fetch-with-auth.ts) - Client-side authenticated fetch wrapper (ALWAYS use this)
+- [lib/api/auth-middleware.ts](lib/api/auth-middleware.ts) - Server-side request authentication
+- [lib/firebase/admin.ts](lib/firebase/admin.ts) - Firebase Admin SDK singleton
+- [lib/firebase/client.ts](lib/firebase/client.ts) - Firebase Client SDK
+- [lib/auth/auth-context.tsx](lib/auth/auth-context.tsx) - React auth provider
+- [lib/rbac.ts](lib/rbac.ts) - Role permissions definitions
+- [lib/audit/logger.ts](lib/audit/logger.ts) - Audit logging utility
+- [lib/i18n/display-text.ts](lib/i18n/display-text.ts) - Multilingual text helpers
+- [types/lesson.ts](types/lesson.ts) - Lesson types with Firestore ↔ Frontend mappers
+
+### RBAC Roles
+| Role | Capabilities |
+|------|-------------|
+| admin | Full access: users, content, programs, commands, stats, audit logs |
+| teacher | Own content/programs, upload media, basic stats |
+| viewer | Read-only content/programs access |
+
+### Main Features (by PR/Issue)
+1. **Authentication & Firestore** (PR #1-2) - fetchWithAuth, snake_case mapping
+2. **Lesson CRUD + Media Upload** (PR #3-5) - Video/audio upload, transcoding
+3. **Program Management** (PR #7) - Full CRUD, lesson ordering, categories
+4. **Media Player** (#12) - Video/audio preview in admin
+5. **Analytics Dashboard** (#14) - User growth, activity charts
+6. **User Management** (#15) - Create/delete users
+7. **Program Cover Images** (#16) - Firebase Storage upload
+8. **Audit Logging** (#21) - Change history, diff viewer
+9. **Content Scheduling** (#22) - Auto-publish/archive dates
+10. **Media Library** (#25) - Media management interface
+11. **Onboarding Management** (#48-57) - Questionnaire editor, 9 layouts
+12. **i18n Support** (#68-72) - FR/EN/ES multilingual, auto-translate
 
 ## CRITICAL: Firestore Field Naming Convention
 
-**⚠️ IMPORTANT**: Firestore uses **snake_case** field names, but the frontend expects **camelCase**.
+**Firestore uses snake_case**, frontend uses **camelCase**. All API routes MUST map between them.
 
-### Firestore Schema (snake_case)
+### Firestore Collections
 ```typescript
 // users collection
-{
-  email: string
-  first_name: string      // NOT firstName
-  last_name: string       // NOT lastName
-  photo_url: string       // NOT photoURL
-  plan_tier: string       // NOT planTier
-  role: string
-  created_at: number      // NOT createdAt (timestamp)
-  updated_at: number      // NOT updatedAt
-  last_login_at: number   // NOT lastLoginAt
-}
+{ email, first_name, last_name, photo_url, plan_tier, role, created_at, updated_at }
 
 // programs collection
-{
-  title: string
-  description: string
-  author_id: string       // NOT authorId
-  created_at: number      // NOT createdAt
-  updated_at: number      // NOT updatedAt
-  // ... check Console for exact field names
-}
+{ title, description, author_id, duration_days, cover_image_url, status, created_at, updated_at }
 
-// lessons/content collection
-{
-  title: string
-  program_id: string      // NOT programId
-  created_at: number      // NOT createdAt
-  // ... check Console for exact field names
-}
+// lessons collection (with i18n)
+{ title_fr, title_en, title_es, description_fr, program_id, duration_sec, status, created_at, updated_at }
+
+// audit_logs collection
+{ action, resource_type, resource_id, actor_id, actor_email, changes, ip_address, user_agent, created_at }
+
+// onboarding_configs collection
+{ questions: [], information_screens: [], published, created_at, updated_at }
 ```
 
 ### API Mapping Pattern
-
-**All API routes MUST map snake_case (Firestore) to camelCase (Frontend)**:
-
 ```typescript
-// ✅ CORRECT - Map fields in API response
+// ✅ CORRECT - Map snake_case to camelCase in API response
 const users = snapshot.docs.map((doc) => {
   const data = doc.data();
   return {
     id: doc.id,
-    email: data.email,
-    firstName: data.first_name,        // Map snake_case to camelCase
+    firstName: data.first_name,    // Map field names
     lastName: data.last_name,
-    photoURL: data.photo_url,
-    planTier: data.plan_tier,
     createdAt: data.created_at,
-    updatedAt: data.updated_at,
   };
 });
 
-// ❌ WRONG - Don't spread Firestore data directly
-return {
-  id: doc.id,
-  ...doc.data(), // This keeps snake_case!
-};
+// ❌ WRONG - Never spread Firestore data directly
+return { id: doc.id, ...doc.data() };  // Keeps snake_case!
 ```
 
 ### Firestore Queries
-
-**Use snake_case in Firestore queries**:
-
 ```typescript
-// ✅ CORRECT
+// ✅ Use snake_case in queries
 firestore.collection('users').orderBy('created_at', 'desc')
 
-// ❌ WRONG
-firestore.collection('users').orderBy('createdAt', 'desc') // Field doesn't exist!
+// ❌ This will fail - field doesn't exist
+firestore.collection('users').orderBy('createdAt', 'desc')
 ```
 
-## Authentication & Authorization
+## i18n (Multilingual Support)
 
-### Client-Side Authentication
+The app supports **French (fr), English (en), Spanish (es)** with French as primary/fallback language.
 
-**ALWAYS use `fetchWithAuth` for authenticated API calls**:
+### Firestore i18n Pattern
+Text fields use language suffixes:
+```typescript
+// Firestore document (snake_case with language suffix)
+{
+  title_fr: "Méditation du matin",
+  title_en: "Morning Meditation",
+  title_es: "Meditación matutina",
+}
+```
 
+### Frontend i18n Pattern
+```typescript
+import type { MultilingualText } from '@/types/lesson';
+import { getDisplayText, getSearchableText } from '@/lib/i18n/display-text';
+
+// Get display text (falls back: preferred → fr → en → es)
+getDisplayText(title, 'en')  // Returns English or falls back
+
+// Get all text for search
+getSearchableText(title)  // Combines all languages
+```
+
+### Auto-Translate Feature
+Uses Google Cloud Translation API (`/api/translate`):
+- Translates FR → EN + ES in single API call
+- Requires `GOOGLE_TRANSLATE_API_KEY` in .env.local
+- UI: 🌐 button next to FR fields
+
+### Mapping Functions
+- `mapLessonFromFirestore()` - Firestore → Frontend (with i18n)
+- `mapLessonToFirestore()` - Frontend → Firestore (with i18n)
+- `mapLessonFromFirestoreLegacy()` - For backward compatibility (French only)
+
+## Authentication
+
+### Client-Side: ALWAYS use fetchWithAuth
 ```typescript
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 
 // ✅ CORRECT - Automatically includes Firebase ID token
 const response = await fetchWithAuth('/api/users');
 
-// ❌ WRONG - Missing authentication
-const response = await fetch('/api/users'); // Will return 401!
+// ❌ WRONG - Will return 401 Unauthorized
+const response = await fetch('/api/users');
 ```
 
-### Server-Side Authentication
-
-All API routes are protected with `authenticateRequest`:
-
+### Server-Side: API Route Pattern
 ```typescript
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate and get user from Firebase token
     const user = await authenticateRequest(request);
 
-    // Check permissions
     if (!requireRole(user, ['admin', 'teacher'])) {
       return apiError('Insufficient permissions', 403);
     }
@@ -150,80 +212,38 @@ export async function GET(request: NextRequest) {
 }
 ```
 
-### Role-Based Access Control (RBAC)
-
-Roles are stored as **custom claims** in Firebase Auth:
-
-- **admin**: Full access to all features
-- **teacher**: Can manage own programs and lessons
-- **viewer**: Read-only access
-
-**Permissions** are defined in `lib/rbac.ts`:
-
+### Audit Logging
+All CRUD operations should be logged:
 ```typescript
-import { hasPermission } from '@/lib/rbac';
+import { logCreate, logUpdate, logDelete } from '@/lib/audit/logger';
 
-if (hasPermission(user.role, 'canEditUsers')) {
-  // Allow action
-}
+// After creating a resource
+await logCreate(request, 'program', program.id, programData);
+
+// After updating (with before/after diff)
+await logUpdate(request, 'program', id, beforeState, afterState);
+
+// After deleting
+await logDelete(request, 'lesson', id, deletedData);
 ```
 
-## Project Structure
+## Onboarding System
 
-```
-OraWebApp/
-├── app/                          # Next.js App Router
-│   ├── (dashboard)/              # Route group for authenticated pages
-│   │   └── analytics/
-│   ├── admin/                    # Admin pages
-│   │   ├── page.tsx              # Dashboard home
-│   │   ├── stats/
-│   │   ├── users/
-│   │   ├── programs/
-│   │   ├── content/
-│   │   └── commands/
-│   ├── api/                      # API Routes (server-side)
-│   │   ├── auth/
-│   │   ├── users/
-│   │   ├── programs/
-│   │   ├── lessons/
-│   │   ├── stats/
-│   │   └── admin/
-│   ├── login/
-│   ├── layout.tsx                # Root layout
-│   └── page.tsx                  # Home page
-├── components/
-│   ├── ui/                       # shadcn/ui components
-│   ├── dashboard/
-│   └── kpi-card.tsx
-├── lib/
-│   ├── api/
-│   │   ├── auth-middleware.ts    # ⭐ Request authentication
-│   │   └── fetch-with-auth.ts    # ⭐ Client-side auth wrapper
-│   ├── auth/
-│   │   ├── auth-context.tsx      # Auth provider
-│   │   └── require-role.ts       # Role guard component
-│   ├── firebase/
-│   │   ├── admin.ts              # ⭐ Firebase Admin SDK (server)
-│   │   └── client.ts             # Firebase Client SDK
-│   ├── hooks/
-│   │   └── use-stats.ts          # Data fetching hooks
-│   ├── rbac.ts                   # ⭐ Role-based permissions
-│   └── types/
-├── scripts/
-│   └── test-firestore.ts         # Firestore debugging script
-├── .env.local                    # ⚠️ NEVER commit! Contains secrets
-├── firebase.json
-├── firestore.rules
-└── package.json
-```
+The onboarding questionnaire system supports:
+- **Question Types**: single_choice, multiple_choice, slider, circular_picker, text_input, profile_group
+- **9 Layout Types**: cards, image_cards, grid, list, swipe, scale, emoji, circular_picker, info_screen
+- **Information Screens**: Welcome screens with features, bullet points, CTAs
+- **Recommendation Rules**: Dynamic content recommendations based on answers
+
+Key files:
+- [app/admin/onboarding/](app/admin/onboarding/) - Admin UI for managing onboarding
+- `onboarding_configs` collection in Firestore
 
 ## Environment Variables
 
 Required in `.env.local`:
-
 ```bash
-# Firebase Client SDK (public)
+# Firebase Client SDK (public - NEXT_PUBLIC_ prefix)
 NEXT_PUBLIC_FIREBASE_API_KEY=...
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
@@ -232,170 +252,57 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
 NEXT_PUBLIC_FIREBASE_APP_ID=...
 
 # Firebase Admin SDK (secret - server-side only)
-FIREBASE_SERVICE_ACCOUNT_JSON='{...}'  # Full service account JSON
-```
+FIREBASE_SERVICE_ACCOUNT_JSON='{...}'  # Full service account JSON as single line
 
-## Common Development Tasks
-
-### Run Development Server
-```bash
-npm run dev
-```
-
-### Build for Production
-```bash
-npm run build
-npm start
-```
-
-### Deploy Firestore Rules
-```bash
-firebase deploy --only firestore:rules
-```
-
-### Test Firestore Connection
-```bash
-npx tsx scripts/test-firestore.ts
-```
-
-### Check Firebase CLI
-```bash
-firebase --version
-firebase projects:list
+# Optional: Auto-translate feature
+GOOGLE_TRANSLATE_API_KEY=...
 ```
 
 ## Troubleshooting
 
 ### "Missing or invalid authorization header"
+Use `fetchWithAuth` instead of `fetch` for API calls.
 
-**Cause**: Client-side fetch is not including Firebase ID token
-
-**Solution**: Use `fetchWithAuth` instead of `fetch`:
-
-```typescript
-// ❌ WRONG
-const response = await fetch('/api/users');
-
-// ✅ CORRECT
-import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
-const response = await fetchWithAuth('/api/users');
-```
-
-### API returns empty array `{ users: [] }`
-
-**Causes**:
-1. **Wrong field names in query**: Use `created_at` not `createdAt`
-2. **Missing Firestore index**: Check Firebase Console > Firestore > Indexes
-3. **Wrong database**: Check if using `(default)` database in Firebase Console
-4. **Service Account permissions**: Verify service account has Firestore read/write access
-
-**Debug**:
-```typescript
-// Add logging to API route
-console.log('[API] Found', snapshot.size, 'documents');
-snapshot.docs.forEach(doc => {
-  console.log('[API] Doc fields:', Object.keys(doc.data()));
-});
-```
+### API returns empty array
+1. Check Firestore field names are snake_case in queries
+2. Check Firebase Console > Firestore > Indexes for missing indexes
+3. Verify service account has Firestore read/write access
 
 ### Firebase Admin "already initialized" error
+Already handled in `lib/firebase/admin.ts` with singleton pattern.
 
-**Cause**: Firebase Admin SDK initialized multiple times
-
-**Solution**: Already fixed in `lib/firebase/admin.ts` with singleton pattern:
-
-```typescript
-if (admin.apps.length > 0) {
-  return admin.apps[0];
-}
-```
-
-### Browser cache issues (old code still running)
-
-**Solution**:
+### Browser shows old code
 ```bash
-# Clear Next.js cache
-rm -rf .next
-
-# Restart dev server
-npm run dev
-
-# Hard refresh in browser
-Ctrl + Shift + R
+rm -rf .next && pnpm dev  # Clear cache and restart
+# Then Ctrl+Shift+R in browser
 ```
 
-## Key Files to Understand
+### Upload fails with 308 status
+Firebase Storage resumable uploads return 308 (Resume Incomplete) for successful chunks - this is normal, not an error.
 
-1. **`lib/api/auth-middleware.ts`** - Authenticates all API requests
-2. **`lib/api/fetch-with-auth.ts`** - Client-side wrapper for authenticated fetch
-3. **`lib/firebase/admin.ts`** - Firebase Admin SDK initialization
-4. **`lib/auth/auth-context.tsx`** - Client-side auth state management
-5. **`lib/rbac.ts`** - Role and permission definitions
-6. **`app/api/users/route.ts`** - Example API route with field mapping
+## UI Components
 
-## Recent Fixes (2025-10-23)
+- shadcn/ui components in [components/ui/](components/ui/)
+- Drag-and-drop with @dnd-kit for lesson reordering
+- Charts with Recharts
+- Icons with lucide-react
+- Design system: Orange coral (#F18D5C), Peach (#F5C9A9), Warm beige (#F5EFE6)
 
-### Authentication Integration
+## API Endpoints Summary
 
-✅ Fixed "Missing or invalid authorization header" errors across all admin pages:
-- Created `fetchWithAuth` utility
-- Updated all client-side API calls in:
-  - `/admin/page.tsx`
-  - `/admin/stats/page.tsx`
-  - `/admin/users/page.tsx`
-  - `/admin/programs/page.tsx`
-  - `/admin/content/page.tsx`
-  - `/admin/commands/page.tsx`
-
-### Firestore Field Name Mapping
-
-✅ Fixed empty data arrays caused by snake_case/camelCase mismatch:
-- Updated `/api/users/route.ts` to use `created_at` instead of `createdAt`
-- Added field mapping from snake_case (Firestore) to camelCase (Frontend)
-- All API routes now properly map Firestore data structure
-
-### Firebase Admin SDK
-
-✅ Fixed double initialization error:
-- Added check for `admin.apps.length > 0`
-- Singleton pattern ensures only one instance
-
-## Best Practices
-
-### API Routes
-
-1. **Always authenticate** with `authenticateRequest`
-2. **Always check permissions** with `requireRole`
-3. **Map field names** from snake_case to camelCase
-4. **Use try-catch** and return proper error responses
-5. **Add logging** for debugging
-
-### Client Components
-
-1. **Use `fetchWithAuth`** for all API calls
-2. **Use `useAuth`** hook for current user
-3. **Check permissions** with `hasPermission` before showing UI
-4. **Handle loading** and error states
-
-### Firestore Queries
-
-1. **Use snake_case** field names in queries
-2. **Create indexes** for complex queries (Firebase Console will prompt)
-3. **Limit results** with `.limit(N)` for performance
-4. **Use orderBy carefully** - requires index if combined with where
-
-## Documentation
-
-- Next.js App Router: https://nextjs.org/docs/app
-- Firebase Admin SDK: https://firebase.google.com/docs/admin/setup
-- Firebase Auth: https://firebase.google.com/docs/auth
-- Firestore: https://firebase.google.com/docs/firestore
-- shadcn/ui: https://ui.shadcn.com
-
-## Support
-
-For issues or questions:
-1. Check this CLAUDE.md file
-2. Check Firebase Console for data structure
-3. Check server logs for API errors
-4. Check browser console for client errors
+| Endpoint | Methods | Access | Description |
+|----------|---------|--------|-------------|
+| `/api/users` | GET, POST, PATCH, DELETE | admin | User management |
+| `/api/programs` | GET, POST | admin, teacher | Program CRUD |
+| `/api/programs/[id]` | GET, PATCH, DELETE | admin, teacher | Single program |
+| `/api/programs/[id]/lessons` | POST | admin, teacher | Update lesson order |
+| `/api/lessons` | GET, POST | admin, teacher | Lesson CRUD |
+| `/api/lessons/[id]` | PATCH, DELETE | admin, teacher | Single lesson |
+| `/api/stats` | GET | admin, teacher | Dashboard stats |
+| `/api/analytics/*` | GET | admin, teacher | Charts data |
+| `/api/audit-logs` | GET | admin | Audit log viewer |
+| `/api/commands` | GET, POST | admin | Admin commands |
+| `/api/upload` | POST | admin, teacher | File upload |
+| `/api/translate` | POST | admin, teacher | Auto-translate |
+| `/api/onboarding/*` | GET, POST, PUT | admin | Onboarding management |
+| `/api/scheduled-content` | GET | admin, teacher | Scheduled content calendar |
