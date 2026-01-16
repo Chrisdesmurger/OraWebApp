@@ -157,19 +157,23 @@ export async function POST(request: NextRequest) {
     // Validate request body
     const validatedData: CreateLessonInput = validateCreateLesson(body);
 
-    // Verify program exists and user has permission
     const firestore = getFirestore();
-    const programDoc = await firestore.collection('programs').doc(validatedData.programId).get();
+    let programData: FirebaseFirestore.DocumentData | undefined;
 
-    if (!programDoc.exists) {
-      return apiError('Program not found', 404);
-    }
+    // If programId is provided, verify program exists and user has permission
+    if (validatedData.programId) {
+      const programDoc = await firestore.collection('programs').doc(validatedData.programId).get();
 
-    const programData = programDoc.data();
+      if (!programDoc.exists) {
+        return apiError('Program not found', 404);
+      }
 
-    // Teachers can only add lessons to their own programs
-    if (user.role === 'teacher' && programData?.author_id !== user.uid) {
-      return apiError('You can only add lessons to your own programs', 403);
+      programData = programDoc.data();
+
+      // Teachers can only add lessons to their own programs
+      if (user.role === 'teacher' && programData?.author_id !== user.uid) {
+        return apiError('You can only add lessons to your own programs', 403);
+      }
     }
 
     // Create new lesson document
@@ -182,7 +186,7 @@ export async function POST(request: NextRequest) {
     const lessonData: LessonDocument = {
       ...mappedData,
       type: validatedData.type,
-      program_id: validatedData.programId,
+      program_id: validatedData.programId || '',  // Empty string if no program
       order: validatedData.order || 0,
       duration_sec: null,
       tags: validatedData.tags || [],
@@ -210,16 +214,18 @@ export async function POST(request: NextRequest) {
     } as LessonDocument;
 
     await lessonRef.set(lessonData);
-    console.log(`[POST /api/lessons] Created lesson ${lessonRef.id} in program ${validatedData.programId}`);
+    console.log(`[POST /api/lessons] Created lesson ${lessonRef.id}${validatedData.programId ? ` in program ${validatedData.programId}` : ' (standalone)'}`);
 
-    // Update program media_count (snake_case for Firestore)
-    await firestore
-      .collection('programs')
-      .doc(validatedData.programId)
-      .update({
-        media_count: (programData?.media_count || 0) + 1,
-        updated_at: now,
-      });
+    // Update program media_count only if programId is provided
+    if (validatedData.programId && programData) {
+      await firestore
+        .collection('programs')
+        .doc(validatedData.programId)
+        .update({
+          media_count: (programData.media_count || 0) + 1,
+          updated_at: now,
+        });
+    }
 
     // Return mapped lesson
     const lesson = mapLessonFromFirestore(lessonRef.id, lessonData);

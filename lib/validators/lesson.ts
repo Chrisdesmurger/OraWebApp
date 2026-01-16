@@ -62,7 +62,7 @@ export const lessonStatusSchema = z.enum(['draft', 'uploading', 'processing', 'r
 /**
  * Lesson category enum (for specialized content)
  */
-export const lessonCategorySchema = z.enum(['meditation', 'yoga', 'massage', 'mindfulness', 'wellness']);
+export const lessonCategorySchema = z.enum(['yoga', 'meditation', 'pilates', 'respiration', 'auto-massage']);
 
 // ============================================================================
 // Video/Audio Rendition Schemas
@@ -191,12 +191,14 @@ export const createLessonSchema = z.object({
   // Basic fields (multilingual)
   title: multilingualTextWithMaxSchema(200),
   description: multilingualTextOptionalSchema.nullable(),
-  category: multilingualTextOptionalSchema.nullable(),
   transcript: multilingualTextOptionalSchema.nullable(),
+
+  // Category (required)
+  category: lessonCategorySchema,
 
   // Non-multilingual fields
   type: lessonTypeSchema,
-  programId: z.string().min(1, 'Program ID is required'),
+  programId: z.string().optional(),  // Program is now optional
   order: z.number().int().min(0).default(0),
   tags: z.array(z.string()).default([]),
 
@@ -227,9 +229,12 @@ export const createLessonSchemaCompat = z.object({
     multilingualTextOptionalSchema.nullable(),
   ]).optional(),
 
+  // Category (required)
+  category: lessonCategorySchema,
+
   // Non-multilingual fields
   type: lessonTypeSchema,
-  programId: z.string().min(1, 'Program ID is required'),
+  programId: z.string().optional(),  // Program is now optional
   order: z.number().int().min(0).default(0),
   tags: z.array(z.string()).default([]),
   transcript: z.union([
@@ -249,8 +254,10 @@ export const updateLessonSchema = z.object({
   // Basic fields (multilingual) - all optional for partial updates
   title: multilingualTextWithMaxSchema(200).optional(),
   description: multilingualTextOptionalSchema.nullable(),
-  category: multilingualTextOptionalSchema.nullable(),
   transcript: multilingualTextOptionalSchema.nullable(),
+
+  // Category (simple enum)
+  category: lessonCategorySchema.optional().nullable(),
 
   // Non-multilingual fields
   order: z.number().int().min(0).optional(),

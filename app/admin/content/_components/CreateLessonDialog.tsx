@@ -28,7 +28,8 @@ import { Progress } from '@/components/ui/progress';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { Upload, X } from 'lucide-react';
 import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
-import type { LessonType, CreateLessonRequest, UploadInitResponse } from '@/types/lesson';
+import type { LessonType, LessonCategory, CreateLessonRequest, UploadInitResponse } from '@/types/lesson';
+import { LESSON_CATEGORY_LABELS } from '@/types/lesson';
 
 interface Program {
   id: string;
@@ -55,8 +56,11 @@ const multilingualTextSchema = z.union([
 const createLessonSchema = z.object({
   title: multilingualTextSchema,
   description: multilingualTextSchema.optional(),
+  category: z.enum(['yoga', 'meditation', 'pilates', 'respiration', 'auto-massage'], {
+    required_error: 'Category is required',
+  }),
   type: z.enum(['video', 'audio']),
-  programId: z.string().min(1, 'Program is required'),
+  programId: z.string().optional(),  // Program is now optional
   order: z.number().int().min(0).optional(),
   tags: z.string().optional(),
   transcript: multilingualTextSchema.optional(),
@@ -152,13 +156,18 @@ export function CreateLessonDialog({
       const { uploadUrl }: UploadInitResponse = await initResponse.json();
 
       // Upload file using XMLHttpRequest for progress tracking
-      return new Promise<void>((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
+        let uploadCompleted = false;
 
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) {
             const progress = Math.round((e.loaded / e.total) * 100);
             setUploadProgress(progress);
+            // If we reached 100%, mark as potentially completed
+            if (progress === 100) {
+              uploadCompleted = true;
+            }
           }
         });
 
@@ -177,6 +186,13 @@ export function CreateLessonDialog({
         });
 
         xhr.addEventListener('error', (e) => {
+          // If upload reached 100% and we get a network error, it's likely a CORS issue
+          // after successful upload - treat as success
+          if (uploadCompleted) {
+            console.log('⚠️ Upload reached 100% but got network error - will verify server-side');
+            resolve();
+            return;
+          }
           console.error('XHR error event:', e, 'Status:', xhr.status, 'ReadyState:', xhr.readyState);
           reject(new Error(`Upload failed - Network error (status: ${xhr.status})`));
         });
@@ -191,9 +207,38 @@ export function CreateLessonDialog({
         xhr.setRequestHeader('Content-Type', file.type);
         xhr.send(file);
       });
+
+      // Verify upload was successful by checking lesson status after a short delay
+      // The Cloud Function should update the status to 'processing' or 'ready'
+      console.log('Verifying upload status...');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds for Cloud Function
+
+      const verifyResponse = await fetchWithAuth(`/api/lessons/${lessonId}`);
+      if (verifyResponse.ok) {
+        const { lesson: updatedLesson } = await verifyResponse.json();
+        if (updatedLesson.status === 'uploading' && !updatedLesson.storagePathOriginal) {
+          // Upload didn't actually complete - file never arrived
+          throw new Error('Upload verification failed - file did not arrive on server');
+        }
+        console.log('✅ Upload verified, lesson status:', updatedLesson.status);
+      }
     } catch (error) {
       console.error('Upload error:', error);
       throw error;
+    }
+  };
+
+  // Delete lesson if upload fails (cleanup)
+  const deleteLesson = async (lessonId: string) => {
+    try {
+      console.log('Cleaning up lesson after failed upload:', lessonId);
+      await fetchWithAuth(`/api/lessons/${lessonId}`, {
+        method: 'DELETE',
+      });
+      console.log('Lesson deleted successfully');
+    } catch (deleteError) {
+      console.error('Failed to delete lesson after upload failure:', deleteError);
+      // Don't throw - this is just cleanup
     }
   };
 
@@ -202,6 +247,8 @@ export function CreateLessonDialog({
       setError('Please select a file to upload');
       return;
     }
+
+    let createdLessonId: string | null = null;
 
     try {
       setUploading(true);
@@ -220,6 +267,7 @@ export function CreateLessonDialog({
       const createRequest: CreateLessonRequest = {
         title: data.title,
         description: data.description,
+        category: data.category,
         type: data.type,
         programId: data.programId,
         order: data.order,
@@ -238,17 +286,24 @@ export function CreateLessonDialog({
       }
 
       const { lesson } = await createResponse.json();
+      createdLessonId = lesson.id;
 
       // Upload file
       await uploadFile(lesson.id, file, lesson.type);
 
-      // Success
+      // Success - clear the lessonId so we don't delete it
+      createdLessonId = null;
       setUploadProgress(100);
       onSuccess();
       handleClose();
     } catch (error) {
       console.error('Error creating lesson:', error);
       setError(error instanceof Error ? error.message : 'Failed to create lesson');
+
+      // If lesson was created but upload failed, delete the lesson
+      if (createdLessonId) {
+        await deleteLesson(createdLessonId);
+      }
     } finally {
       setUploading(false);
     }
@@ -337,13 +392,35 @@ export function CreateLessonDialog({
             {errors.type && <p className="text-sm text-red-500">{errors.type.message}</p>}
           </div>
 
-          {/* Program */}
+          {/* Category */}
           <div className="space-y-2">
-            <Label htmlFor="programId">
-              Program <span className="text-red-500">*</span>
+            <Label htmlFor="category">
+              Category <span className="text-red-500">*</span>
             </Label>
             <Select
-              value={watch('programId')}
+              value={watch('category') || ''}
+              onValueChange={(value) => setValue('category', value as LessonCategory)}
+              disabled={uploading}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(LESSON_CATEGORY_LABELS) as LessonCategory[]).map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {LESSON_CATEGORY_LABELS[cat]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.category && <p className="text-sm text-red-500">{errors.category.message}</p>}
+          </div>
+
+          {/* Program */}
+          <div className="space-y-2">
+            <Label htmlFor="programId">Program</Label>
+            <Select
+              value={watch('programId') || ''}
               onValueChange={(value) => setValue('programId', value)}
               disabled={uploading}
             >

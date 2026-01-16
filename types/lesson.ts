@@ -32,7 +32,18 @@ export type LessonType = 'video' | 'audio';
 
 export type LessonStatus = 'draft' | 'uploading' | 'processing' | 'ready' | 'failed';
 
-export type LessonCategory = 'meditation' | 'yoga' | 'massage' | 'mindfulness' | 'wellness';
+export type LessonCategory = 'yoga' | 'meditation' | 'pilates' | 'respiration' | 'auto-massage';
+
+/**
+ * Lesson category labels for display (French)
+ */
+export const LESSON_CATEGORY_LABELS: Record<LessonCategory, string> = {
+  'yoga': 'Yoga',
+  'meditation': 'Méditation',
+  'pilates': 'Pilates',
+  'respiration': 'Respiration',
+  'auto-massage': 'Auto-massage',
+};
 
 export interface Rendition {
   path: string;
@@ -85,6 +96,9 @@ export interface LessonDocument {
   title?: string;  // Deprecated - use title_fr
   description?: string | null;  // Deprecated - use description_fr
   transcript?: string | null;  // Deprecated - use transcript_fr
+
+  // Category (simple enum, not multilingual)
+  category?: LessonCategory | null;
 
   // Non-multilingual fields
   type: LessonType;
@@ -141,8 +155,10 @@ export interface Lesson {
   // Multilingual fields
   title: MultilingualText;
   description?: MultilingualText | null;
-  category?: MultilingualText | null;
   transcript?: MultilingualText | null;
+
+  // Category (simple enum)
+  category?: LessonCategory | null;
 
   // Non-multilingual fields
   type: LessonType;
@@ -227,8 +243,9 @@ export interface LessonLegacy {
 export interface CreateLessonRequest {
   title: MultilingualText | string;  // Accept both for backward compat
   description?: MultilingualText | string;
+  category: LessonCategory;  // Required
   type: LessonType;
-  programId: string;
+  programId?: string;  // Optional
   order?: number;
   tags?: string[];
   transcript?: MultilingualText | string;
@@ -317,9 +334,8 @@ export function validateLessonDocument(id: string, doc: Partial<LessonDocument>)
     missingFields.push('type');
   }
 
-  if (!doc.program_id) {
-    missingFields.push('program_id');
-  }
+  // program_id is now optional (can be empty string)
+  // No validation needed for program_id
 
   if (!doc.status) {
     missingFields.push('status');
@@ -412,14 +428,8 @@ export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson 
       }
     : null;
 
-  // Build multilingual category
-  const category: MultilingualText | null = doc.category_fr || doc.category_en || doc.category_es
-    ? {
-        fr: doc.category_fr ?? '',
-        en: doc.category_en ?? undefined,
-        es: doc.category_es ?? undefined,
-      }
-    : null;
+  // Get category (simple enum)
+  const category = doc.category || null;
 
   // Build multilingual transcript
   const transcript: MultilingualText | null = doc.transcript_fr || doc.transcript_en || doc.transcript_es || doc.transcript
@@ -557,17 +567,9 @@ export function mapLessonToFirestore(lesson: Partial<Lesson>): Partial<LessonDoc
     }
   }
 
-  // Map multilingual category
+  // Map category (simple enum)
   if (lesson.category !== undefined) {
-    if (lesson.category === null) {
-      doc.category_fr = null;
-      doc.category_en = null;
-      doc.category_es = null;
-    } else {
-      doc.category_fr = lesson.category.fr || null;
-      doc.category_en = lesson.category.en || null;
-      doc.category_es = lesson.category.es || null;
-    }
+    doc.category = lesson.category;
   }
 
   // Map multilingual transcript

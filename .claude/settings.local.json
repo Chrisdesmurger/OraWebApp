@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx firebase:*)",
+      "Bash(firebase functions:list:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(pnpm type-check:*)",
+      "Bash(npx tsc:*)",
+      "Bash(./node_modules/.bin/tsc:*)",
+      "Bash(NEXT_TURBO_BUILD=0 npm run build:*)",
+      "Bash(node node_modules/typescript/bin/tsc:*)",
+      "Bash(git config:*)",
+      "Bash(git reset:*)"
+    ]
+  }
+}
