@@ -154,7 +154,7 @@ export function LessonTable({
                 {getProgramTitle(lesson.programId) ? (
                   <span className="text-sm">{getProgramTitle(lesson.programId)}</span>
                 ) : (
-                  <span className="text-sm text-muted-foreground italic">Aucun programme</span>
+                  <span className="text-sm text-muted-foreground italic">No program</span>
                 )}
               </TableCell>
               <TableCell>
