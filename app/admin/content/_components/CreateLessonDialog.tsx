@@ -156,7 +156,7 @@ export function CreateLessonDialog({
       const { uploadUrl }: UploadInitResponse = await initResponse.json();
 
       // Upload file using XMLHttpRequest for progress tracking
-      return new Promise<void>((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         let uploadCompleted = false;
 
@@ -189,7 +189,7 @@ export function CreateLessonDialog({
           // If upload reached 100% and we get a network error, it's likely a CORS issue
           // after successful upload - treat as success
           if (uploadCompleted) {
-            console.log('✅ Upload likely successful (100% uploaded, ignoring post-upload error)');
+            console.log('⚠️ Upload reached 100% but got network error - will verify server-side');
             resolve();
             return;
           }
@@ -207,6 +207,21 @@ export function CreateLessonDialog({
         xhr.setRequestHeader('Content-Type', file.type);
         xhr.send(file);
       });
+
+      // Verify upload was successful by checking lesson status after a short delay
+      // The Cloud Function should update the status to 'processing' or 'ready'
+      console.log('Verifying upload status...');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds for Cloud Function
+
+      const verifyResponse = await fetchWithAuth(`/api/lessons/${lessonId}`);
+      if (verifyResponse.ok) {
+        const { lesson: updatedLesson } = await verifyResponse.json();
+        if (updatedLesson.status === 'uploading' && !updatedLesson.storagePathOriginal) {
+          // Upload didn't actually complete - file never arrived
+          throw new Error('Upload verification failed - file did not arrive on server');
+        }
+        console.log('✅ Upload verified, lesson status:', updatedLesson.status);
+      }
     } catch (error) {
       console.error('Upload error:', error);
       throw error;
