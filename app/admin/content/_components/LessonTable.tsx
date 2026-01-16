@@ -72,6 +72,10 @@ export function LessonTable({
   const router = useRouter();
 
   const getProgramTitle = (programId: string) => {
+    // If no programId, lesson is standalone
+    if (!programId) {
+      return null;
+    }
     const program = programs.find((p) => p.id === programId);
     return program?.title || 'Unknown Program';
   };
@@ -147,7 +151,11 @@ export function LessonTable({
                 </Badge>
               </TableCell>
               <TableCell>
-                <span className="text-sm">{getProgramTitle(lesson.programId)}</span>
+                {getProgramTitle(lesson.programId) ? (
+                  <span className="text-sm">{getProgramTitle(lesson.programId)}</span>
+                ) : (
+                  <span className="text-sm text-muted-foreground italic">Aucun programme</span>
+                )}
               </TableCell>
               <TableCell>
                 <LessonStatusBadge status={lesson.status} />
