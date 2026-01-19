@@ -28,9 +28,10 @@ import { Badge } from '@/components/ui/badge';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { LessonStatusBadge } from './LessonStatusBadge';
 import { LessonPreviewImageUpload } from './LessonPreviewImageUpload';
+import { YogaPoseEditor } from './YogaPoseEditor';
 import { ExternalLink } from 'lucide-react';
 import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
-import type { Lesson, UpdateLessonRequest, MultilingualText } from '@/types/lesson';
+import type { Lesson, UpdateLessonRequest, MultilingualText, YogaPose } from '@/types/lesson';
 
 interface Program {
   id: string;
@@ -84,13 +85,21 @@ export function EditLessonDialog({
 }: EditLessonDialogProps) {
   const [error, setError] = React.useState<string | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
+  const [yogaPoses, setYogaPoses] = React.useState<YogaPose[]>([]);
 
-  // Initialize preview image URL when lesson changes
+  // Initialize preview image URL and yoga poses when lesson changes
   React.useEffect(() => {
     if (lesson?.previewImageUrl) {
       setPreviewImageUrl(lesson.previewImageUrl);
     } else {
       setPreviewImageUrl(null);
+    }
+
+    // Initialize yoga poses
+    if (lesson?.yogaPoses) {
+      setYogaPoses(lesson.yogaPoses);
+    } else {
+      setYogaPoses([]);
     }
   }, [lesson]);
 
@@ -162,6 +171,8 @@ export function EditLessonDialog({
         order: data.order,
         tags,
         transcript: data.transcript,
+        // Include yoga poses for yoga/pilates lessons (Issue #74)
+        yogaPoses: isYogaOrPilatesLesson ? yogaPoses : undefined,
       };
 
       const response = await fetchWithAuth(`/api/lessons/${lesson.id}`, {
@@ -195,6 +206,9 @@ export function EditLessonDialog({
 
   // Get display values for lesson info
   const lessonTitle = getDisplayText(lesson.title);
+
+  // Check if this is a yoga or pilates lesson (for yoga poses editor)
+  const isYogaOrPilatesLesson = lesson.category === 'yoga' || lesson.category === 'pilates';
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -491,6 +505,18 @@ export function EditLessonDialog({
             rows={6}
             maxLength={10000}
           />
+
+          {/* Yoga Poses Editor - Only for yoga/pilates lessons (Issue #74) */}
+          {isYogaOrPilatesLesson && (
+            <div className="pt-4 border-t">
+              <YogaPoseEditor
+                poses={yogaPoses}
+                onChange={setYogaPoses}
+                lessonDurationSec={lesson.durationSec}
+                disabled={isSubmitting}
+              />
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (

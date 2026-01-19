@@ -17,16 +17,27 @@ import type {
   MassageBodyZoneFirestore,
   MeditationPhase,
   MeditationPhaseFirestore,
+  YogaPose,
+  YogaPoseFirestore,
+  YogaPoseSide,
+  YogaTargetZone,
+} from '@/lib/firestore/conversions';
+
+import {
   yogaChapterFromFirestore,
   yogaChapterToFirestore,
   massageBodyZoneFromFirestore,
   massageBodyZoneToFirestore,
   meditationPhaseFromFirestore,
   meditationPhaseToFirestore,
+  yogaPoseFromFirestore,
+  yogaPoseToFirestore,
+  YOGA_TARGET_ZONES,
 } from '@/lib/firestore/conversions';
 
 // Re-export for convenience
-export type { MultilingualText, YogaChapter, MassageBodyZone, MeditationPhase };
+export type { MultilingualText, YogaChapter, MassageBodyZone, MeditationPhase, YogaPose, YogaPoseSide, YogaTargetZone };
+export { YOGA_TARGET_ZONES };
 
 export type LessonType = 'video' | 'audio';
 
@@ -139,6 +150,9 @@ export interface LessonDocument {
   breathing_instruction_fr?: string | null;
   breathing_instruction_en?: string | null;
   breathing_instruction_es?: string | null;
+
+  // Yoga poses (Issue #74) - snake_case
+  yoga_poses?: YogaPoseFirestore[];
 }
 
 // ============================================================================
@@ -195,6 +209,9 @@ export interface Lesson {
   phases?: MeditationPhase[];
   ambientSoundName?: MultilingualText | null;
   breathingInstruction?: MultilingualText | null;
+
+  // Yoga poses (Issue #74) - for yoga/pilates lessons
+  yogaPoses?: YogaPose[];
 }
 
 // ============================================================================
@@ -263,6 +280,9 @@ export interface CreateLessonRequest {
   phases?: MeditationPhase[];
   ambientSoundName?: MultilingualText;
   breathingInstruction?: MultilingualText;
+
+  // Yoga poses (Issue #74)
+  yogaPoses?: YogaPose[];
 }
 
 /**
@@ -288,6 +308,9 @@ export interface UpdateLessonRequest {
   phases?: MeditationPhase[];
   ambientSoundName?: MultilingualText;
   breathingInstruction?: MultilingualText;
+
+  // Yoga poses (Issue #74)
+  yogaPoses?: YogaPose[];
 }
 
 /**
@@ -485,12 +508,14 @@ export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson 
     scheduledPublishAt: doc.scheduled_publish_at ?? null,
     scheduledArchiveAt: doc.scheduled_archive_at ?? null,
     autoPublishEnabled: doc.auto_publish_enabled ?? false,
-    // Specialized content - would need the conversion functions imported
-    chapters: undefined, // TODO: map if present
-    bodyZones: undefined, // TODO: map if present
-    phases: undefined, // TODO: map if present
+    // Specialized content
+    chapters: doc.chapters?.map(yogaChapterFromFirestore),
+    bodyZones: doc.body_zones?.map(massageBodyZoneFromFirestore),
+    phases: doc.phases?.map(meditationPhaseFromFirestore),
     ambientSoundName,
     breathingInstruction,
+    // Yoga poses (Issue #74)
+    yogaPoses: doc.yoga_poses?.map(yogaPoseFromFirestore),
   };
 }
 
@@ -633,6 +658,22 @@ export function mapLessonToFirestore(lesson: Partial<Lesson>): Partial<LessonDoc
       doc.breathing_instruction_en = lesson.breathingInstruction.en || null;
       doc.breathing_instruction_es = lesson.breathingInstruction.es || null;
     }
+  }
+
+  // Map specialized content arrays
+  if (lesson.chapters !== undefined) {
+    doc.chapters = lesson.chapters?.map(yogaChapterToFirestore);
+  }
+  if (lesson.bodyZones !== undefined) {
+    doc.body_zones = lesson.bodyZones?.map(massageBodyZoneToFirestore);
+  }
+  if (lesson.phases !== undefined) {
+    doc.phases = lesson.phases?.map(meditationPhaseToFirestore);
+  }
+
+  // Map yoga poses (Issue #74)
+  if (lesson.yogaPoses !== undefined) {
+    doc.yoga_poses = lesson.yogaPoses?.map(yogaPoseToFirestore);
   }
 
   return doc;

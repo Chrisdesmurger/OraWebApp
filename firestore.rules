@@ -142,6 +142,7 @@ service cloud.firestore {
     // Android App: Read access for all authenticated users
     // Teachers: Can create/update own lessons, Admin: Can manage all
     // FIX: More permissive read rules + graceful handling of missing author_id
+    // FEATURE #74: yoga_poses field for yoga/pilates lessons
     // ==========================================
     match /lessons/{lessonId} {
       // Read: All authenticated users can read lessons
@@ -150,14 +151,16 @@ service cloud.firestore {
 
       // Create: Admin and teachers can create
       // FIX: author_id is optional (some lessons may not have it)
-      allow create: if (isAdmin() || isTeacher());
+      allow create: if (isAdmin() || isTeacher()) && validateLessonYogaPoses(request.resource.data);
 
       // Update: Admin can update all, teachers can update own (if author_id exists)
       // FIX: Check if author_id exists before comparing
-      allow update: if isAdmin() ||
+      // Validates yoga_poses array if present
+      allow update: if (isAdmin() ||
                       (isTeacher() &&
                        resource.data.keys().hasAny(['author_id']) &&
-                       resource.data.author_id == request.auth.uid);
+                       resource.data.author_id == request.auth.uid)) &&
+                      validateLessonYogaPoses(request.resource.data);
 
       // Delete: Admin only
       allow delete: if isAdmin();
@@ -286,6 +289,13 @@ service cloud.firestore {
           && data.createdBy is string
           && data.createdAt is timestamp
           && data.updatedAt is timestamp;
+    }
+
+    // Validate yoga_poses field in lessons (Issue #74)
+    // yoga_poses is optional, but if present must be a list with max 50 items
+    function validateLessonYogaPoses(data) {
+      return !data.keys().hasAny(['yoga_poses']) ||
+             (data.yoga_poses is list && data.yoga_poses.size() <= 50);
     }
 
     // ==========================================
