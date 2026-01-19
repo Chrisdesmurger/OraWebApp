@@ -623,3 +623,182 @@ export function mergeTranslations(
     es: updates.es ?? existing?.es,
   };
 }
+
+// ============================================================================
+// Yoga Pose Types (Issue #74)
+// ============================================================================
+
+/**
+ * Side type for bilateral poses
+ */
+export type YogaPoseSide = 'none' | 'left' | 'right' | 'both';
+
+/**
+ * Target zones for yoga poses
+ */
+export const YOGA_TARGET_ZONES = [
+  'back',
+  'legs',
+  'hips',
+  'shoulders',
+  'arms',
+  'core',
+  'spine',
+  'hamstrings',
+  'calves',
+  'chest',
+  'neck',
+  'glutes',
+  'full_body',
+] as const;
+
+export type YogaTargetZone = (typeof YOGA_TARGET_ZONES)[number];
+
+/**
+ * Yoga pose entry (TypeScript - camelCase)
+ * Embedded in lesson document for yoga/pilates content
+ */
+export interface YogaPose {
+  // Timing
+  startTimeMs: number;
+  endTimeMs: number;
+
+  // Identity (optional reference to global pose library)
+  poseId?: string;
+
+  // Content with i18n support
+  title: MultilingualText;
+  stimulus: MultilingualText;
+  instructions: MultilingualText[];
+
+  // Metadata
+  targetZones: string[];
+  benefits?: MultilingualText[];
+  side: YogaPoseSide;
+  thumbnailUrl?: string;
+  difficulty?: number; // 1-3
+}
+
+/**
+ * Yoga pose entry (Firestore - snake_case)
+ */
+export interface YogaPoseFirestore {
+  // Timing
+  start_time_ms: number;
+  end_time_ms: number;
+
+  // Identity
+  pose_id?: string;
+
+  // Content with i18n (snake_case with language suffix)
+  title_fr: string;
+  title_en?: string;
+  title_es?: string;
+
+  stimulus_fr: string;
+  stimulus_en?: string;
+  stimulus_es?: string;
+
+  // Instructions as array of multilingual objects
+  instructions_fr: string[];
+  instructions_en?: string[];
+  instructions_es?: string[];
+
+  // Metadata
+  target_zones: string[];
+  benefits_fr?: string[];
+  benefits_en?: string[];
+  benefits_es?: string[];
+
+  side: YogaPoseSide;
+  thumbnail_url?: string;
+  difficulty?: number;
+}
+
+// ============================================================================
+// Yoga Pose Conversion Functions
+// ============================================================================
+
+/**
+ * Convert YogaPose from TypeScript to Firestore format
+ */
+export function yogaPoseToFirestore(pose: YogaPose): YogaPoseFirestore {
+  return {
+    start_time_ms: pose.startTimeMs,
+    end_time_ms: pose.endTimeMs,
+    pose_id: pose.poseId,
+    title_fr: pose.title.fr,
+    title_en: pose.title.en,
+    title_es: pose.title.es,
+    stimulus_fr: pose.stimulus.fr,
+    stimulus_en: pose.stimulus.en,
+    stimulus_es: pose.stimulus.es,
+    instructions_fr: pose.instructions.map((i) => i.fr),
+    instructions_en: pose.instructions.some((i) => i.en)
+      ? pose.instructions.map((i) => i.en || '')
+      : undefined,
+    instructions_es: pose.instructions.some((i) => i.es)
+      ? pose.instructions.map((i) => i.es || '')
+      : undefined,
+    target_zones: pose.targetZones,
+    benefits_fr: pose.benefits?.map((b) => b.fr),
+    benefits_en: pose.benefits?.some((b) => b.en)
+      ? pose.benefits.map((b) => b.en || '')
+      : undefined,
+    benefits_es: pose.benefits?.some((b) => b.es)
+      ? pose.benefits.map((b) => b.es || '')
+      : undefined,
+    side: pose.side,
+    thumbnail_url: pose.thumbnailUrl,
+    difficulty: pose.difficulty,
+  };
+}
+
+/**
+ * Convert YogaPose from Firestore to TypeScript format
+ */
+export function yogaPoseFromFirestore(doc: YogaPoseFirestore): YogaPose {
+  // Build instructions array with i18n
+  const instructionsFr = doc.instructions_fr || [];
+  const instructionsEn = doc.instructions_en || [];
+  const instructionsEs = doc.instructions_es || [];
+  const instructions: MultilingualText[] = instructionsFr.map((fr, index) => ({
+    fr,
+    en: instructionsEn[index],
+    es: instructionsEs[index],
+  }));
+
+  // Build benefits array with i18n (if present)
+  let benefits: MultilingualText[] | undefined;
+  if (doc.benefits_fr && doc.benefits_fr.length > 0) {
+    const benefitsEn = doc.benefits_en || [];
+    const benefitsEs = doc.benefits_es || [];
+    benefits = doc.benefits_fr.map((fr, index) => ({
+      fr,
+      en: benefitsEn[index],
+      es: benefitsEs[index],
+    }));
+  }
+
+  return {
+    startTimeMs: doc.start_time_ms,
+    endTimeMs: doc.end_time_ms,
+    poseId: doc.pose_id,
+    title: {
+      fr: doc.title_fr,
+      en: doc.title_en,
+      es: doc.title_es,
+    },
+    stimulus: {
+      fr: doc.stimulus_fr,
+      en: doc.stimulus_en,
+      es: doc.stimulus_es,
+    },
+    instructions,
+    targetZones: doc.target_zones || [],
+    benefits,
+    side: doc.side || 'none',
+    thumbnailUrl: doc.thumbnail_url,
+    difficulty: doc.difficulty,
+  };
+}

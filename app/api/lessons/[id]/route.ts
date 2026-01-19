@@ -51,11 +51,13 @@ export async function GET(
  * PATCH /api/lessons/[id] - Update lesson metadata
  *
  * Body:
- * - title: string (optional)
+ * - title: string | MultilingualText (optional)
+ * - description: string | MultilingualText (optional)
  * - order: number (optional)
  * - tags: string[] (optional)
- * - transcript: string (optional)
+ * - transcript: string | MultilingualText (optional)
  * - programId: string (optional) - Move to different program
+ * - yogaPoses: YogaPose[] (optional) - Yoga poses for yoga/pilates lessons (Issue #74)
  */
 export async function PATCH(
   request: NextRequest,

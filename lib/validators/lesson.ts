@@ -181,6 +181,66 @@ export const meditationPhaseSchema = z.object({
 );
 
 // ============================================================================
+// Yoga Pose Schemas (Issue #74)
+// ============================================================================
+
+/**
+ * Yoga pose side enum
+ */
+export const yogaPoseSideSchema = z.enum(['none', 'left', 'right', 'both']);
+
+/**
+ * Yoga pose schema with multilingual content
+ * Validates poses embedded in yoga/pilates lessons
+ */
+export const yogaPoseSchema = z.object({
+  // Timing (in milliseconds)
+  startTimeMs: z.number().int().min(0, 'Start time must be >= 0'),
+  endTimeMs: z.number().int().min(0, 'End time must be >= 0'),
+
+  // Identity (optional reference to global pose library)
+  poseId: z.string().optional(),
+
+  // Content with i18n support
+  title: multilingualTextSchema,
+  stimulus: multilingualTextSchema,
+  instructions: z.array(multilingualTextSchema).min(1, 'At least one instruction is required'),
+
+  // Metadata
+  targetZones: z.array(z.string()).default([]),
+  benefits: z.array(multilingualTextSchema).optional(),
+  side: yogaPoseSideSchema.default('none'),
+  thumbnailUrl: z.string().url().optional().or(z.literal('')),
+  difficulty: z.number().int().min(1).max(3).optional(),
+}).refine(
+  (data) => data.endTimeMs > data.startTimeMs,
+  { message: 'End time must be greater than start time', path: ['endTimeMs'] }
+);
+
+/**
+ * Array of yoga poses with overlap validation
+ */
+export const yogaPosesArraySchema = z.array(yogaPoseSchema)
+  .max(50, 'Maximum 50 poses per lesson')
+  .refine(
+    (poses) => {
+      // Check for overlapping poses
+      for (let i = 0; i < poses.length; i++) {
+        for (let j = i + 1; j < poses.length; j++) {
+          const a = poses[i];
+          const b = poses[j];
+          // Check if poses overlap
+          if (a.startTimeMs < b.endTimeMs && b.startTimeMs < a.endTimeMs) {
+            return false;
+          }
+        }
+      }
+      return true;
+    },
+    { message: 'Poses cannot overlap in time' }
+  );
+
+// ============================================================================
 // Create Lesson Schema (with i18n)
 // ============================================================================
 
@@ -212,6 +272,9 @@ export const createLessonSchema = z.object({
   phases: z.array(meditationPhaseSchema).optional(),
   ambientSoundName: multilingualTextOptionalSchema,
   breathingInstruction: multilingualTextOptionalSchema,
+
+  // Yoga poses (Issue #74)
+  yogaPoses: yogaPosesArraySchema.optional(),
 });
 
 /**
@@ -274,6 +337,9 @@ export const updateLessonSchema = z.object({
   phases: z.array(meditationPhaseSchema).optional(),
   ambientSoundName: multilingualTextOptionalSchema,
   breathingInstruction: multilingualTextOptionalSchema,
+
+  // Yoga poses (Issue #74)
+  yogaPoses: yogaPosesArraySchema.optional(),
 });
 
 /**
@@ -295,6 +361,9 @@ export const updateLessonSchemaCompat = z.object({
     multilingualTextOptionalSchema.nullable(),
   ]).optional(),
   programId: z.string().min(1).optional(),
+
+  // Yoga poses (Issue #74)
+  yogaPoses: yogaPosesArraySchema.optional(),
 });
 
 // ============================================================================
@@ -455,6 +524,8 @@ export type YogaChapter = z.infer<typeof yogaChapterSchema>;
 export type MassageInstruction = z.infer<typeof massageInstructionSchema>;
 export type MassageBodyZone = z.infer<typeof massageBodyZoneSchema>;
 export type MeditationPhase = z.infer<typeof meditationPhaseSchema>;
+export type YogaPose = z.infer<typeof yogaPoseSchema>;
+export type YogaPoseSide = z.infer<typeof yogaPoseSideSchema>;
 export type CreateLessonInput = z.infer<typeof createLessonSchemaCompat>;
 export type CreateLessonI18nInput = z.infer<typeof createLessonSchema>;
 export type UpdateLessonInput = z.infer<typeof updateLessonSchemaCompat>;
