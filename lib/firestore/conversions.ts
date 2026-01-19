@@ -721,37 +721,47 @@ export interface YogaPoseFirestore {
 
 /**
  * Convert YogaPose from TypeScript to Firestore format
+ * Note: Firestore doesn't accept undefined values, so we filter them out
  */
 export function yogaPoseToFirestore(pose: YogaPose): YogaPoseFirestore {
-  return {
+  const result: Record<string, unknown> = {
     start_time_ms: pose.startTimeMs,
     end_time_ms: pose.endTimeMs,
-    pose_id: pose.poseId,
     title_fr: pose.title.fr,
-    title_en: pose.title.en,
-    title_es: pose.title.es,
     stimulus_fr: pose.stimulus.fr,
-    stimulus_en: pose.stimulus.en,
-    stimulus_es: pose.stimulus.es,
     instructions_fr: pose.instructions.map((i) => i.fr),
-    instructions_en: pose.instructions.some((i) => i.en)
-      ? pose.instructions.map((i) => i.en || '')
-      : undefined,
-    instructions_es: pose.instructions.some((i) => i.es)
-      ? pose.instructions.map((i) => i.es || '')
-      : undefined,
     target_zones: pose.targetZones,
-    benefits_fr: pose.benefits?.map((b) => b.fr),
-    benefits_en: pose.benefits?.some((b) => b.en)
-      ? pose.benefits.map((b) => b.en || '')
-      : undefined,
-    benefits_es: pose.benefits?.some((b) => b.es)
-      ? pose.benefits.map((b) => b.es || '')
-      : undefined,
     side: pose.side,
-    thumbnail_url: pose.thumbnailUrl,
-    difficulty: pose.difficulty,
   };
+
+  // Only include optional fields if they have values (Firestore rejects undefined)
+  if (pose.poseId) result.pose_id = pose.poseId;
+  if (pose.title.en) result.title_en = pose.title.en;
+  if (pose.title.es) result.title_es = pose.title.es;
+  if (pose.stimulus.en) result.stimulus_en = pose.stimulus.en;
+  if (pose.stimulus.es) result.stimulus_es = pose.stimulus.es;
+
+  if (pose.instructions.some((i) => i.en)) {
+    result.instructions_en = pose.instructions.map((i) => i.en || '');
+  }
+  if (pose.instructions.some((i) => i.es)) {
+    result.instructions_es = pose.instructions.map((i) => i.es || '');
+  }
+
+  if (pose.benefits && pose.benefits.length > 0) {
+    result.benefits_fr = pose.benefits.map((b) => b.fr);
+    if (pose.benefits.some((b) => b.en)) {
+      result.benefits_en = pose.benefits.map((b) => b.en || '');
+    }
+    if (pose.benefits.some((b) => b.es)) {
+      result.benefits_es = pose.benefits.map((b) => b.es || '');
+    }
+  }
+
+  if (pose.thumbnailUrl) result.thumbnail_url = pose.thumbnailUrl;
+  if (pose.difficulty !== undefined) result.difficulty = pose.difficulty;
+
+  return result as unknown as YogaPoseFirestore;
 }
 
 /**
