@@ -341,6 +341,9 @@ export const createLessonSchemaCompat = z.object({
     z.string().nullable(),
     multilingualTextOptionalSchema.nullable(),
   ]).optional(),
+
+  // Subcategory
+  subcategoryId: z.string().nullable().optional(),
 });
 
 // ============================================================================

@@ -279,7 +279,7 @@ service cloud.firestore {
           && data.description is string
           && data.description.size() >= 10
           && data.description.size() <= 1000
-          && data.category in ['meditation', 'yoga', 'mindfulness', 'wellness']
+          && data.category in ['yoga', 'pilates', 'meditation', 'respiration', 'auto-massage']
           && data.difficulty in ['beginner', 'intermediate', 'advanced']
           && data.duration_days is int
           && data.duration_days >= 1
@@ -319,9 +319,10 @@ service cloud.firestore {
 
     // Validate subcategory data (snake_case fields)
     // Required: category, name_fr, slug, display_order, status, created_by
+    // Categories must match types/lesson.ts LessonCategory type
     function validateSubcategory(data) {
       return data.category is string
-          && data.category in ['yoga', 'pilates', 'meditation', 'breathing', 'self_massage']
+          && data.category in ['yoga', 'pilates', 'meditation', 'respiration', 'auto-massage']
           && data.name_fr is string
           && data.name_fr.size() >= 2
           && data.name_fr.size() <= 100

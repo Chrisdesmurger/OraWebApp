@@ -30,6 +30,7 @@ import { Upload, X } from 'lucide-react';
 import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
 import type { LessonType, LessonCategory, CreateLessonRequest, UploadInitResponse } from '@/types/lesson';
 import { LESSON_CATEGORY_LABELS } from '@/types/lesson';
+import type { Subcategory } from '@/types/subcategory';
 
 interface Program {
   id: string;
@@ -83,6 +84,9 @@ export function CreateLessonDialog({
   const [uploadProgress, setUploadProgress] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [subcategories, setSubcategories] = React.useState<Subcategory[]>([]);
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = React.useState<string | null>(null);
+  const [loadingSubcategories, setLoadingSubcategories] = React.useState(false);
 
   const {
     register,
@@ -103,6 +107,41 @@ export function CreateLessonDialog({
   });
 
   const selectedType = watch('type');
+  const selectedCategory = watch('category');
+
+  // Fetch subcategories when category changes
+  React.useEffect(() => {
+    const fetchSubcategories = async () => {
+      if (!selectedCategory) {
+        setSubcategories([]);
+        setSelectedSubcategoryId(null);
+        return;
+      }
+
+      setLoadingSubcategories(true);
+      try {
+        const response = await fetchWithAuth(
+          `/api/subcategories?category=${selectedCategory}&status=active`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setSubcategories(data.subcategories || []);
+        } else {
+          console.error('Failed to fetch subcategories');
+          setSubcategories([]);
+        }
+      } catch (error) {
+        console.error('Error fetching subcategories:', error);
+        setSubcategories([]);
+      } finally {
+        setLoadingSubcategories(false);
+      }
+    };
+
+    fetchSubcategories();
+    // Reset subcategory when category changes
+    setSelectedSubcategoryId(null);
+  }, [selectedCategory]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -273,6 +312,7 @@ export function CreateLessonDialog({
         order: data.order,
         tags,
         transcript: data.transcript,
+        subcategoryId: selectedSubcategoryId,
       };
 
       const createResponse = await fetchWithAuth('/api/lessons', {
@@ -315,6 +355,8 @@ export function CreateLessonDialog({
       setFile(null);
       setError(null);
       setUploadProgress(0);
+      setSubcategories([]);
+      setSelectedSubcategoryId(null);
       onOpenChange(false);
     }
   };
@@ -415,6 +457,53 @@ export function CreateLessonDialog({
             </Select>
             {errors.category && <p className="text-sm text-red-500">{errors.category.message}</p>}
           </div>
+
+          {/* Subcategory */}
+          {selectedCategory && (
+            <div className="space-y-2">
+              <Label htmlFor="subcategoryId">Subcategory</Label>
+              {loadingSubcategories ? (
+                <div className="text-sm text-muted-foreground">Loading subcategories...</div>
+              ) : subcategories.length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  No subcategories available for {LESSON_CATEGORY_LABELS[selectedCategory]}.
+                  <a href="/admin/subcategories" className="text-primary ml-1 underline">
+                    Create subcategories
+                  </a>
+                </div>
+              ) : (
+                <Select
+                  value={selectedSubcategoryId || 'none'}
+                  onValueChange={(value) =>
+                    setSelectedSubcategoryId(value === 'none' ? null : value)
+                  }
+                  disabled={uploading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a subcategory (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-muted-foreground">No subcategory</span>
+                    </SelectItem>
+                    {subcategories.map((sub) => (
+                      <SelectItem key={sub.id} value={sub.id}>
+                        {sub.name.fr}
+                        {sub.name.en && (
+                          <span className="text-muted-foreground ml-2">
+                            ({sub.name.en})
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Subcategories are used to group lessons in horizontal carousels on the mobile app
+              </p>
+            </div>
+          )}
 
           {/* Program */}
           <div className="space-y-2">

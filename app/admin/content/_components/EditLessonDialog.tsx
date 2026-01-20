@@ -32,6 +32,7 @@ import { YogaPoseEditor } from './YogaPoseEditor';
 import { ExternalLink } from 'lucide-react';
 import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
 import type { Lesson, UpdateLessonRequest, MultilingualText, YogaPose } from '@/types/lesson';
+import { LESSON_CATEGORY_LABELS } from '@/types/lesson';
 import type { Subcategory } from '@/types/subcategory';
 
 interface Program {
@@ -505,6 +506,19 @@ export function EditLessonDialog({
             )}
           </div>
 
+          {/* Category (read-only) */}
+          {lesson.category && (
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <div className="flex items-center h-10 px-3 py-2 rounded-md border border-input bg-muted text-muted-foreground">
+                {LESSON_CATEGORY_LABELS[lesson.category] || lesson.category}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Category cannot be changed after creation
+              </p>
+            </div>
+          )}
+
           {/* Subcategory */}
           {lesson.category && (
             <div className="space-y-2">
@@ -513,7 +527,7 @@ export function EditLessonDialog({
                 <div className="text-sm text-muted-foreground">Loading subcategories...</div>
               ) : subcategories.length === 0 ? (
                 <div className="text-sm text-muted-foreground">
-                  No subcategories available for {lesson.category}.
+                  No subcategories available for {LESSON_CATEGORY_LABELS[lesson.category] || lesson.category}.
                   <a href="/admin/subcategories" className="text-primary ml-1 underline">
                     Create subcategories
                   </a>
