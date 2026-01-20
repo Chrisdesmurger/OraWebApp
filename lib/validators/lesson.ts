@@ -64,6 +64,40 @@ export const lessonStatusSchema = z.enum(['draft', 'uploading', 'processing', 'r
  */
 export const lessonCategorySchema = z.enum(['yoga', 'meditation', 'pilates', 'respiration', 'auto-massage']);
 
+/**
+ * Subcategory status enum
+ */
+export const subcategoryStatusSchema = z.enum(['active', 'inactive']);
+
+// ============================================================================
+// Subcategory Schemas
+// ============================================================================
+
+/**
+ * Create subcategory request schema
+ */
+export const createSubcategorySchema = z.object({
+  category: lessonCategorySchema,
+  name: multilingualTextSchema,
+  description: multilingualTextOptionalSchema,
+  slug: z.string().regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens').optional(),
+  displayOrder: z.number().int().min(0).optional(),
+  iconUrl: z.string().url().optional(),
+  status: subcategoryStatusSchema.optional(),
+});
+
+/**
+ * Update subcategory request schema
+ */
+export const updateSubcategorySchema = z.object({
+  name: multilingualTextSchema.optional(),
+  description: multilingualTextOptionalSchema,
+  slug: z.string().regex(/^[a-z0-9-]+$/, 'Slug must contain only lowercase letters, numbers, and hyphens').optional(),
+  displayOrder: z.number().int().min(0).optional(),
+  iconUrl: z.string().url().optional().or(z.literal('')),
+  status: subcategoryStatusSchema.optional(),
+});
+
 // ============================================================================
 // Video/Audio Rendition Schemas
 // ============================================================================
@@ -275,6 +309,9 @@ export const createLessonSchema = z.object({
 
   // Yoga poses (Issue #74)
   yogaPoses: yogaPosesArraySchema.optional(),
+
+  // Subcategory
+  subcategoryId: z.string().nullable().optional(),
 });
 
 /**
@@ -340,6 +377,9 @@ export const updateLessonSchema = z.object({
 
   // Yoga poses (Issue #74)
   yogaPoses: yogaPosesArraySchema.optional(),
+
+  // Subcategory
+  subcategoryId: z.string().nullable().optional(),
 });
 
 /**
@@ -364,6 +404,9 @@ export const updateLessonSchemaCompat = z.object({
 
   // Yoga poses (Issue #74)
   yogaPoses: yogaPosesArraySchema.optional(),
+
+  // Subcategory
+  subcategoryId: z.string().nullable().optional(),
 });
 
 // ============================================================================
@@ -513,6 +556,20 @@ export function safeValidateUpdateLesson(data: unknown) {
   return updateLessonSchemaCompat.safeParse(data);
 }
 
+/**
+ * Validate create subcategory request
+ */
+export function validateCreateSubcategory(data: unknown) {
+  return createSubcategorySchema.safeParse(data);
+}
+
+/**
+ * Validate update subcategory request
+ */
+export function validateUpdateSubcategory(data: unknown) {
+  return updateSubcategorySchema.safeParse(data);
+}
+
 // ============================================================================
 // Type Exports
 // ============================================================================
@@ -532,3 +589,5 @@ export type UpdateLessonInput = z.infer<typeof updateLessonSchemaCompat>;
 export type UpdateLessonI18nInput = z.infer<typeof updateLessonSchema>;
 export type LessonFiltersInput = z.infer<typeof lessonFiltersSchema>;
 export type FileUploadInput = z.infer<typeof fileUploadSchema>;
+export type CreateSubcategoryInput = z.infer<typeof createSubcategorySchema>;
+export type UpdateSubcategoryInput = z.infer<typeof updateSubcategorySchema>;

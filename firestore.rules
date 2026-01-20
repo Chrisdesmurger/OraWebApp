@@ -239,6 +239,25 @@ service cloud.firestore {
     }
 
     // ==========================================
+    // COLLECTION: subcategories/{subcategoryId}
+    // Admin Web: Subcategory management for organizing lessons
+    // Android App: Read access for displaying category details
+    // ==========================================
+    match /subcategories/{subcategoryId} {
+      // Read: All authenticated users can read subcategories
+      allow read: if isAuthenticated();
+
+      // Create: Admin only
+      allow create: if isAdmin() && validateSubcategory(request.resource.data);
+
+      // Update: Admin only
+      allow update: if isAdmin() && validateSubcategory(request.resource.data);
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
     // VALIDATION FUNCTIONS
     // ==========================================
 
@@ -296,6 +315,25 @@ service cloud.firestore {
     function validateLessonYogaPoses(data) {
       return !data.keys().hasAny(['yoga_poses']) ||
              (data.yoga_poses is list && data.yoga_poses.size() <= 50);
+    }
+
+    // Validate subcategory data (snake_case fields)
+    // Required: category, name_fr, slug, display_order, status, created_by
+    function validateSubcategory(data) {
+      return data.category is string
+          && data.category in ['yoga', 'pilates', 'meditation', 'breathing', 'self_massage']
+          && data.name_fr is string
+          && data.name_fr.size() >= 2
+          && data.name_fr.size() <= 100
+          && data.slug is string
+          && data.slug.size() >= 2
+          && data.slug.size() <= 100
+          && data.display_order is int
+          && data.display_order >= 0
+          && data.status is string
+          && data.status in ['active', 'inactive']
+          && data.created_by is string
+          && data.created_by.size() > 0;
     }
 
     // ==========================================

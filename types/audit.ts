@@ -25,7 +25,7 @@ export type AuditAction =
   | 'onboarding.deleted'
   | 'onboarding.exported';
 
-export type ResourceType = 'user' | 'program' | 'lesson' | 'onboarding_config' | 'onboarding_responses';
+export type ResourceType = 'user' | 'program' | 'lesson' | 'onboarding_config' | 'onboarding_responses' | 'subcategory';
 
 export const AUDIT_ACTIONS: AuditAction[] = [
   'create',
@@ -39,7 +39,7 @@ export const AUDIT_ACTIONS: AuditAction[] = [
   'onboarding.deleted',
   'onboarding.exported'
 ];
-export const RESOURCE_TYPES: ResourceType[] = ['user', 'program', 'lesson', 'onboarding_config', 'onboarding_responses'];
+export const RESOURCE_TYPES: ResourceType[] = ['user', 'program', 'lesson', 'onboarding_config', 'onboarding_responses', 'subcategory'];
 // ============================================================================
 // Firestore Document Interface (snake_case)
 // ============================================================================
