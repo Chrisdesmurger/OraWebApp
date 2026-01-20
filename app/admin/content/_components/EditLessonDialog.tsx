@@ -506,35 +506,46 @@ export function EditLessonDialog({
           </div>
 
           {/* Subcategory */}
-          {lesson.category && subcategories.length > 0 && (
+          {lesson.category && (
             <div className="space-y-2">
               <Label htmlFor="subcategoryId">Subcategory</Label>
-              <Select
-                value={selectedSubcategoryId || 'none'}
-                onValueChange={(value) =>
-                  setSelectedSubcategoryId(value === 'none' ? null : value)
-                }
-                disabled={isSubmitting || loadingSubcategories}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a subcategory (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    <span className="text-muted-foreground">No subcategory</span>
-                  </SelectItem>
-                  {subcategories.map((sub) => (
-                    <SelectItem key={sub.id} value={sub.id}>
-                      {sub.name.fr}
-                      {sub.name.en && (
-                        <span className="text-muted-foreground ml-2">
-                          ({sub.name.en})
-                        </span>
-                      )}
+              {loadingSubcategories ? (
+                <div className="text-sm text-muted-foreground">Loading subcategories...</div>
+              ) : subcategories.length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  No subcategories available for {lesson.category}.
+                  <a href="/admin/subcategories" className="text-primary ml-1 underline">
+                    Create subcategories
+                  </a>
+                </div>
+              ) : (
+                <Select
+                  value={selectedSubcategoryId || 'none'}
+                  onValueChange={(value) =>
+                    setSelectedSubcategoryId(value === 'none' ? null : value)
+                  }
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a subcategory (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-muted-foreground">No subcategory</span>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {subcategories.map((sub) => (
+                      <SelectItem key={sub.id} value={sub.id}>
+                        {sub.name.fr}
+                        {sub.name.en && (
+                          <span className="text-muted-foreground ml-2">
+                            ({sub.name.en})
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <p className="text-xs text-muted-foreground">
                 Subcategories are used to group lessons in horizontal carousels on the mobile app
               </p>
