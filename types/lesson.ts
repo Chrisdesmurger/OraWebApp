@@ -465,8 +465,23 @@ export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson 
       }
     : null;
 
-  // Get category (simple enum)
-  const category = doc.category || null;
+  // Get category (simple enum) with normalization for legacy values
+  // Some lessons may have old category values that need to be mapped
+  const normalizeCategory = (cat: string | null | undefined): LessonCategory | null => {
+    if (!cat) return null;
+    const categoryMap: Record<string, LessonCategory> = {
+      'yoga': 'yoga',
+      'pilates': 'pilates',
+      'meditation': 'meditation',
+      'respiration': 'respiration',
+      'breathing': 'respiration',  // Legacy value
+      'auto-massage': 'auto-massage',
+      'self_massage': 'auto-massage',  // Legacy value
+      'self-massage': 'auto-massage',  // Alternative legacy value
+    };
+    return categoryMap[cat.toLowerCase()] || (cat as LessonCategory);
+  };
+  const category = normalizeCategory(doc.category);
 
   // Build multilingual transcript
   const transcript: MultilingualText | null = doc.transcript_fr || doc.transcript_en || doc.transcript_es || doc.transcript
