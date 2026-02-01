@@ -43,15 +43,6 @@ export const onUserCreate = functions
         process.env.NEXT_PUBLIC_APP_URL ||
         'https://ora-wellbeing.com';
 
-      // Generate unsubscribe token
-      const unsubscribeToken = Buffer.from(
-        JSON.stringify({
-          userId: user.uid,
-          email,
-          exp: Date.now() + 30 * 24 * 60 * 60 * 1000,
-        })
-      ).toString('base64url');
-
       // Call the Next.js API to send the welcome email
       const response = await fetch(`${baseUrl}/api/email/welcome`, {
         method: 'POST',

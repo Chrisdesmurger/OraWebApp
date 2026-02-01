@@ -8,9 +8,6 @@
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import { Resend } from 'resend';
-
-const resend = new Resend(functions.config().resend?.api_key || process.env.RESEND_API_KEY);
 
 // Initialize admin if not already initialized
 if (!admin.apps.length) {
@@ -172,19 +169,6 @@ async function sendInactivityEmail(
         { year: 'numeric', month: 'long', day: 'numeric' }
       )
     : '';
-
-  const subjects: Record<string, Record<string, string>> = {
-    inactivity_7d: {
-      fr: 'Vous nous manquez ! Reprenez votre pratique',
-      en: 'We miss you! Resume your practice',
-      es: 'Te echamos de menos! Retoma tu practica',
-    },
-    inactivity_30d: {
-      fr: 'Il est temps de reprendre votre pratique bien-etre',
-      en: "It's time to resume your wellness practice",
-      es: 'Es hora de retomar tu practica de bienestar',
-    },
-  };
 
   try {
     // Call the Next.js API to send the email (which handles template rendering)
