@@ -22,26 +22,47 @@ import {
   FileText,
   Settings,
   RefreshCw,
+  Download,
+  TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+interface TimeSeriesPoint {
+  date: string;
+  sent: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  bounced: number;
+}
 
 interface EmailStats {
-  totalSent: number;
-  totalDelivered: number;
-  totalOpened: number;
-  totalClicked: number;
-  totalFailed: number;
-  deliveryRate: number;
-  openRate: number;
-  clickRate: number;
-  last7Days: {
-    sent: number;
-    delivered: number;
-    opened: number;
+  summary: {
+    totalSent: number;
+    totalDelivered: number;
+    totalOpened: number;
+    totalClicked: number;
+    totalFailed: number;
+    totalBounced: number;
+    deliveryRate: number;
+    openRate: number;
+    clickRate: number;
+    bounceRate: number;
   };
+  byType: Record<string, { sent: number; delivered: number; opened: number }>;
+  timeSeries: TimeSeriesPoint[];
+  period: string;
+  breakdown: string;
 }
 
 interface RecentEmail {
@@ -58,12 +79,14 @@ export default function EmailDashboard() {
   const [stats, setStats] = React.useState<EmailStats | null>(null);
   const [recentEmails, setRecentEmails] = React.useState<RecentEmail[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [period, setPeriod] = React.useState('30d');
+  const [exporting, setExporting] = React.useState(false);
 
   const fetchEmailStats = React.useCallback(async () => {
     try {
       setLoading(true);
       const [statsRes, logsRes] = await Promise.all([
-        fetchWithAuth('/api/email/stats'),
+        fetchWithAuth(`/api/email/stats?period=${period}`),
         fetchWithAuth('/api/email/logs?limit=10'),
       ]);
 
@@ -81,7 +104,29 @@ export default function EmailDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [period]);
+
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const response = await fetchWithAuth('/api/email/logs/export');
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `email-logs-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error('Error exporting logs:', error);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   React.useEffect(() => {
     fetchEmailStats();
@@ -122,6 +167,21 @@ export default function EmailDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="Period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7d">7 days</SelectItem>
+              <SelectItem value="30d">30 days</SelectItem>
+              <SelectItem value="90d">90 days</SelectItem>
+              <SelectItem value="all">All time</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={handleExport} disabled={exporting}>
+            <Download className={`mr-2 h-4 w-4 ${exporting ? 'animate-pulse' : ''}`} />
+            Export
+          </Button>
           <Button variant="outline" onClick={fetchEmailStats} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -139,33 +199,98 @@ export default function EmailDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Emails Sent"
-          value={stats?.totalSent ?? 0}
+          value={stats?.summary?.totalSent ?? 0}
           icon={<Send className="h-4 w-4" />}
           isLoading={loading}
-          changeLabel={`${stats?.last7Days?.sent ?? 0} last 7 days`}
+          changeLabel={`${stats?.summary?.totalDelivered ?? 0} delivered`}
         />
         <KpiCard
           title="Delivery Rate"
-          value={`${stats?.deliveryRate?.toFixed(1) ?? 0}%`}
+          value={`${stats?.summary?.deliveryRate ?? 0}%`}
           icon={<CheckCircle className="h-4 w-4" />}
           isLoading={loading}
-          changeLabel={`${stats?.totalDelivered ?? 0} delivered`}
+          changeLabel={`${stats?.summary?.bounceRate ?? 0}% bounced`}
         />
         <KpiCard
           title="Open Rate"
-          value={`${stats?.openRate?.toFixed(1) ?? 0}%`}
+          value={`${stats?.summary?.openRate ?? 0}%`}
           icon={<Eye className="h-4 w-4" />}
           isLoading={loading}
-          changeLabel={`${stats?.totalOpened ?? 0} opened`}
+          changeLabel={`${stats?.summary?.totalOpened ?? 0} opened`}
         />
         <KpiCard
           title="Click Rate"
-          value={`${stats?.clickRate?.toFixed(1) ?? 0}%`}
+          value={`${stats?.summary?.clickRate ?? 0}%`}
           icon={<MousePointer className="h-4 w-4" />}
           isLoading={loading}
-          changeLabel={`${stats?.totalClicked ?? 0} clicked`}
+          changeLabel={`${stats?.summary?.totalClicked ?? 0} clicked`}
         />
       </div>
+
+      {/* Time Series Chart */}
+      {stats?.timeSeries && stats.timeSeries.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Email Activity Over Time
+            </CardTitle>
+            <CardDescription>
+              Daily email performance for the selected period
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64 flex items-end gap-1">
+              {stats.timeSeries.slice(-30).map((point, index) => {
+                const maxSent = Math.max(...stats.timeSeries.map(p => p.sent), 1);
+                const heightPercent = (point.sent / maxSent) * 100;
+                const deliveredPercent = point.sent > 0 ? (point.delivered / point.sent) * 100 : 0;
+
+                return (
+                  <div
+                    key={point.date}
+                    className="flex-1 flex flex-col items-center group relative"
+                  >
+                    <div className="w-full flex flex-col justify-end h-48">
+                      <div
+                        className="w-full bg-orange-200 dark:bg-orange-900 rounded-t transition-all"
+                        style={{ height: `${heightPercent}%`, minHeight: point.sent > 0 ? '4px' : '0' }}
+                      >
+                        <div
+                          className="w-full bg-orange-500 rounded-t"
+                          style={{ height: `${deliveredPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                    {index % 5 === 0 && (
+                      <span className="text-[10px] text-muted-foreground mt-1 transform -rotate-45 origin-left">
+                        {new Date(point.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                      </span>
+                    )}
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 hidden group-hover:block bg-popover border rounded-lg p-2 shadow-lg z-10 text-xs whitespace-nowrap">
+                      <div className="font-medium">{new Date(point.date).toLocaleDateString('fr-FR')}</div>
+                      <div>Sent: {point.sent}</div>
+                      <div>Delivered: {point.delivered}</div>
+                      <div>Opened: {point.opened}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-center gap-6 mt-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-orange-500 rounded" />
+                <span className="text-muted-foreground">Delivered</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-orange-200 dark:bg-orange-900 rounded" />
+                <span className="text-muted-foreground">Sent (pending)</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         {/* Recent Emails */}
@@ -266,16 +391,16 @@ export default function EmailDashboard() {
             </div>
 
             {/* Error Summary */}
-            {stats && stats.totalFailed > 0 && (
+            {stats && (stats.summary?.totalFailed > 0 || stats.summary?.totalBounced > 0) && (
               <div className="mt-6 p-4 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
                 <div className="flex items-center">
                   <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
                   <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                    {stats.totalFailed} failed emails
+                    {(stats.summary?.totalFailed || 0) + (stats.summary?.totalBounced || 0)} delivery issues
                   </span>
                 </div>
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                  Check logs for delivery issues
+                  {stats.summary?.totalBounced || 0} bounced, {stats.summary?.totalFailed || 0} failed
                 </p>
               </div>
             )}
