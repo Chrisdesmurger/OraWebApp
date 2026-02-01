@@ -4,6 +4,7 @@ import {
   Auth,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithCustomToken as firebaseSignInWithCustomToken,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged,
@@ -86,6 +87,14 @@ export async function signInWithGoogle() {
 export async function signOut() {
   const auth = getFirebaseAuth();
   return firebaseSignOut(auth);
+}
+
+/**
+ * Sign in with custom token (for magic link authentication)
+ */
+export async function signInWithCustomToken(customToken: string) {
+  const auth = getFirebaseAuth();
+  return firebaseSignInWithCustomToken(auth, customToken);
 }
 
 /**
