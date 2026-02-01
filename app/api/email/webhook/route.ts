@@ -90,7 +90,7 @@ function verifyWebhookSignature(
       ? signatureParts[1]
       : signature;
 
-    return crypto.timingSafeEquals(
+    return crypto.timingSafeEqual(
       Buffer.from(expectedSignature),
       Buffer.from(receivedSignature)
     );
