@@ -10,11 +10,23 @@ import type { EmailType } from '@/types/email';
 
 // Import available templates directly
 // Only import templates that exist - others will be added as they're created
+
+// Authentication - Phase 2
 import { MagicLinkEmail } from '@/emails/auth/MagicLinkEmail';
 import { PasswordResetEmail } from '@/emails/auth/PasswordResetEmail';
 import { SecurityAlertEmail } from '@/emails/auth/SecurityAlertEmail';
+
+// Welcome - Phase 3
 import { WelcomeEmail } from '@/emails/welcome/WelcomeEmail';
 import { OnboardingCompleteEmail } from '@/emails/welcome/OnboardingCompleteEmail';
+
+// Engagement - Phase 6
+import { InactivityReminderEmail } from '@/emails/engagement/InactivityReminderEmail';
+import { StreakMilestoneEmail } from '@/emails/engagement/StreakMilestoneEmail';
+
+// Marketing - Phase 6
+import { NewContentEmail } from '@/emails/marketing/NewContentEmail';
+import { WeeklyDigestEmail } from '@/emails/marketing/WeeklyDigestEmail';
 
 // ============================================================================
 // Template Component Registry
@@ -27,14 +39,26 @@ const templateRegistry: Partial<Record<EmailType, ComponentType<any>>> = {
   magic_link: MagicLinkEmail,
   password_reset: PasswordResetEmail,
   security_alert: SecurityAlertEmail,
+
   // Welcome - Phase 3
   welcome: WelcomeEmail,
   onboarding_complete: OnboardingCompleteEmail,
-  // Other templates will be added in future phases:
+
+  // Engagement - Phase 6
+  inactivity_7d: InactivityReminderEmail,
+  inactivity_30d: InactivityReminderEmail, // Same template, different content based on context
+  streak_milestone: StreakMilestoneEmail,
+
+  // Marketing - Phase 6
+  new_content: NewContentEmail,
+  weekly_digest: WeeklyDigestEmail,
+
+  // TODO: Future templates
   // email_verification (Phase 2)
-  // engagement templates (Phase 6)
-  // marketing templates (Phase 6)
-  // transactional templates (Phase 6)
+  // first_completion (Phase 6)
+  // program_complete (Phase 6)
+  // program_recommendation (Phase 6)
+  // subscription_confirmed, subscription_expiring, payment_failed (Transactional)
 };
 
 /**
