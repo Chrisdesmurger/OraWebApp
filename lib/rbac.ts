@@ -41,6 +41,12 @@ export interface RBACPermissions {
 
   // Audit logs
   canViewAuditLogs: boolean;
+
+  // Email management
+  canViewEmailTemplates: boolean;
+  canEditEmailTemplates: boolean;
+  canSendEmails: boolean;
+  canViewEmailLogs: boolean;
 }
 
 /**
@@ -78,6 +84,11 @@ export function getPermissions(role: UserRole): RBACPermissions {
         canViewAdvancedStats: true,
 
         canViewAuditLogs: true,
+
+        canViewEmailTemplates: true,
+        canEditEmailTemplates: true,
+        canSendEmails: true,
+        canViewEmailLogs: true,
       };
 
     case 'teacher':
@@ -110,6 +121,11 @@ export function getPermissions(role: UserRole): RBACPermissions {
         canViewAdvancedStats: false,
 
         canViewAuditLogs: false,
+
+        canViewEmailTemplates: true,
+        canEditEmailTemplates: false,
+        canSendEmails: false,
+        canViewEmailLogs: false,
       };
 
     case 'viewer':
@@ -142,6 +158,11 @@ export function getPermissions(role: UserRole): RBACPermissions {
         canViewAdvancedStats: false,
 
         canViewAuditLogs: false,
+
+        canViewEmailTemplates: false,
+        canEditEmailTemplates: false,
+        canSendEmails: false,
+        canViewEmailLogs: false,
       };
   }
 }
@@ -176,6 +197,10 @@ export function canAccessRoute(role: UserRole, route: string): boolean {
 
   if (route.startsWith('/admin/audit-logs')) {
     return hasPermission(role, 'canViewAuditLogs');
+  }
+
+  if (route.startsWith('/admin/email')) {
+    return hasPermission(role, 'canViewEmailTemplates');
   }
 
   if (route.startsWith('/admin')) {

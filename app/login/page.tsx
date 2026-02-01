@@ -8,12 +8,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Mail, Lock, Wand2, CheckCircle2 } from 'lucide-react';
+
+type LoginMethod = 'password' | 'magic-link';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>('password');
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/admin';
@@ -43,6 +49,34 @@ function LoginForm() {
     }
   };
 
+  const handleMagicLinkLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    setMagicLinkSent(false);
+
+    try {
+      const response = await fetch('/api/auth/magic-link/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, language: 'fr' }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send magic link');
+      }
+
+      setMagicLinkSent(true);
+    } catch (err: any) {
+      console.error('Magic link error:', err);
+      setError(err.message || 'Failed to send magic link. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGoogleLogin = async () => {
     setError('');
     setLoading(true);
@@ -67,6 +101,12 @@ function LoginForm() {
     }
   };
 
+  const handleTabChange = (value: string) => {
+    setLoginMethod(value as LoginMethod);
+    setError('');
+    setMagicLinkSent(false);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 p-4">
       <Card className="w-full max-w-md">
@@ -83,35 +123,98 @@ function LoginForm() {
             </Alert>
           )}
 
-          <form onSubmit={handleEmailLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="admin@ora.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign in with Email'}
-            </Button>
-          </form>
+          <Tabs value={loginMethod} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="password" className="flex items-center gap-2">
+                <Lock className="h-4 w-4" />
+                Password
+              </TabsTrigger>
+              <TabsTrigger value="magic-link" className="flex items-center gap-2">
+                <Wand2 className="h-4 w-4" />
+                Magic Link
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="password" className="space-y-4 mt-4">
+              <form onSubmit={handleEmailLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email-password">Email</Label>
+                  <Input
+                    id="email-password"
+                    type="email"
+                    placeholder="admin@ora.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Signing in...' : 'Sign in with Email'}
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="magic-link" className="space-y-4 mt-4">
+              {magicLinkSent ? (
+                <div className="text-center py-6 space-y-4">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                    <CheckCircle2 className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Check your email</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      We sent a login link to <strong>{email}</strong>
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    The link will expire in 1 hour. If you don't see the email, check your spam folder.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => setMagicLinkSent(false)}
+                    className="mt-4"
+                  >
+                    Use a different email
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleMagicLinkLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email-magic">Email</Label>
+                    <Input
+                      id="email-magic"
+                      type="email"
+                      placeholder="admin@ora.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    We'll send you a magic link to sign in without a password.
+                  </p>
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    <Mail className="mr-2 h-4 w-4" />
+                    {loading ? 'Sending...' : 'Send Magic Link'}
+                  </Button>
+                </form>
+              )}
+            </TabsContent>
+          </Tabs>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
