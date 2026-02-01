@@ -7,7 +7,7 @@
  * completes the authentication flow.
  */
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signInWithCustomToken } from '@/lib/firebase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +24,7 @@ interface VerificationResult {
   error?: string;
 }
 
-export default function MagicLinkVerifyPage() {
+function MagicLinkVerifyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -167,5 +167,22 @@ export default function MagicLinkVerifyPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function MagicLinkVerifyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
+            <p className="mt-4 text-muted-foreground">Loading...</p>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <MagicLinkVerifyContent />
+    </Suspense>
   );
 }

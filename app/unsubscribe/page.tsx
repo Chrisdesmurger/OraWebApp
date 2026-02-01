@@ -8,6 +8,7 @@
  */
 
 import * as React from 'react';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,12 +30,11 @@ interface UnsubscribeOption {
   label: string;
 }
 
-export default function UnsubscribePage() {
+function UnsubscribeContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
   const [loading, setLoading] = React.useState(true);
-  const [verifying, setVerifying] = React.useState(true);
   const [email, setEmail] = React.useState<string>('');
   const [options, setOptions] = React.useState<UnsubscribeOption[]>([]);
   const [selectedType, setSelectedType] = React.useState<UnsubscribeType>('all');
@@ -47,7 +47,6 @@ export default function UnsubscribePage() {
     if (!token) {
       setError('Missing unsubscribe token. Please use the link from your email.');
       setLoading(false);
-      setVerifying(false);
       return;
     }
 
@@ -70,7 +69,6 @@ export default function UnsubscribePage() {
       setError('Failed to verify unsubscribe link. Please try again.');
     } finally {
       setLoading(false);
-      setVerifying(false);
     }
   }
 
@@ -246,5 +244,22 @@ export default function UnsubscribePage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function UnsubscribePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-orange-500 mb-4" />
+            <p className="text-muted-foreground">Loading...</p>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <UnsubscribeContent />
+    </Suspense>
   );
 }
