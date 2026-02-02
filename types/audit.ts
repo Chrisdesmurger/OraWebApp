@@ -27,7 +27,7 @@ export type AuditAction =
   | 'email_sent'
   | 'email_send_failed';
 
-export type ResourceType = 'user' | 'program' | 'lesson' | 'onboarding_config' | 'onboarding_responses' | 'email' | 'email_template';
+export type ResourceType = 'user' | 'program' | 'lesson' | 'onboarding_config' | 'onboarding_responses' | 'subcategory' | 'email' | 'email_template';
 
 export const AUDIT_ACTIONS: AuditAction[] = [
   'create',
@@ -43,7 +43,7 @@ export const AUDIT_ACTIONS: AuditAction[] = [
   'email_sent',
   'email_send_failed'
 ];
-export const RESOURCE_TYPES: ResourceType[] = ['user', 'program', 'lesson', 'onboarding_config', 'onboarding_responses', 'email', 'email_template'];
+export const RESOURCE_TYPES: ResourceType[] = ['user', 'program', 'lesson', 'onboarding_config', 'onboarding_responses', 'subcategory', 'email', 'email_template'];
 // ============================================================================
 // Firestore Document Interface (snake_case)
 // ============================================================================

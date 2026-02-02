@@ -239,6 +239,25 @@ service cloud.firestore {
     }
 
     // ==========================================
+    // COLLECTION: subcategories/{subcategoryId}
+    // Admin Web: Subcategory management for organizing lessons
+    // Android App: Read access for displaying category details
+    // ==========================================
+    match /subcategories/{subcategoryId} {
+      // Read: All authenticated users can read subcategories
+      allow read: if isAuthenticated();
+
+      // Create: Admin only
+      allow create: if isAdmin() && validateSubcategory(request.resource.data);
+
+      // Update: Admin only
+      allow update: if isAdmin() && validateSubcategory(request.resource.data);
+
+      // Delete: Admin only
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================
     // VALIDATION FUNCTIONS
     // ==========================================
 
@@ -260,7 +279,7 @@ service cloud.firestore {
           && data.description is string
           && data.description.size() >= 10
           && data.description.size() <= 1000
-          && data.category in ['meditation', 'yoga', 'mindfulness', 'wellness']
+          && data.category in ['yoga', 'pilates', 'meditation', 'respiration', 'auto-massage']
           && data.difficulty in ['beginner', 'intermediate', 'advanced']
           && data.duration_days is int
           && data.duration_days >= 1
@@ -297,6 +316,27 @@ service cloud.firestore {
       return !data.keys().hasAny(['yoga_poses']) ||
              (data.yoga_poses is list && data.yoga_poses.size() <= 50);
     }
+
+    // Validate subcategory data (snake_case fields)
+    // Required: category, name_fr, slug, display_order, status, created_by
+    // Categories must match types/lesson.ts LessonCategory type
+    function validateSubcategory(data) {
+      return data.category is string
+          && data.category in ['yoga', 'pilates', 'meditation', 'respiration', 'auto-massage']
+          && data.name_fr is string
+          && data.name_fr.size() >= 2
+          && data.name_fr.size() <= 100
+          && data.slug is string
+          && data.slug.size() >= 2
+          && data.slug.size() <= 100
+          && data.display_order is int
+          && data.display_order >= 0
+          && data.status is string
+          && data.status in ['active', 'inactive']
+          && data.created_by is string
+          && data.created_by.size() > 0;
+    }
+
 
     // ==========================================
     // DEFAULT DENY ALL OTHER COLLECTIONS

@@ -111,6 +111,10 @@ export interface LessonDocument {
   // Category (simple enum, not multilingual)
   category?: LessonCategory | null;
 
+  // Subcategory (Issue #XX - Subcategory system)
+  subcategory_id?: string | null;
+  subcategory_slug?: string | null;
+
   // Non-multilingual fields
   type: LessonType;
   program_id: string;
@@ -173,6 +177,10 @@ export interface Lesson {
 
   // Category (simple enum)
   category?: LessonCategory | null;
+
+  // Subcategory
+  subcategoryId?: string | null;
+  subcategorySlug?: string | null;
 
   // Non-multilingual fields
   type: LessonType;
@@ -283,6 +291,9 @@ export interface CreateLessonRequest {
 
   // Yoga poses (Issue #74)
   yogaPoses?: YogaPose[];
+
+  // Subcategory
+  subcategoryId?: string | null;
 }
 
 /**
@@ -311,6 +322,9 @@ export interface UpdateLessonRequest {
 
   // Yoga poses (Issue #74)
   yogaPoses?: YogaPose[];
+
+  // Subcategory
+  subcategoryId?: string | null;
 }
 
 /**
@@ -451,8 +465,23 @@ export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson 
       }
     : null;
 
-  // Get category (simple enum)
-  const category = doc.category || null;
+  // Get category (simple enum) with normalization for legacy values
+  // Some lessons may have old category values that need to be mapped
+  const normalizeCategory = (cat: string | null | undefined): LessonCategory | null => {
+    if (!cat) return null;
+    const categoryMap: Record<string, LessonCategory> = {
+      'yoga': 'yoga',
+      'pilates': 'pilates',
+      'meditation': 'meditation',
+      'respiration': 'respiration',
+      'breathing': 'respiration',  // Legacy value
+      'auto-massage': 'auto-massage',
+      'self_massage': 'auto-massage',  // Legacy value
+      'self-massage': 'auto-massage',  // Alternative legacy value
+    };
+    return categoryMap[cat.toLowerCase()] || (cat as LessonCategory);
+  };
+  const category = normalizeCategory(doc.category);
 
   // Build multilingual transcript
   const transcript: MultilingualText | null = doc.transcript_fr || doc.transcript_en || doc.transcript_es || doc.transcript
@@ -516,6 +545,9 @@ export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson 
     breathingInstruction,
     // Yoga poses (Issue #74)
     yogaPoses: doc.yoga_poses?.map(yogaPoseFromFirestore),
+    // Subcategory
+    subcategoryId: doc.subcategory_id ?? null,
+    subcategorySlug: doc.subcategory_slug ?? null,
   };
 }
 
@@ -674,6 +706,14 @@ export function mapLessonToFirestore(lesson: Partial<Lesson>): Partial<LessonDoc
   // Map yoga poses (Issue #74)
   if (lesson.yogaPoses !== undefined) {
     doc.yoga_poses = lesson.yogaPoses?.map(yogaPoseToFirestore);
+  }
+
+  // Map subcategory
+  if (lesson.subcategoryId !== undefined) {
+    doc.subcategory_id = lesson.subcategoryId;
+  }
+  if (lesson.subcategorySlug !== undefined) {
+    doc.subcategory_slug = lesson.subcategorySlug;
   }
 
   return doc;

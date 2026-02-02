@@ -32,6 +32,8 @@ import { YogaPoseEditor } from './YogaPoseEditor';
 import { ExternalLink } from 'lucide-react';
 import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
 import type { Lesson, UpdateLessonRequest, MultilingualText, YogaPose } from '@/types/lesson';
+import { LESSON_CATEGORY_LABELS } from '@/types/lesson';
+import type { Subcategory } from '@/types/subcategory';
 
 interface Program {
   id: string;
@@ -86,8 +88,11 @@ export function EditLessonDialog({
   const [error, setError] = React.useState<string | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
   const [yogaPoses, setYogaPoses] = React.useState<YogaPose[]>([]);
+  const [subcategories, setSubcategories] = React.useState<Subcategory[]>([]);
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = React.useState<string | null>(null);
+  const [loadingSubcategories, setLoadingSubcategories] = React.useState(false);
 
-  // Initialize preview image URL and yoga poses when lesson changes
+  // Initialize preview image URL, yoga poses, and subcategory when lesson changes
   React.useEffect(() => {
     if (lesson?.previewImageUrl) {
       setPreviewImageUrl(lesson.previewImageUrl);
@@ -101,7 +106,42 @@ export function EditLessonDialog({
     } else {
       setYogaPoses([]);
     }
+
+
+    // Initialize subcategory
+    setSelectedSubcategoryId(lesson?.subcategoryId || null);
   }, [lesson]);
+
+  // Fetch subcategories when lesson category is available
+  React.useEffect(() => {
+    const fetchSubcategories = async () => {
+      if (!lesson?.category) {
+        setSubcategories([]);
+        return;
+      }
+
+      setLoadingSubcategories(true);
+      try {
+        const response = await fetchWithAuth(
+          `/api/subcategories?category=${lesson.category}&status=active`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setSubcategories(data.subcategories || []);
+        } else {
+          console.error('Failed to fetch subcategories');
+          setSubcategories([]);
+        }
+      } catch (error) {
+        console.error('Error fetching subcategories:', error);
+        setSubcategories([]);
+      } finally {
+        setLoadingSubcategories(false);
+      }
+    };
+
+    fetchSubcategories();
+  }, [lesson?.category]);
 
   const handlePreviewImageUpload = (url: string) => {
     setPreviewImageUrl(url);
@@ -173,6 +213,8 @@ export function EditLessonDialog({
         transcript: data.transcript,
         // Include yoga poses for yoga/pilates lessons (Issue #74)
         yogaPoses: isYogaOrPilatesLesson ? yogaPoses : undefined,
+        // Include subcategory
+        subcategoryId: selectedSubcategoryId,
       };
 
       const response = await fetchWithAuth(`/api/lessons/${lesson.id}`, {
@@ -464,6 +506,66 @@ export function EditLessonDialog({
               <p className="text-sm text-red-500">{errors.programId.message}</p>
             )}
           </div>
+
+          {/* Category (read-only) */}
+          {lesson.category && (
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <div className="flex items-center h-10 px-3 py-2 rounded-md border border-input bg-muted text-muted-foreground">
+                {LESSON_CATEGORY_LABELS[lesson.category] || lesson.category}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Category cannot be changed after creation
+              </p>
+            </div>
+          )}
+
+          {/* Subcategory */}
+          {lesson.category && (
+            <div className="space-y-2">
+              <Label htmlFor="subcategoryId">Subcategory</Label>
+              {loadingSubcategories ? (
+                <div className="text-sm text-muted-foreground">Loading subcategories...</div>
+              ) : subcategories.length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  No subcategories available for {LESSON_CATEGORY_LABELS[lesson.category] || lesson.category}.
+                  <a href="/admin/subcategories" className="text-primary ml-1 underline">
+                    Create subcategories
+                  </a>
+                </div>
+              ) : (
+                <Select
+                  value={selectedSubcategoryId || 'none'}
+                  onValueChange={(value) =>
+                    setSelectedSubcategoryId(value === 'none' ? null : value)
+                  }
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a subcategory (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-muted-foreground">No subcategory</span>
+                    </SelectItem>
+                    {subcategories.map((sub) => (
+                      <SelectItem key={sub.id} value={sub.id}>
+                        {sub.name.fr}
+                        {sub.name.en && (
+                          <span className="text-muted-foreground ml-2">
+                            ({sub.name.en})
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Subcategories are used to group lessons in horizontal carousels on the mobile app
+              </p>
+            </div>
+          )}
 
           {/* Order */}
           <div className="space-y-2">

@@ -58,6 +58,7 @@ export async function GET(
  * - transcript: string | MultilingualText (optional)
  * - programId: string (optional) - Move to different program
  * - yogaPoses: YogaPose[] (optional) - Yoga poses for yoga/pilates lessons (Issue #74)
+ * - subcategoryId: string | null (optional) - Assign to a subcategory
  */
 export async function PATCH(
   request: NextRequest,

@@ -15,7 +15,8 @@
     "remove-role": "tsx scripts/remove-user-role.ts",
     "seed-onboarding": "tsx scripts/seed-onboarding.ts",
     "add-info-screens": "tsx scripts/add-information-screens.ts",
-    "import-personalization": "tsx scripts/import-personalization-config.ts"
+    "import-personalization": "tsx scripts/import-personalization-config.ts",
+    "seed-subcategories": "tsx scripts/seed-subcategories.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

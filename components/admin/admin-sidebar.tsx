@@ -20,6 +20,7 @@ import {
   Image,
   ClipboardList,
   Target,
+  Layers,
   Mail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,12 @@ const navItems: NavItem[] = [
     title: 'Content',
     href: '/admin/content',
     icon: BookOpen,
+    permission: 'canViewContent',
+  },
+  {
+    title: 'Subcategories',
+    href: '/admin/subcategories',
+    icon: Layers,
     permission: 'canViewContent',
   },
   {
