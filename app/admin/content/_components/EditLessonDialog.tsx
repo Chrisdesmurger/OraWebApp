@@ -107,6 +107,7 @@ export function EditLessonDialog({
       setYogaPoses([]);
     }
 
+
     // Initialize subcategory
     setSelectedSubcategoryId(lesson?.subcategoryId || null);
   }, [lesson]);

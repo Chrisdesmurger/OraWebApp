@@ -21,6 +21,7 @@ import {
   ClipboardList,
   Target,
   Layers,
+  Mail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -95,6 +96,12 @@ const navItems: NavItem[] = [
     href: '/admin/audit-logs',
     icon: FileText,
     permission: 'canViewAuditLogs',
+  },
+  {
+    title: 'Email',
+    href: '/admin/email',
+    icon: Mail,
+    permission: 'canViewEmailTemplates',
   },
 ];
 

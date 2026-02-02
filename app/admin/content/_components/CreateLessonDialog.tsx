@@ -505,6 +505,7 @@ export function CreateLessonDialog({
             </div>
           )}
 
+
           {/* Program */}
           <div className="space-y-2">
             <Label htmlFor="programId">Program</Label>

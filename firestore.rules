@@ -337,6 +337,7 @@ service cloud.firestore {
           && data.created_by.size() > 0;
     }
 
+
     // ==========================================
     // DEFAULT DENY ALL OTHER COLLECTIONS
     // ==========================================
