@@ -15,8 +15,10 @@ import {
   transcodeVideo,
   transcodeAudio,
   generateThumbnail,
-  VIDEO_RENDITIONS,
   AUDIO_VARIANTS,
+  getRenditionsForContentType,
+  getEffectiveAspectMode,
+  DEFAULT_ASPECT_CONFIG,
 } from './utils/ffmpeg-wrapper';
 
 // Initialize Firebase Admin SDK
@@ -75,7 +77,9 @@ export const transcodeOnFinalize = functions.storage.onObjectFinalized(
       }
 
       const lessonType = lessonData.type as 'video' | 'audio';
+      const lessonCategory = lessonData.category as string | null | undefined;
       console.log('📹 Lesson type:', lessonType);
+      console.log('📂 Lesson category:', lessonCategory || 'none');
 
       // Update status to 'processing'
       await lessonRef.update({
@@ -105,6 +109,9 @@ export const transcodeOnFinalize = functions.storage.onObjectFinalized(
       const renditions: any = {};
       const audioVariants: any = {};
 
+      // Determine aspect conversion mode for metadata (Issue #88)
+      let aspectConversionMode: 'crop' | 'letterbox' | 'none' | null = null;
+
       if (lessonType === 'video') {
         // Generate thumbnail
         const thumbnailPath = path.join(tempDir, 'thumb.jpg');
@@ -120,13 +127,29 @@ export const transcodeOnFinalize = functions.storage.onObjectFinalized(
           console.warn('⚠️  Thumbnail generation failed (non-critical):', thumbError);
         }
 
+        // Get content-type specific renditions (Issue #87)
+        const videoRenditions = getRenditionsForContentType(lessonCategory);
+        console.log(`🎬 Using ${lessonCategory || 'default'} video profile (${videoRenditions[0].bitrate} high bitrate)`);
+
+        // Calculate aspect conversion mode (Issue #88)
+        if (metadata.width && metadata.height) {
+          aspectConversionMode = getEffectiveAspectMode(
+            metadata.width,
+            metadata.height,
+            DEFAULT_ASPECT_CONFIG.targetRatio,
+            DEFAULT_ASPECT_CONFIG.mode
+          );
+          console.log(`📐 Aspect conversion mode: ${aspectConversionMode}`);
+        }
+
         // Transcode video renditions
-        for (const config of VIDEO_RENDITIONS) {
+        for (const config of videoRenditions) {
           const outputPath = path.join(tempDir, `${config.quality}.mp4`);
           const storagePath = `media/lessons/${lessonId}/video/${config.quality}.mp4`;
 
           try {
-            await transcodeVideo(tempInputPath, outputPath, config);
+            // Pass metadata for aspect ratio handling (Issue #86)
+            await transcodeVideo(tempInputPath, outputPath, config, metadata, DEFAULT_ASPECT_CONFIG);
 
             // Upload to Storage
             await bucket.upload(outputPath, {
@@ -187,6 +210,13 @@ export const transcodeOnFinalize = functions.storage.onObjectFinalized(
       if (lessonType === 'video') {
         updateData.renditions = renditions;
         updateData.thumbnail_url = `media/lessons/${lessonId}/thumb.jpg`;
+
+        // Add aspect ratio metadata (Issue #88)
+        updateData.source_aspect_ratio = metadata.width && metadata.height
+          ? `${metadata.width}:${metadata.height}`
+          : null;
+        updateData.output_aspect_ratio = '16:9';
+        updateData.aspect_conversion_mode = aspectConversionMode;
       } else {
         updateData.audio_variants = audioVariants;
       }
