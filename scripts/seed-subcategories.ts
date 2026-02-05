@@ -1,10 +1,10 @@
 /**
- * Script de seed pour créer les sous-catégories initiales
+ * Script de seed pour creer les sous-categories initiales
  *
  * Usage: npx tsx scripts/seed-subcategories.ts
  *
  * Prerequisites:
- * - Set FIREBASE_SERVICE_ACCOUNT_JSON in .env.local
+ * - Set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY in .env.local
  */
 
 import * as dotenv from 'dotenv';
@@ -13,9 +13,19 @@ import { resolve } from 'path';
 // Load .env.local
 dotenv.config({ path: resolve(__dirname, '../.env.local') });
 
-import { getFirestore } from '../lib/firebase/admin';
+import { createClient } from '@supabase/supabase-js';
 import { generateSlug, type SubcategoryDocument } from '../types/subcategory';
 import type { LessonCategory } from '../types/lesson';
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface SubcategoryData {
   category: LessonCategory;
@@ -56,24 +66,29 @@ const SUBCATEGORIES: SubcategoryData[] = [
 async function seedSubcategories() {
   console.log('Seeding subcategories...\n');
 
-  const db = getFirestore();
-  const subcategoriesRef = db.collection('subcategories');
-
   // Check existing subcategories
-  const existingSnapshot = await subcategoriesRef.get();
-  if (!existingSnapshot.empty) {
-    console.log(`Found ${existingSnapshot.size} existing subcategories.`);
+  const { data: existingRows, error: fetchError } = await supabase
+    .from('subcategories')
+    .select('category, slug');
+
+  if (fetchError) {
+    throw new Error(`Failed to fetch existing subcategories: ${fetchError.message}`);
+  }
+
+  if (existingRows && existingRows.length > 0) {
+    console.log(`Found ${existingRows.length} existing subcategories.`);
     console.log('Do you want to skip existing ones? (Script will only add new ones)\n');
   }
 
   const existingSlugs = new Map<string, Set<string>>();
-  existingSnapshot.docs.forEach((doc) => {
-    const data = doc.data();
-    if (!existingSlugs.has(data.category)) {
-      existingSlugs.set(data.category, new Set());
-    }
-    existingSlugs.get(data.category)!.add(data.slug);
-  });
+  if (existingRows) {
+    existingRows.forEach((row) => {
+      if (!existingSlugs.has(row.category)) {
+        existingSlugs.set(row.category, new Set());
+      }
+      existingSlugs.get(row.category)!.add(row.slug);
+    });
+  }
 
   const now = new Date().toISOString();
   let created = 0;
@@ -107,7 +122,15 @@ async function seedSubcategories() {
       Object.entries(docData).filter(([_, v]) => v !== undefined)
     ) as SubcategoryDocument;
 
-    await subcategoriesRef.add(filteredData);
+    const { error: insertError } = await supabase
+      .from('subcategories')
+      .insert(filteredData);
+
+    if (insertError) {
+      console.error(`  [ERROR] ${sub.category}/${slug}: ${insertError.message}`);
+      continue;
+    }
+
     console.log(`  [CREATE] ${sub.category}/${slug}: "${sub.nameFr}"`);
     created++;
   }

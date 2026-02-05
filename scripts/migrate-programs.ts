@@ -7,7 +7,17 @@
  * - Adds missing fields: category, difficulty, duration_days, lessons, tags
  */
 
-import { getFirestore } from '../lib/firebase/admin';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface OldProgram {
   title: string;
@@ -23,6 +33,9 @@ interface OldProgram {
   published?: boolean;
   duration?: number;
   lessonCount?: number;
+  // Also check for already-migrated snake_case fields
+  author_id?: string;
+  created_at?: string;
 }
 
 interface NewProgram {
@@ -45,15 +58,20 @@ const DEFAULT_AUTHOR = 'admin-migration';
 async function migratePrograms() {
   console.log('🔄 Starting programs migration...\n');
 
-  const firestore = getFirestore();
-  const programsRef = firestore.collection('programs');
-
   try {
     // Fetch all existing programs
-    const snapshot = await programsRef.get();
-    console.log(`📊 Found ${snapshot.size} programs to migrate\n`);
+    const { data: rows, error } = await supabase
+      .from('programs')
+      .select('*');
 
-    if (snapshot.empty) {
+    if (error) {
+      throw error;
+    }
+
+    const programs = rows || [];
+    console.log(`📊 Found ${programs.length} programs to migrate\n`);
+
+    if (programs.length === 0) {
       console.log('✅ No programs to migrate');
       return;
     }
@@ -62,13 +80,13 @@ async function migratePrograms() {
     let skipped = 0;
     let errors = 0;
 
-    for (const doc of snapshot.docs) {
-      const oldData = doc.data() as OldProgram;
+    for (const row of programs) {
+      const oldData = row as OldProgram & { id: string };
 
-      console.log(`📝 Processing: ${doc.id} - "${oldData.title}"`);
+      console.log(`📝 Processing: ${oldData.id} - "${oldData.title}"`);
 
       // Check if already migrated (has snake_case fields)
-      if ('author_id' in oldData || 'created_at' in oldData) {
+      if (oldData.author_id || oldData.created_at) {
         console.log(`  ⏭️  Skipped (already migrated)\n`);
         skipped++;
         continue;
@@ -126,8 +144,14 @@ async function migratePrograms() {
           updated_at: oldData.updatedAt || new Date().toISOString(),
         };
 
-        // Update the document
-        await programsRef.doc(doc.id).set(newData);
+        // Update the row (upsert to overwrite all fields)
+        const { error: upsertError } = await supabase
+          .from('programs')
+          .upsert({ id: oldData.id, ...newData });
+
+        if (upsertError) {
+          throw upsertError;
+        }
 
         console.log(`  ✅ Migrated successfully`);
         console.log(`     Category: ${category} | Difficulty: ${difficulty} | Status: ${status}\n`);
@@ -143,7 +167,7 @@ async function migratePrograms() {
     console.log(`   ✅ Migrated: ${migrated}`);
     console.log(`   ⏭️  Skipped: ${skipped}`);
     console.log(`   ❌ Errors: ${errors}`);
-    console.log(`   📊 Total: ${snapshot.size}\n`);
+    console.log(`   📊 Total: ${programs.length}\n`);
 
     if (errors === 0) {
       console.log('✨ Migration completed successfully!\n');

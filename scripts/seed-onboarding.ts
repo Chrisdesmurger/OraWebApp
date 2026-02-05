@@ -1,11 +1,11 @@
 /**
- * Script de seed pour créer une configuration d'onboarding de test
+ * Script de seed pour creer une configuration d'onboarding de test
  * Utilise tous les 9 types de layouts modernes
  *
  * Usage: npm run seed-onboarding
  *
  * Prerequisites:
- * - Set FIREBASE_SERVICE_ACCOUNT_JSON in .env.local
+ * - Set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY in .env.local
  */
 
 import * as dotenv from 'dotenv';
@@ -14,19 +14,26 @@ import { resolve } from 'path';
 // Load .env.local
 dotenv.config({ path: resolve(__dirname, '../.env.local') });
 
-import { getFirestore } from '../lib/firebase/admin';
+import { createClient } from '@supabase/supabase-js';
 import type { OnboardingConfig, OnboardingQuestion, AnswerOption } from '../types/onboarding';
 
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
 async function seedOnboarding() {
-  console.log('🌱 Démarrage du seed d\'onboarding...\n');
+  console.log('Demarrage du seed d\'onboarding...\n');
 
-  const db = getFirestore();
-  const onboardingRef = db.collection('onboarding_configs');
-
-  // Créer l'ID de la configuration
+  // Creer l'ID de la configuration
   const configId = 'test-layouts-v1';
 
-  // Question 1: Grid Selection - Objectifs de bien-être
+  // Question 1: Grid Selection - Objectifs de bien-etre
   const q1Options: AnswerOption[] = [
     { id: 'opt_meditate', label: 'Méditer', labelFr: 'Méditer', labelEn: 'Meditate', icon: '🧘', color: '#FFB84D', order: 0 },
     { id: 'opt_sleep', label: 'Mieux dormir', labelFr: 'Mieux dormir', labelEn: 'Sleep Better', icon: '😴', color: '#9B72CB', order: 1 },
@@ -36,7 +43,7 @@ async function seedOnboarding() {
     { id: 'opt_mental', label: 'Santé mentale', labelFr: 'Santé mentale', labelEn: 'Mental Health', icon: '🧠', color: '#95E1D3', order: 5 },
   ];
 
-  // Question 2: Toggle List - Domaines d'intérêt
+  // Question 2: Toggle List - Domaines d'interet
   const q2Options: AnswerOption[] = [
     { id: 'opt_exercise', label: 'Exercice physique', labelFr: 'Exercice physique', labelEn: 'Physical Exercise', order: 0 },
     { id: 'opt_habits', label: 'Habitudes saines', labelFr: 'Habitudes saines', labelEn: 'Healthy Habits', order: 1 },
@@ -48,7 +55,7 @@ async function seedOnboarding() {
     { id: 'opt_growth', label: 'Développement personnel', labelFr: 'Développement personnel', labelEn: 'Personal Growth', order: 7 },
   ];
 
-  // Question 5: Rating - Niveau d'expérience
+  // Question 5: Rating - Niveau d'experience
   const q5Options: AnswerOption[] = [
     { id: 'opt_beginner', label: 'Débutant', labelFr: 'Débutant', labelEn: 'Beginner', icon: '⭐', order: 0 },
     { id: 'opt_novice', label: 'Novice', labelFr: 'Novice', labelEn: 'Novice', icon: '⭐', order: 1 },
@@ -57,7 +64,7 @@ async function seedOnboarding() {
     { id: 'opt_expert', label: 'Expert', labelFr: 'Expert', labelEn: 'Expert', icon: '⭐', order: 4 },
   ];
 
-  // Question 6: Multiple Choice Grid - Moments de la journée
+  // Question 6: Multiple Choice Grid - Moments de la journee
   const q6Options: AnswerOption[] = [
     { id: 'opt_morning', label: 'Matin', labelFr: 'Matin', labelEn: 'Morning', icon: '🌅', order: 0 },
     { id: 'opt_noon', label: 'Midi', labelFr: 'Midi', labelEn: 'Noon', icon: '☀️', order: 1 },
@@ -249,7 +256,7 @@ async function seedOnboarding() {
     },
   ];
 
-  // Créer la configuration
+  // Creer la configuration
   const config: Omit<OnboardingConfig, 'createdAt' | 'updatedAt'> = {
     id: configId,
     title: 'Découverte de Votre Parcours Wellbeing',
@@ -261,35 +268,49 @@ async function seedOnboarding() {
   };
 
   try {
-    // Insérer dans Firestore
-    await onboardingRef.doc(configId).set({
-      ...config,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    const now = new Date().toISOString();
 
-    console.log('✅ Configuration d\'onboarding créée avec succès !');
-    console.log(`📋 ID: ${configId}`);
-    console.log(`📊 Nombre de questions: ${questions.length}`);
-    console.log('\n📝 Questions créées:');
+    // Upsert into Supabase
+    const { error } = await supabase
+      .from('onboarding_configs')
+      .upsert({
+        id: configId,
+        title: config.title,
+        description: config.description,
+        status: config.status,
+        version: config.version,
+        questions: config.questions,
+        created_by: config.createdBy,
+        created_at: now,
+        updated_at: now,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    console.log('Configuration d\'onboarding creee avec succes !');
+    console.log(`ID: ${configId}`);
+    console.log(`Nombre de questions: ${questions.length}`);
+    console.log('\nQuestions creees:');
     questions.forEach((q, i) => {
       console.log(`  ${i + 1}. ${q.title} (${q.type.kind})`);
     });
-    console.log('\n🎉 Seed terminé ! Vous pouvez maintenant voir la configuration dans l\'admin.');
-    console.log(`🔗 URL: http://localhost:3000/admin/onboarding/${configId}\n`);
+    console.log('\nSeed termine ! Vous pouvez maintenant voir la configuration dans l\'admin.');
+    console.log(`URL: http://localhost:3000/admin/onboarding/${configId}\n`);
   } catch (error) {
-    console.error('❌ Erreur lors du seed:', error);
+    console.error('Erreur lors du seed:', error);
     throw error;
   }
 }
 
-// Exécuter le script
+// Executer le script
 seedOnboarding()
   .then(() => {
-    console.log('✅ Script terminé avec succès');
+    console.log('Script termine avec succes');
     process.exit(0);
   })
   .catch((error) => {
-    console.error('❌ Erreur fatale:', error);
+    console.error('Erreur fatale:', error);
     process.exit(1);
   });

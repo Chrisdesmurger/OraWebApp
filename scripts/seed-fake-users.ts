@@ -3,8 +3,18 @@
  * Generates fake users with sample data for testing
  */
 
-import { getAuth, getFirestore } from '../lib/firebase/admin';
+import { createClient } from '@supabase/supabase-js';
 import type { CommandResult } from '../lib/types/commands';
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const FAKE_USER_PREFIX = 'fake_user_';
 
@@ -279,9 +289,6 @@ export async function seedFakeUsers(): Promise<CommandResult> {
     output.push('Starting fake user seeding process...');
     output.push(`Creating ${FAKE_USERS.length} fake users...`);
 
-    const auth = getAuth();
-    const db = getFirestore();
-
     for (let i = 0; i < FAKE_USERS.length; i++) {
       const userData = FAKE_USERS[i];
       const email = `${FAKE_USER_PREFIX}${i + 1}@oraapp.test`;
@@ -289,27 +296,63 @@ export async function seedFakeUsers(): Promise<CommandResult> {
       try {
         output.push(`\nCreating user: ${userData.displayName} (${email})`);
 
-        // Create Firebase Auth user
-        const userRecord = await auth.createUser({
+        // Create Supabase Auth user
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
           email,
           password: userData.password,
-          displayName: userData.displayName,
-          emailVerified: true,
+          email_confirm: true,
+          user_metadata: {
+            display_name: userData.displayName,
+          },
         });
 
-        output.push(`  - Firebase Auth user created: ${userRecord.uid}`);
+        if (authError) {
+          throw authError;
+        }
 
-        // Create Firestore profile document
-        await db.collection('users').doc(userRecord.uid).set({
-          ...userData.profile,
-          email,
-          uid: userRecord.uid,
-        });
+        const userId = authData.user.id;
+        output.push(`  - Auth user created: ${userId}`);
+
+        // Create users table profile row
+        const { error: profileError } = await supabase
+          .from('users')
+          .upsert({
+            id: userId,
+            email,
+            first_name: userData.profile.firstName,
+            last_name: userData.profile.lastName,
+            motto: userData.profile.motto || null,
+            photo_url: userData.profile.photoUrl || null,
+            plan_tier: userData.profile.planTier,
+            created_at: userData.profile.createdAt,
+            updated_at: userData.profile.updatedAt,
+          });
+
+        if (profileError) {
+          throw profileError;
+        }
 
         output.push(`  - Profile document created`);
 
-        // Create Firestore stats document
-        await db.collection('stats').doc(userRecord.uid).set(userData.stats);
+        // Create user_practice_stats row
+        const { error: statsError } = await supabase
+          .from('user_practice_stats')
+          .upsert({
+            user_id: userId,
+            total_sessions: userData.stats.totalSessions,
+            total_minutes: userData.stats.totalMinutes,
+            current_streak: userData.stats.currentStreak,
+            longest_streak: userData.stats.longestStreak,
+            completed_programs: userData.stats.completedPrograms,
+            badges: userData.stats.badges,
+            last_active: userData.stats.lastActive,
+            created_at: userData.stats.createdAt,
+            updated_at: userData.stats.updatedAt,
+          });
+
+        if (statsError) {
+          throw statsError;
+        }
 
         output.push(`  - Stats document created`);
         output.push(`  - User created successfully!`);

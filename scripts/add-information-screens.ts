@@ -1,11 +1,11 @@
 /**
- * Script to add information screens to "Découverte de Votre Parcours Wellbeing" onboarding
+ * Script to add information screens to "Decouverte de Votre Parcours Wellbeing" onboarding
  * Inspired by Minday's onboarding flow
  *
  * Usage: npm run add-info-screens
  *
  * Prerequisites:
- * - Set FIREBASE_SERVICE_ACCOUNT_JSON in .env.local
+ * - Set SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY in .env.local
  */
 
 import * as dotenv from 'dotenv';
@@ -14,11 +14,21 @@ import { resolve } from 'path';
 // Load .env.local
 dotenv.config({ path: resolve(__dirname, '../.env.local') });
 
-import { getFirestore } from '../lib/firebase/admin';
+import { createClient } from '@supabase/supabase-js';
 import type { InformationScreen } from '../types/onboarding';
 
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
 const informationScreens: Omit<InformationScreen, 'id' | 'createdAt' | 'updatedAt'>[] = [
-  // Écran 0: Bienvenue - Position 0 (avant la première question)
+  // Ecran 0: Bienvenue - Position 0 (avant la premiere question)
   {
     position: 0,
     order: 0,
@@ -52,7 +62,7 @@ const informationScreens: Omit<InformationScreen, 'id' | 'createdAt' | 'updatedA
     backgroundColor: '#F5EFE6',
   },
 
-  // Écran 1: Après objectifs - Position 1 (après Q1 sur les objectifs)
+  // Ecran 1: Apres objectifs - Position 1 (apres Q1 sur les objectifs)
   {
     position: 1,
     order: 0,
@@ -86,7 +96,7 @@ const informationScreens: Omit<InformationScreen, 'id' | 'createdAt' | 'updatedA
     backgroundColor: '#E8F4F8',
   },
 
-  // Écran 2: Pour débutants - Position 2 (conditionnel après expérience)
+  // Ecran 2: Pour debutants - Position 2 (conditionnel apres experience)
   {
     position: 2,
     order: 0,
@@ -123,7 +133,7 @@ const informationScreens: Omit<InformationScreen, 'id' | 'createdAt' | 'updatedA
     backgroundColor: '#F0F8E8',
   },
 
-  // Écran 3: À mi-parcours - Position 3
+  // Ecran 3: A mi-parcours - Position 3
   {
     position: 3,
     order: 0,
@@ -142,7 +152,7 @@ const informationScreens: Omit<InformationScreen, 'id' | 'createdAt' | 'updatedA
     backgroundColor: '#FFF4E6',
   },
 
-  // Écran 4: Engagement temps - Position 5 (après question sur le temps disponible)
+  // Ecran 4: Engagement temps - Position 5 (apres question sur le temps disponible)
   {
     position: 5,
     order: 0,
@@ -176,7 +186,7 @@ const informationScreens: Omit<InformationScreen, 'id' | 'createdAt' | 'updatedA
     backgroundColor: '#F5F0FF',
   },
 
-  // Écran 5: Avant la fin - Position 7
+  // Ecran 5: Avant la fin - Position 7
   {
     position: 7,
     order: 0,
@@ -195,7 +205,7 @@ const informationScreens: Omit<InformationScreen, 'id' | 'createdAt' | 'updatedA
     backgroundColor: '#FFE8F0',
   },
 
-  // Écran 6: Félicitations - Position 100 (à la fin, après toutes les questions)
+  // Ecran 6: Felicitations - Position 100 (a la fin, apres toutes les questions)
   {
     position: 100,
     order: 0,
@@ -232,45 +242,52 @@ const informationScreens: Omit<InformationScreen, 'id' | 'createdAt' | 'updatedA
 
 async function addInformationScreens() {
   try {
-    console.log('🔍 Recherche de la configuration "Découverte de Votre Parcours Wellbeing"...');
-
-    const db = getFirestore();
+    console.log('Recherche de la configuration "Decouverte de Votre Parcours Wellbeing"...');
 
     // Find the onboarding config by title
-    const configsSnapshot = await db
-      .collection('onboarding_configs')
-      .where('title', '==', 'Découverte de Votre Parcours Wellbeing')
+    const { data: configRow, error: findError } = await supabase
+      .from('onboarding_configs')
+      .select('*')
+      .eq('title', 'Découverte de Votre Parcours Wellbeing')
       .limit(1)
-      .get();
+      .single();
 
-    if (configsSnapshot.empty) {
-      console.log('❌ Configuration non trouvée. Recherche de toutes les configurations...');
+    if (findError || !configRow) {
+      console.log('Configuration non trouvee. Recherche de toutes les configurations...');
 
       // List all configs to help user
-      const allConfigs = await db.collection('onboarding_configs').get();
-      console.log('\n📋 Configurations disponibles:');
-      allConfigs.docs.forEach(doc => {
-        const data = doc.data();
-        console.log(`  - ${data.title} (${doc.id}) - Status: ${data.status}`);
-      });
+      const { data: allConfigs, error: listError } = await supabase
+        .from('onboarding_configs')
+        .select('id, title, status');
+
+      if (listError) {
+        throw new Error(`Failed to list configs: ${listError.message}`);
+      }
+
+      console.log('\nConfigurations disponibles:');
+      if (allConfigs && allConfigs.length > 0) {
+        allConfigs.forEach((cfg) => {
+          console.log(`  - ${cfg.title} (${cfg.id}) - Status: ${cfg.status}`);
+        });
+      } else {
+        console.log('  (aucune configuration trouvee)');
+      }
 
       return;
     }
 
-    const configDoc = configsSnapshot.docs[0];
-    const configId = configDoc.id;
-    const configData = configDoc.data();
+    const configId = configRow.id;
 
-    console.log(`✅ Configuration trouvée: ${configId}`);
-    console.log(`   Titre: ${configData.title}`);
-    console.log(`   Version: ${configData.version}`);
-    console.log(`   Status: ${configData.status}`);
-    console.log(`   Questions: ${configData.questions?.length || 0}`);
+    console.log(`Configuration trouvee: ${configId}`);
+    console.log(`   Titre: ${configRow.title}`);
+    console.log(`   Version: ${configRow.version}`);
+    console.log(`   Status: ${configRow.status}`);
+    console.log(`   Questions: ${configRow.questions?.length || 0}`);
 
     // Add information screens to the config
-    console.log('\n📝 Ajout des écrans d\'information...');
+    console.log('\nAjout des ecrans d\'information...');
 
-    const now = new Date();
+    const now = new Date().toISOString();
     const screensWithIds = informationScreens.map((screen, index) => ({
       ...screen,
       id: `info_screen_${Date.now()}_${index}`,
@@ -279,27 +296,33 @@ async function addInformationScreens() {
     }));
 
     // Update the config with information screens
-    // Use snake_case to match Android backend schema
-    await db.collection('onboarding_configs').doc(configId).update({
-      information_screens: screensWithIds,
-      updated_at: now,
-    });
+    const { error: updateError } = await supabase
+      .from('onboarding_configs')
+      .update({
+        information_screens: screensWithIds,
+        updated_at: now,
+      })
+      .eq('id', configId);
 
-    console.log(`✅ ${screensWithIds.length} écrans d'information ajoutés avec succès !`);
+    if (updateError) {
+      throw new Error(`Failed to update config: ${updateError.message}`);
+    }
 
-    console.log('\n📊 Résumé des écrans ajoutés:');
+    console.log(`${screensWithIds.length} ecrans d'information ajoutes avec succes !`);
+
+    console.log('\nResume des ecrans ajoutes:');
     screensWithIds.forEach((screen, index) => {
       console.log(`  ${index + 1}. "${screen.title}" - Position ${screen.position}`);
       if (screen.displayConditions) {
-        console.log(`     ⚙️  Conditionnel: ${JSON.stringify(screen.displayConditions)}`);
+        console.log(`     Conditionnel: ${JSON.stringify(screen.displayConditions)}`);
       }
     });
 
-    console.log('\n🎉 Terminé ! Vous pouvez maintenant voir les écrans dans l\'interface admin.');
+    console.log('\nTermine ! Vous pouvez maintenant voir les ecrans dans l\'interface admin.');
     console.log(`   URL: /admin/onboarding/${configId}/information-screens`);
 
   } catch (error) {
-    console.error('❌ Erreur:', error);
+    console.error('Erreur:', error);
     throw error;
   }
 }
@@ -307,10 +330,10 @@ async function addInformationScreens() {
 // Run the script
 addInformationScreens()
   .then(() => {
-    console.log('\n✅ Script terminé avec succès');
+    console.log('\nScript termine avec succes');
     process.exit(0);
   })
   .catch((error) => {
-    console.error('\n❌ Erreur fatale:', error);
+    console.error('\nErreur fatale:', error);
     process.exit(1);
   });
