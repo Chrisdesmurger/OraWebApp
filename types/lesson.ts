@@ -157,6 +157,11 @@ export interface LessonDocument {
 
   // Yoga poses (Issue #74) - snake_case
   yoga_poses?: YogaPoseFirestore[];
+
+  // Aspect ratio metadata (Issue #88) - snake_case
+  source_aspect_ratio?: string | null;  // e.g., "1920:1080"
+  output_aspect_ratio?: string | null;  // e.g., "16:9"
+  aspect_conversion_mode?: 'crop' | 'letterbox' | 'none' | null;
 }
 
 // ============================================================================
@@ -220,6 +225,11 @@ export interface Lesson {
 
   // Yoga poses (Issue #74) - for yoga/pilates lessons
   yogaPoses?: YogaPose[];
+
+  // Aspect ratio metadata (Issue #88)
+  sourceAspectRatio?: string | null;  // e.g., "1920:1080"
+  outputAspectRatio?: string | null;  // e.g., "16:9"
+  aspectConversionMode?: 'crop' | 'letterbox' | 'none' | null;
 }
 
 // ============================================================================
@@ -548,6 +558,10 @@ export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson 
     // Subcategory
     subcategoryId: doc.subcategory_id ?? null,
     subcategorySlug: doc.subcategory_slug ?? null,
+    // Aspect ratio metadata (Issue #88)
+    sourceAspectRatio: doc.source_aspect_ratio ?? null,
+    outputAspectRatio: doc.output_aspect_ratio ?? null,
+    aspectConversionMode: doc.aspect_conversion_mode ?? null,
   };
 }
 
@@ -714,6 +728,17 @@ export function mapLessonToFirestore(lesson: Partial<Lesson>): Partial<LessonDoc
   }
   if (lesson.subcategorySlug !== undefined) {
     doc.subcategory_slug = lesson.subcategorySlug;
+  }
+
+  // Map aspect ratio metadata (Issue #88)
+  if (lesson.sourceAspectRatio !== undefined) {
+    doc.source_aspect_ratio = lesson.sourceAspectRatio;
+  }
+  if (lesson.outputAspectRatio !== undefined) {
+    doc.output_aspect_ratio = lesson.outputAspectRatio;
+  }
+  if (lesson.aspectConversionMode !== undefined) {
+    doc.aspect_conversion_mode = lesson.aspectConversionMode;
   }
 
   return doc;
