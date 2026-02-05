@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { verifyIdToken } from '@/lib/firebase/admin';
+import { createSupabaseServerClient, getUserRole } from '@/lib/supabase/server';
 import type { UserRole } from '@/lib/rbac';
 
 export interface AuthenticatedRequest {
@@ -9,33 +9,27 @@ export interface AuthenticatedRequest {
 }
 
 /**
- * Extract and verify Firebase ID token from request headers
+ * Authenticate request using Supabase session
+ * Uses cookie-based session from Supabase SSR
  */
 export async function authenticateRequest(request: NextRequest): Promise<AuthenticatedRequest> {
-  const authHeader = request.headers.get('authorization');
+  const supabase = await createSupabaseServerClient();
 
-  console.log('[auth-middleware] Authorization header:', authHeader ? `Bearer ${authHeader.substring(7, 20)}...` : 'MISSING');
+  const { data: { user }, error } = await supabase.auth.getUser();
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.error('[auth-middleware] Auth header invalid or missing');
-    throw new Error('Missing or invalid authorization header');
+  if (error || !user) {
+    console.error('[auth-middleware] Authentication failed:', error?.message || 'No user');
+    throw new Error('Missing or invalid authentication');
   }
 
-  const idToken = authHeader.split('Bearer ')[1];
+  // Get role from users table (replaces Firebase custom claims)
+  const role = await getUserRole(user.id);
 
-  try {
-    const decodedToken = await verifyIdToken(idToken);
-    const role = (decodedToken.role as UserRole) || 'viewer';
-
-    return {
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      role,
-    };
-  } catch (error) {
-    console.error('Token verification failed:', error);
-    throw new Error('Invalid or expired token');
-  }
+  return {
+    uid: user.id,
+    email: user.email,
+    role,
+  };
 }
 
 /**

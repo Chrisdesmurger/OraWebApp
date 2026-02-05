@@ -1,39 +1,43 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { updateSession } from '@/lib/supabase/middleware';
 
 /**
- * Middleware to protect admin routes
+ * Middleware to:
+ * 1. Refresh Supabase auth session on every request
+ * 2. Protect /admin routes (redirect to login if not authenticated)
  */
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
+  // Refresh Supabase session
+  const response = await updateSession(request);
+
   const { pathname } = request.nextUrl;
 
   // Protect /admin routes
   if (pathname.startsWith('/admin')) {
-    const idToken = request.cookies.get('firebaseIdToken')?.value;
+    // Check for Supabase auth cookies
+    const hasAuthCookies = request.cookies.getAll().some(
+      (cookie) => cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token')
+    );
 
-    // If no token, redirect to login
-    if (!idToken) {
+    if (!hasAuthCookies) {
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }
   }
 
-  // Allow all other requests
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - login (login page)
-     * - unauthorized (unauthorized page)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|login|unauthorized).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

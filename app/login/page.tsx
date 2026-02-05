@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signInWithEmail, signInWithGoogle } from '@/lib/firebase/client';
+import { signInWithEmail, signInWithGoogle, signInWithMagicLink } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,16 +30,8 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const userCredential = await signInWithEmail(email, password);
-      const idToken = await userCredential.user.getIdToken();
-
-      // Set token in cookie
-      await fetch('/api/auth/set-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-
+      await signInWithEmail(email, password);
+      // Supabase handles session cookies automatically
       router.push(redirectTo);
     } catch (err: any) {
       console.error('Login error:', err);
@@ -56,18 +48,8 @@ function LoginForm() {
     setMagicLinkSent(false);
 
     try {
-      const response = await fetch('/api/auth/magic-link/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, language: 'fr' }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send magic link');
-      }
-
+      // Supabase handles magic link natively via OTP
+      await signInWithMagicLink(email);
       setMagicLinkSent(true);
     } catch (err: any) {
       console.error('Magic link error:', err);
@@ -82,21 +64,12 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const userCredential = await signInWithGoogle();
-      const idToken = await userCredential.user.getIdToken();
-
-      // Set token in cookie
-      await fetch('/api/auth/set-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-
-      router.push(redirectTo);
+      // Supabase OAuth redirects to Google, then back to /auth/callback
+      await signInWithGoogle();
+      // The redirect happens automatically, no need to router.push
     } catch (err: any) {
       console.error('Google login error:', err);
       setError(err.message || 'Failed to sign in with Google.');
-    } finally {
       setLoading(false);
     }
   };
