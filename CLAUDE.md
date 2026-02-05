@@ -4,20 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-OraWebApp is a Next.js admin portal for the **Ora wellbeing platform** (yoga, meditation, wellness). It provides administrative interfaces for managing users, programs, lessons, content, onboarding flows, and analytics with Firebase Authentication and Firestore backend.
+OraWebApp is a Next.js admin portal for the **Ora wellbeing platform** (yoga, meditation, wellness). It provides administrative interfaces for managing users, programs, lessons, content, onboarding flows, and analytics with Supabase (PostgreSQL + Auth + Storage) backend.
 
-**Target audience**: Administrators and teachers managing content for the Ora mobile app (Android).
+**Target audience**: Administrators and teachers managing content for the Ora mobile app (Android + iOS).
 
 ## Tech Stack
 
 - **Framework**: Next.js 16+ (App Router)
 - **Language**: TypeScript (strict mode)
 - **UI**: React 18 + Tailwind CSS + shadcn/ui (Radix UI primitives)
-- **Authentication**: Firebase Auth (Email/Password + Google Sign-In)
-- **Database**: Cloud Firestore
-- **Storage**: Firebase Cloud Storage (media files)
-- **Backend**: Firebase Admin SDK (server-side via Next.js Route Handlers)
-- **Authorization**: Role-Based Access Control (RBAC) with Firebase custom claims
+- **Authentication**: Supabase Auth (Email/Password + Google OAuth + Magic Link)
+- **Database**: PostgreSQL via Supabase
+- **Storage**: Supabase Storage (media files)
+- **Backend**: Supabase Client (server-side via Next.js Route Handlers)
+- **Authorization**: Role-Based Access Control (RBAC) via `role` column in `users` table
 - **Forms**: React Hook Form + Zod validation
 - **Drag & Drop**: @dnd-kit (lesson reordering)
 - **Charts**: Recharts
@@ -36,41 +36,30 @@ pnpm type-check       # TypeScript type checking
 # Testing
 pnpm test             # Run Vitest unit tests
 pnpm test:e2e         # Run Playwright E2E tests
-
-# Firebase Admin Scripts (require .env.local with FIREBASE_SERVICE_ACCOUNT_JSON)
-pnpm set-role <email> <role>     # Set user role: admin | teacher | viewer
-pnpm list-admins                  # List all users with custom roles
-pnpm remove-role <email>          # Remove user's custom role
-
-# Seeding/Migration Scripts
-pnpm seed-onboarding              # Seed onboarding flow data
-pnpm add-info-screens             # Add information screens
-pnpm import-personalization       # Import personalization config
-
-# Firebase CLI
-firebase deploy --only firestore:rules    # Deploy Firestore rules
-firebase deploy --only storage:rules      # Deploy Storage rules
 ```
 
 ## Architecture
 
 ### Data Flow
 ```
-Client Components → fetchWithAuth() → API Routes → Firebase Admin SDK → Firestore
-                          ↓
-              Includes Firebase ID token
+Client Components → fetchWithAuth() → API Routes → Supabase Service Client → PostgreSQL
+                                                                            → Supabase Storage
+                                                                            → Supabase Auth
+Auth cookies are sent automatically (no manual token injection needed)
 ```
 
 ### Key Files
 - [lib/api/fetch-with-auth.ts](lib/api/fetch-with-auth.ts) - Client-side authenticated fetch wrapper (ALWAYS use this)
 - [lib/api/auth-middleware.ts](lib/api/auth-middleware.ts) - Server-side request authentication
-- [lib/firebase/admin.ts](lib/firebase/admin.ts) - Firebase Admin SDK singleton
-- [lib/firebase/client.ts](lib/firebase/client.ts) - Firebase Client SDK
+- [lib/supabase/client.ts](lib/supabase/client.ts) - Supabase Browser Client (auth, storage helpers)
+- [lib/supabase/server.ts](lib/supabase/server.ts) - Supabase Server Client (cookie-based + service role)
+- [lib/supabase/middleware.ts](lib/supabase/middleware.ts) - Session refresh middleware
 - [lib/auth/auth-context.tsx](lib/auth/auth-context.tsx) - React auth provider
 - [lib/rbac.ts](lib/rbac.ts) - Role permissions definitions
 - [lib/audit/logger.ts](lib/audit/logger.ts) - Audit logging utility
+- [lib/storage.ts](lib/storage.ts) - Storage upload/download/delete helpers
 - [lib/i18n/display-text.ts](lib/i18n/display-text.ts) - Multilingual text helpers
-- [types/lesson.ts](types/lesson.ts) - Lesson types with Firestore ↔ Frontend mappers
+- [types/lesson.ts](types/lesson.ts) - Lesson types with DB ↔ Frontend mappers
 
 ### RBAC Roles
 | Role | Capabilities |
@@ -79,76 +68,92 @@ Client Components → fetchWithAuth() → API Routes → Firebase Admin SDK → 
 | teacher | Own content/programs, upload media, basic stats |
 | viewer | Read-only content/programs access |
 
-### Main Features (by PR/Issue)
-1. **Authentication & Firestore** (PR #1-2) - fetchWithAuth, snake_case mapping
-2. **Lesson CRUD + Media Upload** (PR #3-5) - Video/audio upload, transcoding
-3. **Program Management** (PR #7) - Full CRUD, lesson ordering, categories
-4. **Media Player** (#12) - Video/audio preview in admin
-5. **Analytics Dashboard** (#14) - User growth, activity charts
-6. **User Management** (#15) - Create/delete users
-7. **Program Cover Images** (#16) - Firebase Storage upload
-8. **Audit Logging** (#21) - Change history, diff viewer
-9. **Content Scheduling** (#22) - Auto-publish/archive dates
-10. **Media Library** (#25) - Media management interface
-11. **Onboarding Management** (#48-57) - Questionnaire editor, 9 layouts
-12. **i18n Support** (#68-72) - FR/EN/ES multilingual, auto-translate
+Roles are stored in the `role` column of the `users` PostgreSQL table (ENUM: admin, teacher, viewer, user).
 
-## CRITICAL: Firestore Field Naming Convention
+### Main Features
+1. **Authentication** - Supabase Auth (email/password, Google OAuth, magic link)
+2. **Lesson CRUD + Media Upload** - Video/audio upload with transcoding
+3. **Program Management** - Full CRUD, lesson ordering, categories
+4. **Media Player** - Video/audio preview in admin
+5. **Analytics Dashboard** - User growth, activity charts
+6. **User Management** - Create/delete users, role management
+7. **Program Cover Images** - Supabase Storage upload
+8. **Audit Logging** - Change history, diff viewer
+9. **Content Scheduling** - Auto-publish/archive dates
+10. **Media Library** - Media management interface
+11. **Onboarding Management** - Questionnaire editor, 9 layouts
+12. **i18n Support** - FR/EN/ES multilingual, auto-translate
 
-**Firestore uses snake_case**, frontend uses **camelCase**. All API routes MUST map between them.
+## CRITICAL: Database Field Naming Convention
 
-### Firestore Collections
+**PostgreSQL uses snake_case**, frontend uses **camelCase**. All API routes MUST map between them.
+
+### PostgreSQL Tables
 ```typescript
-// users collection
-{ email, first_name, last_name, photo_url, plan_tier, role, created_at, updated_at }
+// users table
+{ id, email, first_name, last_name, photo_url, plan_tier, role, created_at, updated_at }
 
-// programs collection
-{ title, description, author_id, duration_days, cover_image_url, status, created_at, updated_at }
+// programs table
+{ id, title, description, author_id, duration_days, cover_image_url, status, created_at, updated_at }
 
-// lessons collection (with i18n)
-{ title_fr, title_en, title_es, description_fr, program_id, duration_sec, status, created_at, updated_at }
+// lessons table (with i18n)
+{ id, title_fr, title_en, title_es, description_fr, program_id, duration_sec, status, created_at, updated_at }
 
-// audit_logs collection
-{ action, resource_type, resource_id, actor_id, actor_email, changes, ip_address, user_agent, created_at }
+// audit_logs table
+{ id, action, resource_type, resource_id, actor_id, actor_email, changes, ip_address, user_agent, created_at }
 
-// onboarding_configs collection
-{ questions: [], information_screens: [], published, created_at, updated_at }
+// onboarding_configs table
+{ id, questions (JSONB), information_screens (JSONB), status, created_at, updated_at }
 ```
 
 ### API Mapping Pattern
 ```typescript
 // ✅ CORRECT - Map snake_case to camelCase in API response
-const users = snapshot.docs.map((doc) => {
-  const data = doc.data();
-  return {
-    id: doc.id,
-    firstName: data.first_name,    // Map field names
-    lastName: data.last_name,
-    createdAt: data.created_at,
-  };
-});
+const { data: rows } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+const users = rows?.map(row => ({
+  id: row.id,
+  firstName: row.first_name,
+  lastName: row.last_name,
+  createdAt: row.created_at,
+}));
 
-// ❌ WRONG - Never spread Firestore data directly
-return { id: doc.id, ...doc.data() };  // Keeps snake_case!
+// ✅ Supabase returns data directly as arrays (no .docs.map())
+const { data, error } = await supabase.from('programs').select('*').eq('status', 'published');
 ```
 
-### Firestore Queries
+### Supabase Query Patterns
 ```typescript
-// ✅ Use snake_case in queries
-firestore.collection('users').orderBy('created_at', 'desc')
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
-// ❌ This will fail - field doesn't exist
-firestore.collection('users').orderBy('createdAt', 'desc')
+const supabase = createSupabaseServiceClient();
+
+// List with filters
+const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
+
+// Get single
+const { data, error } = await supabase.from('programs').select('*').eq('id', id).single();
+
+// Create
+const { data: created, error } = await supabase.from('programs').insert(data).select().single();
+
+// Update
+const { error } = await supabase.from('programs').update(data).eq('id', id);
+
+// Delete
+const { error } = await supabase.from('programs').delete().eq('id', id);
+
+// Count
+const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
 ```
 
 ## i18n (Multilingual Support)
 
 The app supports **French (fr), English (en), Spanish (es)** with French as primary/fallback language.
 
-### Firestore i18n Pattern
-Text fields use language suffixes:
+### Database i18n Pattern
+Text fields use language suffixes in snake_case:
 ```typescript
-// Firestore document (snake_case with language suffix)
+// PostgreSQL row (snake_case with language suffix)
 {
   title_fr: "Méditation du matin",
   title_en: "Morning Meditation",
@@ -172,12 +177,10 @@ getSearchableText(title)  // Combines all languages
 Uses Google Cloud Translation API (`/api/translate`):
 - Translates FR → EN + ES in single API call
 - Requires `GOOGLE_TRANSLATE_API_KEY` in .env.local
-- UI: 🌐 button next to FR fields
 
 ### Mapping Functions
-- `mapLessonFromFirestore()` - Firestore → Frontend (with i18n)
-- `mapLessonToFirestore()` - Frontend → Firestore (with i18n)
-- `mapLessonFromFirestoreLegacy()` - For backward compatibility (French only)
+- `mapLessonFromFirestore()` - DB row → Frontend (with i18n) - works with both Firestore and PostgreSQL snake_case
+- `mapLessonToFirestore()` - Frontend → DB row (with i18n)
 
 ## Authentication
 
@@ -185,7 +188,7 @@ Uses Google Cloud Translation API (`/api/translate`):
 ```typescript
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 
-// ✅ CORRECT - Automatically includes Firebase ID token
+// ✅ CORRECT - Supabase cookies are sent automatically
 const response = await fetchWithAuth('/api/users');
 
 // ❌ WRONG - Will return 401 Unauthorized
@@ -204,10 +207,12 @@ export async function GET(request: NextRequest) {
       return apiError('Insufficient permissions', 403);
     }
 
-    // ... your logic
+    const supabase = createSupabaseServiceClient();
+    // ... your Supabase queries
     return apiSuccess({ data });
-  } catch (error: any) {
-    return apiError(error.message, 401);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Authentication failed';
+    return apiError(message, 401);
   }
 }
 ```
@@ -218,67 +223,65 @@ All CRUD operations should be logged:
 import { logCreate, logUpdate, logDelete } from '@/lib/audit/logger';
 
 // After creating a resource
-await logCreate(request, 'program', program.id, programData);
+logCreate({ resourceType: 'program', resourceId: id, actorId: user.uid, actorEmail: user.email || '', resource: data, request });
 
 // After updating (with before/after diff)
-await logUpdate(request, 'program', id, beforeState, afterState);
-
-// After deleting
-await logDelete(request, 'lesson', id, deletedData);
+logUpdate({ resourceType: 'program', resourceId: id, actorId: user.uid, actorEmail: user.email || '', before: oldData, after: newData, request });
 ```
 
-## Onboarding System
+## Supabase Storage
 
-The onboarding questionnaire system supports:
-- **Question Types**: single_choice, multiple_choice, slider, circular_picker, text_input, profile_group
-- **9 Layout Types**: cards, image_cards, grid, list, swipe, scale, emoji, circular_picker, info_screen
-- **Information Screens**: Welcome screens with features, bullet points, CTAs
-- **Recommendation Rules**: Dynamic content recommendations based on answers
+Three buckets:
+- `media-lessons` - Video/audio/thumbnails for lessons
+- `media-programs` - Cover images for programs
+- `media-users` - User avatars
 
-Key files:
-- [app/admin/onboarding/](app/admin/onboarding/) - Admin UI for managing onboarding
-- `onboarding_configs` collection in Firestore
+Storage paths follow: `{lessonId}/original/{filename}`, `{lessonId}/video/high.mp4`, etc.
+
+Use `lib/storage.ts` helpers: `uploadFile()`, `getSignedUrl()`, `deleteFile()`, `deleteLessonMedia()`.
+
+## SQL Schema
+
+Schema files in `supabase/migrations/`:
+- `00001_initial_schema.sql` - 17 tables with ENUM types
+- `00002_indexes.sql` - 35+ indexes
+- `00003_rls_policies.sql` - RLS policies + triggers
+- `00004_storage_buckets.sql` - Storage buckets + policies
+- `00005_fix_enums.sql` - Additional ENUM values
 
 ## Environment Variables
 
 Required in `.env.local`:
 ```bash
-# Firebase Client SDK (public - NEXT_PUBLIC_ prefix)
-NEXT_PUBLIC_FIREBASE_API_KEY=...
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=...
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
-NEXT_PUBLIC_FIREBASE_APP_ID=...
+# Supabase (public)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 
-# Firebase Admin SDK (secret - server-side only)
-FIREBASE_SERVICE_ACCOUNT_JSON='{...}'  # Full service account JSON as single line
+# Supabase Admin (secret - server-side only)
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
 # Optional: Auto-translate feature
 GOOGLE_TRANSLATE_API_KEY=...
+
+# Optional: Email
+RESEND_API_KEY=...
 ```
 
 ## Troubleshooting
 
-### "Missing or invalid authorization header"
-Use `fetchWithAuth` instead of `fetch` for API calls.
+### "Missing or invalid authentication"
+Use `fetchWithAuth` instead of `fetch` for API calls. Supabase cookies are sent automatically.
 
 ### API returns empty array
-1. Check Firestore field names are snake_case in queries
-2. Check Firebase Console > Firestore > Indexes for missing indexes
-3. Verify service account has Firestore read/write access
-
-### Firebase Admin "already initialized" error
-Already handled in `lib/firebase/admin.ts` with singleton pattern.
+1. Check PostgreSQL column names are snake_case in queries
+2. Check RLS policies allow the query
+3. Verify Supabase connection is configured
 
 ### Browser shows old code
 ```bash
 rm -rf .next && pnpm dev  # Clear cache and restart
 # Then Ctrl+Shift+R in browser
 ```
-
-### Upload fails with 308 status
-Firebase Storage resumable uploads return 308 (Resume Incomplete) for successful chunks - this is normal, not an error.
 
 ## UI Components
 
