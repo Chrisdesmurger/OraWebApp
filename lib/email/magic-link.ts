@@ -4,6 +4,11 @@
  * Handles generation, storage, and validation of magic link tokens
  * for passwordless authentication.
  *
+ * NOTE: With Supabase Auth, magic links are now handled natively via
+ * supabase.auth.signInWithOtp(). This module is kept for backward
+ * compatibility but uses Supabase (magic_link_tokens table) instead
+ * of Firestore.
+ *
  * Security features:
  * - Cryptographically secure random tokens
  * - Tokens hashed before storage (never stored in plain text)
@@ -13,7 +18,7 @@
  */
 
 import { randomBytes, createHash } from 'crypto';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import type { SupportedLanguage } from '@/lib/firestore/conversions';
 
 // ============================================================================
@@ -22,7 +27,7 @@ import type { SupportedLanguage } from '@/lib/firestore/conversions';
 
 const TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 const TOKEN_LENGTH = 32; // 32 bytes = 64 hex characters
-const COLLECTION_NAME = 'magic_link_tokens';
+const TABLE_NAME = 'magic_link_tokens';
 
 // ============================================================================
 // Token Document Types
@@ -77,6 +82,8 @@ function hashToken(token: string): string {
 /**
  * Create a new magic link token for an email address
  *
+ * @deprecated Prefer using Supabase Auth native magic links via signInWithOtp()
+ *
  * @param email - The email address to create the token for
  * @param language - Preferred language for emails
  * @param ipAddress - IP address of the request (optional, for logging)
@@ -90,7 +97,7 @@ export async function createMagicLinkToken(
   userAgent?: string
 ): Promise<CreateTokenResult> {
   try {
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
     const now = Date.now();
     const expiresAt = now + TOKEN_EXPIRY_MS;
 
@@ -98,20 +105,13 @@ export async function createMagicLinkToken(
     const token = generateSecureToken();
     const tokenHash = hashToken(token);
 
-    // Check for existing unexpired tokens for this email
-    // Delete them to prevent token accumulation
-    const existingTokens = await firestore
-      .collection(COLLECTION_NAME)
-      .where('email', '==', email.toLowerCase())
-      .where('used', '==', false)
-      .where('expires_at', '>', now)
-      .get();
-
-    // Delete existing unused tokens
-    const batch = firestore.batch();
-    existingTokens.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
+    // Delete existing unused, unexpired tokens for this email
+    await supabase
+      .from(TABLE_NAME)
+      .delete()
+      .eq('email', email.toLowerCase())
+      .eq('used', false)
+      .gt('expires_at', now);
 
     // Create new token document
     const tokenDoc: MagicLinkTokenDocument = {
@@ -125,17 +125,22 @@ export async function createMagicLinkToken(
       language,
     };
 
-    const docRef = firestore.collection(COLLECTION_NAME).doc();
-    batch.set(docRef, tokenDoc);
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .insert(tokenDoc)
+      .select('id')
+      .single();
 
-    await batch.commit();
+    if (error) {
+      throw new Error(`Failed to create token: ${error.message}`);
+    }
 
     console.log(`[MagicLink] Created token for ${email}, expires at ${new Date(expiresAt).toISOString()}`);
 
     return {
       success: true,
       token,
-      tokenId: docRef.id,
+      tokenId: data.id,
       expiresAt,
     };
   } catch (error) {
@@ -155,6 +160,8 @@ export async function createMagicLinkToken(
 /**
  * Verify a magic link token and mark it as used
  *
+ * @deprecated Prefer using Supabase Auth native magic links via verifyOtp()
+ *
  * @param token - The plain token from the magic link URL
  * @returns The email associated with the token if valid
  */
@@ -162,19 +169,23 @@ export async function verifyMagicLinkToken(
   token: string
 ): Promise<VerifyTokenResult> {
   try {
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
     const now = Date.now();
     const tokenHash = hashToken(token);
 
     // Find the token document
-    const snapshot = await firestore
-      .collection(COLLECTION_NAME)
-      .where('token_hash', '==', tokenHash)
-      .where('used', '==', false)
-      .limit(1)
-      .get();
+    const { data: rows, error: selectError } = await supabase
+      .from(TABLE_NAME)
+      .select('*')
+      .eq('token_hash', tokenHash)
+      .eq('used', false)
+      .limit(1);
 
-    if (snapshot.empty) {
+    if (selectError) {
+      throw new Error(`Failed to query token: ${selectError.message}`);
+    }
+
+    if (!rows || rows.length === 0) {
       console.warn('[MagicLink] Token not found or already used');
       return {
         success: false,
@@ -182,14 +193,13 @@ export async function verifyMagicLinkToken(
       };
     }
 
-    const doc = snapshot.docs[0];
-    const data = doc.data() as MagicLinkTokenDocument;
+    const row = rows[0] as MagicLinkTokenDocument & { id: string };
 
     // Check if expired
-    if (data.expires_at < now) {
+    if (row.expires_at < now) {
       console.warn('[MagicLink] Token expired');
       // Delete expired token
-      await doc.ref.delete();
+      await supabase.from(TABLE_NAME).delete().eq('id', row.id);
       return {
         success: false,
         error: 'Token has expired',
@@ -197,17 +207,17 @@ export async function verifyMagicLinkToken(
     }
 
     // Mark token as used
-    await doc.ref.update({
-      used: true,
-      used_at: now,
-    });
+    await supabase
+      .from(TABLE_NAME)
+      .update({ used: true, used_at: now })
+      .eq('id', row.id);
 
-    console.log(`[MagicLink] Token verified for ${data.email}`);
+    console.log(`[MagicLink] Token verified for ${row.email}`);
 
     return {
       success: true,
-      email: data.email,
-      language: data.language,
+      email: row.email,
+      language: row.language,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -225,47 +235,38 @@ export async function verifyMagicLinkToken(
 
 /**
  * Delete expired and used tokens
- * Should be called periodically (e.g., via Cloud Function)
+ * Should be called periodically (e.g., via cron job or scheduled function)
  */
 export async function cleanupExpiredTokens(): Promise<{ deleted: number }> {
   try {
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
     const now = Date.now();
     const cutoff = now - TOKEN_EXPIRY_MS * 24; // Keep for 24x expiry time for audit
 
-    // Find expired or old used tokens
-    const expiredSnapshot = await firestore
-      .collection(COLLECTION_NAME)
-      .where('expires_at', '<', cutoff)
-      .limit(500)
-      .get();
+    // Delete expired tokens older than cutoff
+    const { data: expiredRows, error: expiredError } = await supabase
+      .from(TABLE_NAME)
+      .delete()
+      .lt('expires_at', cutoff)
+      .select('id');
 
-    const usedSnapshot = await firestore
-      .collection(COLLECTION_NAME)
-      .where('used', '==', true)
-      .where('used_at', '<', cutoff)
-      .limit(500)
-      .get();
-
-    // Combine and dedupe
-    const toDelete = new Set<string>();
-    expiredSnapshot.docs.forEach((doc) => toDelete.add(doc.id));
-    usedSnapshot.docs.forEach((doc) => toDelete.add(doc.id));
-
-    // Delete in batches
-    const batch = firestore.batch();
-    let deleted = 0;
-
-    for (const docId of toDelete) {
-      batch.delete(firestore.collection(COLLECTION_NAME).doc(docId));
-      deleted++;
-      if (deleted >= 500) break; // Firestore batch limit
+    if (expiredError) {
+      console.error('[MagicLink] Cleanup expired tokens failed:', expiredError);
     }
 
-    if (deleted > 0) {
-      await batch.commit();
+    // Delete used tokens older than cutoff
+    const { data: usedRows, error: usedError } = await supabase
+      .from(TABLE_NAME)
+      .delete()
+      .eq('used', true)
+      .lt('used_at', cutoff)
+      .select('id');
+
+    if (usedError) {
+      console.error('[MagicLink] Cleanup used tokens failed:', usedError);
     }
 
+    const deleted = (expiredRows?.length || 0) + (usedRows?.length || 0);
     console.log(`[MagicLink] Cleaned up ${deleted} expired tokens`);
     return { deleted };
   } catch (error) {
@@ -287,17 +288,23 @@ export async function checkRateLimit(
   maxRequestsPerHour: number = 5
 ): Promise<{ allowed: boolean; remainingRequests: number }> {
   try {
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
     // Count tokens created in the last hour for this email
-    const snapshot = await firestore
-      .collection(COLLECTION_NAME)
-      .where('email', '==', email.toLowerCase())
-      .where('created_at', '>', oneHourAgo)
-      .get();
+    const { count, error } = await supabase
+      .from(TABLE_NAME)
+      .select('id', { count: 'exact', head: true })
+      .eq('email', email.toLowerCase())
+      .gt('created_at', oneHourAgo);
 
-    const requestCount = snapshot.size;
+    if (error) {
+      console.error('[MagicLink] Rate limit check failed:', error);
+      // Fail open - allow request if check fails
+      return { allowed: true, remainingRequests: 1 };
+    }
+
+    const requestCount = count || 0;
     const allowed = requestCount < maxRequestsPerHour;
     const remainingRequests = Math.max(0, maxRequestsPerHour - requestCount);
 

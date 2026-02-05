@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Calendar, Clock, User, Tag, Video, Music, FileText, Loader2 } from 'lucide-react';
-import { getStorageDownloadURL } from '@/lib/firebase/client';
+import { getStorageDownloadURL } from '@/lib/supabase/client';
 import type { Lesson, MultilingualText } from '@/types/lesson';
 
 /**
@@ -35,7 +35,7 @@ export default function LessonDetailsPage() {
     fetchLesson();
   }, [lessonId]);
 
-  // Convert Firebase Storage path to download URL when lesson loads
+  // Convert storage path to download URL when lesson loads
   React.useEffect(() => {
     if (lesson && (lesson.type === 'video' || lesson.type === 'audio')) {
       convertMediaUrl();
@@ -61,7 +61,7 @@ export default function LessonDetailsPage() {
     }
   };
 
-  // Get low quality media path for preview (Firebase Storage path)
+  // Get low quality media path for preview (storage path)
   // Using low quality to reduce bandwidth and improve loading speed
   const getMediaPath = (): string => {
     if (!lesson) return '';
@@ -85,13 +85,13 @@ export default function LessonDetailsPage() {
     return lesson.storagePathOriginal || '';
   };
 
-  // Convert Firebase Storage path to download URL
-  const convertMediaUrl = async () => {
+  // Convert storage path to download URL
+  const convertMediaUrl = () => {
     setLoadingMediaUrl(true);
     try {
       const storagePath = getMediaPath();
       if (storagePath) {
-        const downloadUrl = await getStorageDownloadURL(storagePath);
+        const downloadUrl = getStorageDownloadURL(storagePath);
         if (downloadUrl) {
           setMediaUrl(downloadUrl);
         } else {

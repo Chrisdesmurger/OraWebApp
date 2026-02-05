@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
-import { getStorageDownloadURL } from '@/lib/firebase/client';
+import { getStorageDownloadURL } from '@/lib/supabase/client';
 import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
 import { useToast } from '@/components/ui/use-toast';
 import {
@@ -33,7 +33,7 @@ interface ManageLessonsDialogProps {
  *
  * Features:
  * - Two tabs: "Current Lessons" (reorder/remove) and "Add Lessons" (picker)
- * - Real-time sync with Firestore
+ * - Real-time sync with backend
  * - Optimistic UI updates
  * - Drag-and-drop lesson reordering
  * - Add/remove lessons from program
@@ -80,11 +80,12 @@ export function ManageLessonsDialog({
 
       const data = await response.json();
       setLessonDetails(data.lessonDetails || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load lessons';
       console.error('Error fetching program lessons:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to load lessons',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -120,7 +121,8 @@ export function ManageLessonsDialog({
       });
 
       onSuccess(); // Refresh parent program list
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reorder lessons';
       console.error('Error reordering lessons:', error);
 
       // Revert optimistic update
@@ -128,7 +130,7 @@ export function ManageLessonsDialog({
 
       toast({
         title: 'Error',
-        description: error.message || 'Failed to reorder lessons',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
@@ -165,7 +167,8 @@ export function ManageLessonsDialog({
       });
 
       onSuccess(); // Refresh parent program list
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to remove lesson';
       console.error('Error removing lesson:', error);
 
       // Revert optimistic update
@@ -173,7 +176,7 @@ export function ManageLessonsDialog({
 
       toast({
         title: 'Error',
-        description: error.message || 'Failed to remove lesson',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
@@ -220,12 +223,13 @@ export function ManageLessonsDialog({
       await fetchProgramWithLessons();
       setShowPicker(false);
       onSuccess(); // Refresh parent program list
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to add lessons';
       console.error('Error adding lessons:', error);
 
       toast({
         title: 'Error',
-        description: error.message || 'Failed to add lessons',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
@@ -239,7 +243,7 @@ export function ManageLessonsDialog({
   };
 
   /**
-   * Convert Firebase Storage path to download URL when preview lesson changes
+   * Convert storage path to download URL when preview lesson changes
    */
   React.useEffect(() => {
     if (previewLesson && (previewLesson.type === 'video' || previewLesson.type === 'audio')) {
@@ -248,7 +252,7 @@ export function ManageLessonsDialog({
   }, [previewLesson]);
 
   /**
-   * Get low quality media path for preview (Firebase Storage path)
+   * Get low quality media path for preview (storage path)
    */
   const getMediaPath = (lesson: Lesson): string => {
     if (lesson.type === 'video' && lesson.renditions) {
@@ -271,16 +275,16 @@ export function ManageLessonsDialog({
   };
 
   /**
-   * Convert Firebase Storage path to download URL
+   * Convert storage path to download URL
    */
-  const convertPreviewMediaUrl = async () => {
+  const convertPreviewMediaUrl = () => {
     if (!previewLesson) return;
 
     setLoadingMediaUrl(true);
     try {
       const storagePath = getMediaPath(previewLesson);
       if (storagePath) {
-        const downloadUrl = await getStorageDownloadURL(storagePath);
+        const downloadUrl = getStorageDownloadURL(storagePath);
         if (downloadUrl) {
           setPreviewMediaUrl(downloadUrl);
         } else {

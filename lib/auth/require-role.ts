@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
-import { verifyIdToken } from '@/lib/firebase/admin';
-import { cookies } from 'next/headers';
+import { createSupabaseServerClient, getUserRole } from '@/lib/supabase/server';
 
 export type UserRole = 'admin' | 'teacher' | 'viewer';
 
@@ -12,36 +11,31 @@ export interface AuthenticatedUser {
 
 /**
  * Server-side authentication guard
- * Verifies Firebase ID token from cookie and checks user role
+ * Verifies Supabase session from cookie and checks user role
  */
 export async function requireAuth(requiredRoles?: UserRole[]): Promise<AuthenticatedUser> {
   try {
-    const cookieStore = await cookies();
-    const idToken = cookieStore.get('firebaseIdToken')?.value;
+    const supabase = await createSupabaseServerClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
 
-    if (!idToken) {
-      console.log('❌ No ID token found in cookies');
+    if (error || !user) {
       redirect('/login');
     }
 
-    // Verify token with Firebase Admin
-    const decodedToken = await verifyIdToken(idToken);
-    const role = (decodedToken.role as UserRole) || 'viewer';
+    const role = await getUserRole(user.id);
 
-    // Check if user has required role
-    if (requiredRoles && !requiredRoles.includes(role)) {
-      console.log(`❌ Access denied. Required roles: ${requiredRoles.join(', ')}, User role: ${role}`);
+    if (requiredRoles && !requiredRoles.includes(role as UserRole)) {
       redirect('/unauthorized');
     }
 
     return {
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      role,
+      uid: user.id,
+      email: user.email,
+      role: role as UserRole,
     };
   } catch (error) {
-    console.error('❌ Auth verification failed:', error);
-    redirect('/login');
+    // Don't catch redirect errors - rethrow them
+    throw error;
   }
 }
 
@@ -64,23 +58,21 @@ export async function requireTeacher(): Promise<AuthenticatedUser> {
  */
 export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
   try {
-    const cookieStore = await cookies();
-    const idToken = cookieStore.get('firebaseIdToken')?.value;
+    const supabase = await createSupabaseServerClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
 
-    if (!idToken) {
+    if (error || !user) {
       return null;
     }
 
-    const decodedToken = await verifyIdToken(idToken);
-    const role = (decodedToken.role as UserRole) || 'viewer';
+    const role = await getUserRole(user.id);
 
     return {
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      role,
+      uid: user.id,
+      email: user.email,
+      role: role as UserRole,
     };
-  } catch (error) {
-    console.error('Failed to get current user:', error);
+  } catch {
     return null;
   }
 }

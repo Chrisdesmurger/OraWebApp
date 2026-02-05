@@ -3,22 +3,21 @@
 /**
  * Magic Link Verification Page
  *
- * Handles the verification of magic link tokens and
- * completes the authentication flow.
+ * With Supabase, magic links natively redirect to /auth/callback
+ * which handles session establishment. This page handles the legacy
+ * custom token verification flow via the API and redirects to dashboard.
  */
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signInWithCustomToken } from '@/lib/firebase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle2, XCircle, Mail } from 'lucide-react';
 
-type VerificationStatus = 'verifying' | 'success' | 'error' | 'signing-in';
+type VerificationStatus = 'verifying' | 'success' | 'error';
 
 interface VerificationResult {
   success: boolean;
-  customToken?: string;
   email?: string;
   isNewUser?: boolean;
   error?: string;
@@ -47,7 +46,8 @@ function MagicLinkVerifyContent() {
     try {
       setStatus('verifying');
 
-      // Call verify API
+      // Call verify API - with Supabase, the API route handles
+      // session establishment via cookies automatically
       const response = await fetch(`/api/auth/magic-link/verify?token=${encodeURIComponent(token)}`);
       const data: VerificationResult = await response.json();
 
@@ -57,29 +57,7 @@ function MagicLinkVerifyContent() {
         return;
       }
 
-      if (!data.customToken) {
-        setStatus('error');
-        setErrorMessage('Authentication failed');
-        return;
-      }
-
       setEmail(data.email || '');
-      setStatus('signing-in');
-
-      // Sign in with the custom token
-      await signInWithCustomToken(data.customToken);
-
-      // Get the ID token and set it as cookie
-      const user = (await import('@/lib/firebase/client')).getFirebaseAuth().currentUser;
-      if (user) {
-        const idToken = await user.getIdToken();
-        await fetch('/api/auth/set-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idToken }),
-        });
-      }
-
       setStatus('success');
 
       // Redirect after a short delay
@@ -105,9 +83,6 @@ function MagicLinkVerifyContent() {
             {status === 'verifying' && (
               <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
             )}
-            {status === 'signing-in' && (
-              <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
-            )}
             {status === 'success' && (
               <CheckCircle2 className="h-12 w-12 text-green-500" />
             )}
@@ -117,13 +92,11 @@ function MagicLinkVerifyContent() {
           </div>
           <CardTitle className="text-xl">
             {status === 'verifying' && 'Verifying your link...'}
-            {status === 'signing-in' && 'Signing you in...'}
             {status === 'success' && 'Successfully signed in!'}
             {status === 'error' && 'Verification failed'}
           </CardTitle>
           <CardDescription>
             {status === 'verifying' && 'Please wait while we verify your magic link.'}
-            {status === 'signing-in' && 'Please wait while we complete your sign-in.'}
             {status === 'success' && (
               <>
                 Welcome back{email ? `, ${email}` : ''}! Redirecting you to the dashboard...

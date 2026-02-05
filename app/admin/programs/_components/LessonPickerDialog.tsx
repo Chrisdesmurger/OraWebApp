@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
-import { getStorageDownloadURL } from '@/lib/firebase/client';
+import { getStorageDownloadURL } from '@/lib/supabase/client';
 import type { Lesson } from '@/types/lesson';
 import { getMultilingualDisplayText } from '@/components/ui/multilingual-input';
 import {
@@ -96,7 +96,7 @@ export function LessonPickerDialog({
     onOpenChange(false);
   };
 
-  // Convert Firebase Storage path to download URL when preview lesson changes
+  // Convert storage path to download URL when preview lesson changes
   React.useEffect(() => {
     if (previewLesson && (previewLesson.type === 'video' || previewLesson.type === 'audio')) {
       convertPreviewMediaUrl();
@@ -110,7 +110,7 @@ export function LessonPickerDialog({
     return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
   };
 
-  // Get low quality media path for preview (Firebase Storage path)
+  // Get low quality media path for preview (storage path)
   // Using low quality to reduce bandwidth and improve loading speed
   const getMediaPath = (lesson: Lesson): string => {
     if (lesson.type === 'video' && lesson.renditions) {
@@ -132,15 +132,15 @@ export function LessonPickerDialog({
     return lesson.storagePathOriginal || '';
   };
 
-  // Convert Firebase Storage path to download URL
-  const convertPreviewMediaUrl = async () => {
+  // Convert storage path to download URL
+  const convertPreviewMediaUrl = () => {
     if (!previewLesson) return;
 
     setLoadingMediaUrl(true);
     try {
       const storagePath = getMediaPath(previewLesson);
       if (storagePath) {
-        const downloadUrl = await getStorageDownloadURL(storagePath);
+        const downloadUrl = getStorageDownloadURL(storagePath);
         if (downloadUrl) {
           setPreviewMediaUrl(downloadUrl);
         } else {

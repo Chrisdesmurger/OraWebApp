@@ -1,19 +1,17 @@
 /**
  * Types for User Recommendation System
- * Matches Firestore schema in users/{uid}/recommendations/{id}
+ * Matches database schema in users/{uid}/recommendations
  */
 
-import { Timestamp } from 'firebase-admin/firestore';
-
 /**
- * Firestore document structure (snake_case)
- * Retrieved directly from Firestore
+ * Database document structure (snake_case)
+ * Retrieved directly from the database
  */
 export interface RecommendationDocument {
   uid: string;
   lesson_ids: string[]; // Top 5 lesson IDs sorted by score
   scores: { [lessonId: string]: number }; // Score for each lesson
-  generated_at: Timestamp;
+  generated_at: string; // ISO timestamp string
   algorithm_version: string;
   based_on: {
     intentions: string[];
