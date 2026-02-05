@@ -8,7 +8,7 @@
 
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import {
   mapSubcategoryFromFirestore,
   mapSubcategoryUpdateToFirestore,
@@ -28,16 +28,18 @@ export async function GET(
     const user = await authenticateRequest(request);
     const { id } = await params;
 
-    const firestore = getFirestore();
-    const subcategoryRef = firestore.collection('subcategories').doc(id);
-    const subcategoryDoc = await subcategoryRef.get();
+    const supabase = createSupabaseServiceClient();
+    const { data: row, error } = await supabase
+      .from('subcategories')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!subcategoryDoc.exists) {
+    if (error || !row) {
       return apiError('Subcategory not found', 404);
     }
 
-    const subcategoryData = subcategoryDoc.data() as SubcategoryDocument;
-    const subcategory = mapSubcategoryFromFirestore(id, subcategoryData);
+    const subcategory = mapSubcategoryFromFirestore(id, row as unknown as SubcategoryDocument);
 
     console.log('[GET /api/subcategories/[id]] Returning subcategory:', subcategory.id);
     return apiSuccess({ subcategory });
@@ -81,43 +83,66 @@ export async function PATCH(
       return apiError(`Validation failed: ${errors}`, 400);
     }
 
-    const firestore = getFirestore();
-    const subcategoryRef = firestore.collection('subcategories').doc(id);
-    const subcategoryDoc = await subcategoryRef.get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!subcategoryDoc.exists) {
+    // Fetch existing subcategory
+    const { data: existing, error: fetchError } = await supabase
+      .from('subcategories')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existing) {
       return apiError('Subcategory not found', 404);
     }
 
-    const subcategoryData = subcategoryDoc.data() as SubcategoryDocument;
+    const subcategoryData = existing as unknown as SubcategoryDocument;
 
     // Save before state for audit log
     const beforeState = { ...subcategoryData };
 
     // Check for duplicate slug if slug is being updated
     if (validation.data.slug && validation.data.slug !== subcategoryData.slug) {
-      const existingSlug = await firestore
-        .collection('subcategories')
-        .where('category', '==', subcategoryData.category)
-        .where('slug', '==', validation.data.slug)
-        .get();
+      const { data: existingSlug } = await supabase
+        .from('subcategories')
+        .select('id')
+        .eq('category', subcategoryData.category)
+        .eq('slug', validation.data.slug)
+        .limit(1);
 
-      if (!existingSlug.empty) {
+      if (existingSlug && existingSlug.length > 0) {
         return apiError(`A subcategory with slug "${validation.data.slug}" already exists in this category`, 409);
       }
     }
 
-    // Convert to Firestore format
+    // Convert to database format
     const updateData = {
       ...mapSubcategoryUpdateToFirestore(validation.data),
       updated_at: new Date().toISOString(),
     };
 
-    await subcategoryRef.update(updateData);
+    const { error: updateError } = await supabase
+      .from('subcategories')
+      .update(updateData)
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('[PATCH /api/subcategories/[id]] Update error:', updateError);
+      return apiError('Failed to update subcategory', 500);
+    }
 
     // Fetch updated subcategory
-    const updatedDoc = await subcategoryRef.get();
-    const updatedData = updatedDoc.data() as SubcategoryDocument;
+    const { data: updated, error: refetchError } = await supabase
+      .from('subcategories')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (refetchError || !updated) {
+      return apiError('Failed to fetch updated subcategory', 500);
+    }
+
+    const updatedData = updated as unknown as SubcategoryDocument;
     const subcategory = mapSubcategoryFromFirestore(id, updatedData);
 
     // Log audit event
@@ -157,24 +182,29 @@ export async function DELETE(
       return apiError('Insufficient permissions - admin only', 403);
     }
 
-    const firestore = getFirestore();
-    const subcategoryRef = firestore.collection('subcategories').doc(id);
-    const subcategoryDoc = await subcategoryRef.get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!subcategoryDoc.exists) {
+    // Fetch existing subcategory
+    const { data: existing, error: fetchError } = await supabase
+      .from('subcategories')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existing) {
       return apiError('Subcategory not found', 404);
     }
 
-    const subcategoryData = subcategoryDoc.data() as SubcategoryDocument;
+    const subcategoryData = existing as unknown as SubcategoryDocument;
 
     // Check if any lessons are assigned to this subcategory
-    const lessonsSnapshot = await firestore
-      .collection('lessons')
-      .where('subcategory_id', '==', id)
-      .limit(1)
-      .get();
+    const { data: lessons } = await supabase
+      .from('lessons')
+      .select('id')
+      .eq('subcategory_id', id)
+      .limit(1);
 
-    if (!lessonsSnapshot.empty) {
+    if (lessons && lessons.length > 0) {
       return apiError(
         'Cannot delete subcategory with assigned lessons. Please reassign or remove lessons first.',
         409
@@ -184,7 +214,15 @@ export async function DELETE(
     // Save state before deletion for audit log
     const beforeState = { ...subcategoryData };
 
-    await subcategoryRef.delete();
+    const { error: deleteError } = await supabase
+      .from('subcategories')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      console.error('[DELETE /api/subcategories/[id]] Delete error:', deleteError);
+      return apiError('Failed to delete subcategory', 500);
+    }
 
     // Log audit event
     logDelete({

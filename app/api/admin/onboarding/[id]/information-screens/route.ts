@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { deepCamelToSnake, deepSnakeToCamel } from '@/lib/firestore/conversions';
 
@@ -72,7 +72,7 @@ const putBodySchema = z.object({
 /**
  * GET /api/admin/onboarding/[id]/information-screens
  * Returns the config's information screens (camelCase) with best-effort compatibility
- * with Firestore snake_case storage.
+ * with snake_case storage.
  */
 export async function GET(
   request: NextRequest,
@@ -88,18 +88,21 @@ export async function GET(
     const { id } = await params;
     if (!id) return apiError('Configuration ID is required', 400);
 
-    const db = getFirestore();
-    const doc = await db.collection('onboarding_configs').doc(id).get();
+    const supabase = createSupabaseServiceClient();
+    const { data: row, error } = await supabase
+      .from('onboarding_configs')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!doc.exists) {
+    if (error || !row) {
       return apiError('Onboarding configuration not found', 404);
     }
 
-    const data = doc.data() ?? {};
-    const camel = deepSnakeToCamel<Record<string, unknown>>(data);
+    const camel = deepSnakeToCamel<Record<string, unknown>>(row);
 
     const merged = {
-      ...data,
+      ...row,
       ...camel,
     } as any;
 
@@ -107,17 +110,16 @@ export async function GET(
       merged.informationScreens || merged.information_screens || [];
 
     return apiSuccess({ informationScreens });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('GET /api/admin/onboarding/[id]/information-screens error:', error);
-    return apiError(error.message || 'Failed to fetch information screens', 500);
+    const message = error instanceof Error ? error.message : 'Failed to fetch information screens';
+    return apiError(message, 500);
   }
 }
 
 /**
  * PUT /api/admin/onboarding/[id]/information-screens
- * Persists information screens in BOTH formats:
- * - camelCase: informationScreens (legacy + current UI)
- * - snake_case: information_screens (Android-aligned / future-proof)
+ * Persists information screens as JSONB in the onboarding_configs table.
  */
 export async function PUT(
   request: NextRequest,
@@ -139,15 +141,20 @@ export async function PUT(
       return apiError(parsed.error.message, 400);
     }
 
-    const db = getFirestore();
-    const docRef = db.collection('onboarding_configs').doc(id);
-    const existing = await docRef.get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!existing.exists) {
+    // Verify config exists
+    const { data: existing, error: fetchError } = await supabase
+      .from('onboarding_configs')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existing) {
       return apiError('Onboarding configuration not found', 404);
     }
 
-    const now = new Date();
+    const now = new Date().toISOString();
 
     // Normalize & timestamp each screen
     const informationScreensCamel = parsed.data.informationScreens.map((s) => {
@@ -186,12 +193,18 @@ export async function PUT(
 
     const informationScreensSnake = deepCamelToSnake(informationScreensCamel);
 
-    await docRef.update({
-      informationScreens: informationScreensCamel,
-      information_screens: informationScreensSnake,
-      updatedAt: now,
-      updated_at: now,
-    });
+    const { error: updateError } = await supabase
+      .from('onboarding_configs')
+      .update({
+        information_screens: informationScreensSnake,
+        updated_at: now,
+      })
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('PUT /api/admin/onboarding/[id]/information-screens update error:', updateError);
+      return apiError('Failed to update information screens', 500);
+    }
 
     logAuditEvent({
       action: 'onboarding.updated',
@@ -200,7 +213,7 @@ export async function PUT(
       actorId: currentUser.uid,
       actorEmail: currentUser.email || 'unknown',
       changesAfter: {
-        updatedFields: ['informationScreens', 'information_screens'],
+        updatedFields: ['information_screens'],
         informationScreensCount: informationScreensCamel.length,
       },
       request,
@@ -210,8 +223,9 @@ export async function PUT(
       message: 'Information screens updated successfully',
       informationScreens: informationScreensCamel,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('PUT /api/admin/onboarding/[id]/information-screens error:', error);
-    return apiError(error.message || 'Failed to update information screens', 500);
+    const message = error instanceof Error ? error.message : 'Failed to update information screens';
+    return apiError(message, 500);
   }
 }

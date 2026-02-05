@@ -2,8 +2,7 @@
  * API Route: GET /api/users/[uid]/recommendations/history
  * Fetches recommendation history for a specific user
  *
- * IMPORTANT: Reads from user_onboarding/{uid}/recommendations/
- * (Updated path after Firestore migration - see issue #66)
+ * Reads from user_recommendations table in Supabase
  */
 
 import { NextRequest } from 'next/server';
@@ -13,37 +12,45 @@ import {
   apiError,
   apiSuccess,
 } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import {
-  RecommendationDocument,
   RecommendationHistoryItem,
 } from '@/types/recommendation';
-import { Timestamp } from 'firebase-admin/firestore';
+
+type TriggerType = 'onboarding_complete' | 'weekly_cron' | 'manual';
+
+const VALID_TRIGGERS: TriggerType[] = ['onboarding_complete', 'weekly_cron', 'manual'];
 
 /**
- * Convert Firestore document to RecommendationHistoryItem
+ * Convert Supabase row to RecommendationHistoryItem
  */
 function mapToHistoryItem(
-  doc: FirebaseFirestore.DocumentSnapshot
+  row: Record<string, unknown>
 ): RecommendationHistoryItem | null {
-  const data = doc.data() as RecommendationDocument | undefined;
-
-  if (!data) {
+  if (!row) {
     return null;
   }
 
-  const generatedAt =
-    data.generated_at instanceof Timestamp
-      ? data.generated_at.toDate()
-      : new Date(data.generated_at as unknown as string);
+  const recommendations = row.recommendations as Record<string, unknown> | undefined;
+  if (!recommendations) return null;
+
+  const lessonIds = (recommendations.lesson_ids as string[]) || [];
+  const metadata = (recommendations.metadata as Record<string, unknown>) || {};
+
+  const rawTrigger = (metadata.trigger as string) || 'manual';
+  const trigger: TriggerType = VALID_TRIGGERS.includes(rawTrigger as TriggerType)
+    ? (rawTrigger as TriggerType)
+    : 'manual';
 
   return {
-    id: doc.id,
-    uid: data.uid,
-    lessonCount: data.lesson_ids.length,
-    avgScore: data.metadata.avg_score,
-    generatedAt,
-    trigger: data.metadata.trigger,
+    id: row.id as string,
+    uid: (row.user_id as string) || '',
+    lessonCount: lessonIds.length,
+    avgScore: (metadata.avg_score as number) || 0,
+    generatedAt: row.generated_at
+      ? new Date(row.generated_at as string)
+      : new Date(),
+    trigger,
   };
 }
 
@@ -69,43 +76,39 @@ export async function GET(
 
     console.log(`[API] Fetching recommendation history for user: ${uid}`);
 
-    // Fetch all recommendations from NEW path: user_onboarding/{uid}/recommendations/
-    // (Updated after Firestore migration - see issue #66)
-    // Excluding 'latest' as it's a duplicate
-    const snapshot = await getFirestore()
-      .collection('user_onboarding')
-      .doc(uid)
-      .collection('recommendations')
-      .orderBy('generated_at', 'desc')
-      .limit(11) // Fetch 11 to exclude 'latest' and get 10 historical
-      .get();
+    const supabase = createSupabaseServiceClient();
 
-    if (snapshot.empty) {
+    // Fetch all recommendations, ordered by most recent
+    const { data: rows, error } = await supabase
+      .from('user_recommendations')
+      .select('*')
+      .eq('user_id', uid)
+      .order('generated_at', { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error('[API] Error fetching recommendation history:', error);
+      return apiError('Failed to fetch recommendation history', 500);
+    }
+
+    if (!rows || rows.length === 0) {
       console.log('[API] No recommendation history found');
       return apiSuccess({ history: [] });
     }
 
-    // Map documents to history items, excluding 'latest'
+    // Map rows to history items
     const history: RecommendationHistoryItem[] = [];
 
-    for (const doc of snapshot.docs) {
-      // Skip 'latest' document as it's always the most recent
-      if (doc.id === 'latest') {
-        continue;
-      }
-
-      const historyItem = mapToHistoryItem(doc);
+    for (const row of rows) {
+      const historyItem = mapToHistoryItem(row);
       if (historyItem) {
         history.push(historyItem);
       }
     }
 
-    // Limit to 10 items
-    const limitedHistory = history.slice(0, 10);
+    console.log(`[API] Found ${history.length} recommendation history items`);
 
-    console.log(`[API] Found ${limitedHistory.length} recommendation history items`);
-
-    return apiSuccess({ history: limitedHistory });
+    return apiSuccess({ history });
   } catch (error: unknown) {
     console.error('[API] Error fetching recommendation history:', error);
     const errorMessage =

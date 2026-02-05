@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { logAuditEvent } from '@/lib/audit/logger';
 
 /**
@@ -33,24 +33,33 @@ export async function GET(
       return apiError('Invalid format. Must be csv or json', 400);
     }
 
-    const db = getFirestore();
+    const supabase = createSupabaseServiceClient();
 
     // Verify config exists
-    const configDoc = await db.collection('onboarding_configs').doc(id).get();
-    if (!configDoc.exists) {
+    const { data: configRow, error: configError } = await supabase
+      .from('onboarding_configs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (configError || !configRow) {
       return apiError('Onboarding configuration not found', 404);
     }
 
-    const configData = configDoc.data();
+    const configData = configRow;
 
-    // Fetch all user responses for this config using collectionGroup (efficient)
-    // NEW: Query dedicated collection instead of nested field
-    const responsesSnapshot = await db
-      .collectionGroup('responses')
-      .where('config_version', '==', id)
-      .get();
+    // Fetch all user responses for this config
+    const { data: responsesRows, error: responsesError } = await supabase
+      .from('onboarding_responses')
+      .select('*')
+      .eq('config_version', id);
 
-    if (responsesSnapshot.empty) {
+    if (responsesError) {
+      console.error('GET /api/admin/onboarding/[id]/export responses error:', responsesError);
+      return apiError('Failed to fetch responses', 500);
+    }
+
+    if (!responsesRows || responsesRows.length === 0) {
       return apiError('No responses found for this configuration', 404);
     }
 
@@ -64,15 +73,14 @@ export async function GET(
       changesAfter: {
         version: configData?.version,
         format,
-        responseCount: responsesSnapshot.size,
+        responseCount: responsesRows.length,
       },
       request,
     });
 
     if (format === 'json') {
-      // Export as JSON (NEW: using dedicated collection data structure)
-      const responses = responsesSnapshot.docs.map(doc => {
-        const data = doc.data();
+      // Export as JSON
+      const responses = responsesRows.map(data => {
         return {
           uid: data.uid,
           configVersion: data.config_version,
@@ -120,24 +128,22 @@ export async function GET(
       ];
 
       // Add question columns
-      questions.forEach((q: any) => {
+      (questions as any[]).forEach((q: any) => {
         headers.push(`Q: ${q.title}`);
       });
 
       const csvRows: string[] = [headers.join(',')];
 
-      // Build CSV rows (NEW: using dedicated collection data structure)
-      responsesSnapshot.docs.forEach(doc => {
-        const data = doc.data();
-
+      // Build CSV rows
+      responsesRows.forEach(data => {
         const row: string[] = [
           data.uid || '',
-          '', // Email (not stored in responses collection)
-          '', // First Name (not stored in responses collection)
-          '', // Last Name (not stored in responses collection)
+          '', // Email (not stored in responses table)
+          '', // First Name (not stored in responses table)
+          '', // Last Name (not stored in responses table)
           data.completed ? 'Yes' : 'No',
-          data.started_at ? new Date(data.started_at.toDate()).toISOString() : '',
-          data.completed_at ? new Date(data.completed_at.toDate()).toISOString() : '',
+          data.started_at ? new Date(data.started_at).toISOString() : '',
+          data.completed_at ? new Date(data.completed_at).toISOString() : '',
           data.metadata?.total_time_seconds?.toString() || '',
           escapeCSV(data.metadata?.device_type || ''),
           escapeCSV(data.metadata?.app_version || ''),
@@ -151,7 +157,7 @@ export async function GET(
             const selectedLabels: string[] = [];
 
             // Find option labels from question definition
-            const question = questions.find((q: any) => q.id === answer.question_id);
+            const question = (questions as any[]).find((q: any) => q.id === answer.question_id);
             if (question && answer.selected_options) {
               answer.selected_options.forEach((optionId: string) => {
                 const option = question.options.find((opt: any) => opt.id === optionId);
@@ -170,7 +176,7 @@ export async function GET(
           });
         }
 
-        questions.forEach((q: any) => {
+        (questions as any[]).forEach((q: any) => {
           row.push(escapeCSV(answerMap.get(q.id) || ''));
         });
 
@@ -188,9 +194,10 @@ export async function GET(
       });
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('GET /api/admin/onboarding/[id]/export error:', error);
-    return apiError(error.message || 'Failed to export responses', 500);
+    const message = error instanceof Error ? error.message : 'Failed to export responses';
+    return apiError(message, 500);
   }
 }
 

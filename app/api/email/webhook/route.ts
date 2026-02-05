@@ -15,25 +15,7 @@
 import { NextRequest } from 'next/server';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-
-// Initialize Firebase Admin
-if (getApps().length === 0) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      initializeApp({
-        credential: cert(serviceAccount),
-      });
-    } catch (error) {
-      console.error('[Webhook] Firebase initialization error:', error);
-    }
-  }
-}
-
-const db = getFirestore();
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 // Resend webhook event types
 type ResendEventType =
@@ -128,38 +110,44 @@ export async function POST(request: NextRequest) {
     const event: ResendWebhookEvent = JSON.parse(payload);
     console.log(`[Webhook] Event type: ${event.type}, Email ID: ${event.data.email_id}`);
 
-    // Find the email log by resend_id
-    const logsSnapshot = await db
-      .collection('email_logs')
-      .where('resend_id', '==', event.data.email_id)
-      .limit(1)
-      .get();
+    const supabase = createSupabaseServiceClient();
 
-    if (logsSnapshot.empty) {
+    // Find the email log by resend_id
+    const { data: logRows } = await supabase
+      .from('email_logs')
+      .select('id')
+      .eq('resend_id', event.data.email_id)
+      .limit(1);
+
+    if (!logRows || logRows.length === 0) {
       // Try to find by recipient email if resend_id not found
       const recipientEmail = event.data.to[0];
       console.log(`[Webhook] Log not found by resend_id, trying email: ${recipientEmail}`);
 
       // Create a new tracking entry if not found
-      await db.collection('email_tracking').add({
+      await supabase.from('email_tracking').insert({
         resend_id: event.data.email_id,
         recipient_email: recipientEmail,
         subject: event.data.subject,
         event_type: event.type,
         event_data: event.data,
-        created_at: FieldValue.serverTimestamp(),
+        created_at: new Date().toISOString(),
       });
     } else {
       // Update existing log
-      const logDoc = logsSnapshot.docs[0];
+      const logId = logRows[0].id;
       const updateData = getUpdateDataForEvent(event);
 
-      await logDoc.ref.update(updateData);
-      console.log(`[Webhook] Updated log ${logDoc.id} with ${event.type}`);
+      await supabase
+        .from('email_logs')
+        .update(updateData)
+        .eq('id', logId);
+
+      console.log(`[Webhook] Updated log ${logId} with ${event.type}`);
     }
 
     // Update aggregate stats
-    await updateEmailStats(event.type);
+    await updateEmailStats(supabase, event.type);
 
     return new Response('OK', { status: 200 });
   } catch (error) {
@@ -172,8 +160,9 @@ export async function POST(request: NextRequest) {
  * Get update data based on event type
  */
 function getUpdateDataForEvent(event: ResendWebhookEvent): Record<string, unknown> {
+  const now = new Date().toISOString();
   const baseUpdate = {
-    updated_at: FieldValue.serverTimestamp(),
+    updated_at: now,
   };
 
   switch (event.type) {
@@ -181,37 +170,35 @@ function getUpdateDataForEvent(event: ResendWebhookEvent): Record<string, unknow
       return {
         ...baseUpdate,
         status: 'sent',
-        sent_at: FieldValue.serverTimestamp(),
+        sent_at: now,
       };
 
     case 'email.delivered':
       return {
         ...baseUpdate,
         status: 'delivered',
-        delivered_at: FieldValue.serverTimestamp(),
+        delivered_at: now,
       };
 
     case 'email.delivery_delayed':
       return {
         ...baseUpdate,
         status: 'delayed',
-        delayed_at: FieldValue.serverTimestamp(),
+        delayed_at: now,
       };
 
     case 'email.opened':
       return {
         ...baseUpdate,
         status: 'opened',
-        opened_at: FieldValue.serverTimestamp(),
-        open_count: FieldValue.increment(1),
+        opened_at: now,
       };
 
     case 'email.clicked':
       return {
         ...baseUpdate,
         status: 'clicked',
-        clicked_at: FieldValue.serverTimestamp(),
-        click_count: FieldValue.increment(1),
+        clicked_at: now,
         last_clicked_link: event.data.click?.link,
       };
 
@@ -219,7 +206,7 @@ function getUpdateDataForEvent(event: ResendWebhookEvent): Record<string, unknow
       return {
         ...baseUpdate,
         status: 'bounced',
-        bounced_at: FieldValue.serverTimestamp(),
+        bounced_at: now,
         bounce_message: event.data.bounce?.message,
       };
 
@@ -227,7 +214,7 @@ function getUpdateDataForEvent(event: ResendWebhookEvent): Record<string, unknow
       return {
         ...baseUpdate,
         status: 'complained',
-        complained_at: FieldValue.serverTimestamp(),
+        complained_at: now,
       };
 
     default:
@@ -238,48 +225,57 @@ function getUpdateDataForEvent(event: ResendWebhookEvent): Record<string, unknow
 /**
  * Update aggregate email stats
  */
-async function updateEmailStats(eventType: ResendEventType): Promise<void> {
+async function updateEmailStats(supabase: ReturnType<typeof createSupabaseServiceClient>, eventType: ResendEventType): Promise<void> {
   const today = new Date().toISOString().split('T')[0];
-  const statsRef = db.collection('email_stats').doc(today);
 
   try {
-    await db.runTransaction(async (transaction) => {
-      const statsDoc = await transaction.get(statsRef);
+    // Check if stats row exists for today
+    const { data: existing } = await supabase
+      .from('email_stats')
+      .select('*')
+      .eq('date', today)
+      .single();
 
-      if (!statsDoc.exists) {
-        // Create new stats document for today
-        transaction.set(statsRef, {
-          date: today,
-          sent: eventType === 'email.sent' ? 1 : 0,
-          delivered: eventType === 'email.delivered' ? 1 : 0,
-          opened: eventType === 'email.opened' ? 1 : 0,
-          clicked: eventType === 'email.clicked' ? 1 : 0,
-          bounced: eventType === 'email.bounced' ? 1 : 0,
-          complained: eventType === 'email.complained' ? 1 : 0,
-          created_at: FieldValue.serverTimestamp(),
-          updated_at: FieldValue.serverTimestamp(),
-        });
-      } else {
-        // Update existing stats
-        const fieldMap: Record<ResendEventType, string> = {
-          'email.sent': 'sent',
-          'email.delivered': 'delivered',
-          'email.delivery_delayed': 'delayed',
-          'email.opened': 'opened',
-          'email.clicked': 'clicked',
-          'email.bounced': 'bounced',
-          'email.complained': 'complained',
-        };
+    const fieldMap: Record<ResendEventType, string> = {
+      'email.sent': 'sent',
+      'email.delivered': 'delivered',
+      'email.delivery_delayed': 'delayed',
+      'email.opened': 'opened',
+      'email.clicked': 'clicked',
+      'email.bounced': 'bounced',
+      'email.complained': 'complained',
+    };
 
-        const field = fieldMap[eventType];
-        if (field) {
-          transaction.update(statsRef, {
-            [field]: FieldValue.increment(1),
-            updated_at: FieldValue.serverTimestamp(),
-          });
-        }
-      }
-    });
+    const field = fieldMap[eventType];
+    if (!field) return;
+
+    if (!existing) {
+      // Create new stats document for today
+      const newStats: Record<string, unknown> = {
+        date: today,
+        sent: 0,
+        delivered: 0,
+        opened: 0,
+        clicked: 0,
+        bounced: 0,
+        complained: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      newStats[field] = 1;
+
+      await supabase.from('email_stats').insert(newStats);
+    } else {
+      // Increment the field
+      const currentValue = (existing as Record<string, unknown>)[field] as number || 0;
+      await supabase
+        .from('email_stats')
+        .update({
+          [field]: currentValue + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('date', today);
+    }
   } catch (error) {
     console.error('[Webhook] Error updating stats:', error);
   }

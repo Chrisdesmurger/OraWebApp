@@ -6,7 +6,7 @@
 
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { type ProgramDocument } from '@/types/program';
 import { safeValidateUpdateProgramLessons } from '@/lib/validators/program';
 
@@ -49,15 +49,20 @@ export async function POST(
 
     const { lessons } = validation.data;
 
-    const firestore = getFirestore();
-    const programRef = firestore.collection('programs').doc(id);
-    const programDoc = await programRef.get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!programDoc.exists) {
+    // Fetch current program
+    const { data: programRow, error: fetchError } = await supabase
+      .from('programs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !programRow) {
       return apiError('Program not found', 404);
     }
 
-    const programData = programDoc.data() as ProgramDocument;
+    const programData = programRow as ProgramDocument & { id: string };
 
     // Check permissions: admin can edit all, teacher can edit own
     if (user.role === 'teacher' && programData.author_id !== user.uid) {
@@ -67,20 +72,25 @@ export async function POST(
     // Verify all lesson IDs exist (optional but recommended)
     if (lessons.length > 0) {
       try {
-        const lessonChecks = await Promise.all(
-          lessons.map((lessonId) =>
-            firestore.collection('lessons').doc(lessonId).get()
-          )
-        );
+        const { data: existingLessons, error: lessonError } = await supabase
+          .from('lessons')
+          .select('id')
+          .in('id', lessons);
 
-        const invalidLessons = lessons.filter((lessonId, index) => !lessonChecks[index].exists);
+        if (lessonError) {
+          console.warn('[POST /api/programs/[id]/lessons] Failed to verify lessons:', lessonError.message);
+          // Continue anyway - lesson verification is optional
+        } else if (existingLessons) {
+          const existingIds = new Set(existingLessons.map((l) => l.id));
+          const invalidLessons = lessons.filter((lessonId) => !existingIds.has(lessonId));
 
-        if (invalidLessons.length > 0) {
-          console.warn('[POST /api/programs/[id]/lessons] Invalid lesson IDs:', invalidLessons);
-          return apiError(
-            `Invalid lesson IDs: ${invalidLessons.join(', ')}`,
-            400
-          );
+          if (invalidLessons.length > 0) {
+            console.warn('[POST /api/programs/[id]/lessons] Invalid lesson IDs:', invalidLessons);
+            return apiError(
+              `Invalid lesson IDs: ${invalidLessons.join(', ')}`,
+              400
+            );
+          }
         }
       } catch (lessonError: any) {
         console.warn('[POST /api/programs/[id]/lessons] Failed to verify lessons:', lessonError.message);
@@ -89,10 +99,18 @@ export async function POST(
     }
 
     // Update program with new lesson order
-    await programRef.update({
-      lessons,
-      updated_at: new Date().toISOString(),
-    });
+    const { error: updateError } = await supabase
+      .from('programs')
+      .update({
+        lessons,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('[POST /api/programs/[id]/lessons] Supabase update error:', updateError);
+      return apiError('Failed to update program lessons', 500);
+    }
 
     console.log('[POST /api/programs/[id]/lessons] Updated lessons for program:', id, 'New count:', lessons.length);
     return apiSuccess({ lessons });

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { deleteMultipleFiles } from '@/lib/firebase/storage-utils';
+import { deleteMultipleFiles } from '@/lib/supabase/storage-utils';
 import { logAuditEvent } from '@/lib/audit/logger';
 import type { CleanupRequest, CleanupResponse } from '@/types/media';
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[POST /api/media/cleanup] Attempting to delete', filePaths.length, 'files');
 
-    // Delete files from storage
+    // Delete files from Supabase Storage
     const { deletedCount, errors } = await deleteMultipleFiles(filePaths);
 
     console.log('[POST /api/media/cleanup] Deleted', deletedCount, 'files with', errors.length, 'errors');
@@ -77,8 +77,9 @@ export async function POST(request: NextRequest) {
     };
 
     return apiSuccess(response);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('POST /api/media/cleanup error:', error);
-    return apiError(error.message || 'Failed to cleanup media files', 500);
+    return apiError(errorMessage || 'Failed to cleanup media files', 500);
   }
 }

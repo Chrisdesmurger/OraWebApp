@@ -15,7 +15,7 @@ import {
   apiError,
   apiSuccess,
 } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 /**
  * Firebase Cloud Function HTTP endpoint URL
@@ -46,10 +46,15 @@ export async function POST(
 
     console.log(`[API] Manual recommendation regeneration requested for user: ${uid}`);
 
-    // Verify user exists in Firestore
-    const userDoc = await getFirestore().collection('users').doc(uid).get();
+    // Verify user exists in Supabase
+    const supabase = createSupabaseServiceClient();
+    const { data: userRow, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', uid)
+      .single();
 
-    if (!userDoc.exists) {
+    if (userError || !userRow) {
       return apiError('User not found', 404);
     }
 

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 /**
  * POST /api/admin/migrate-content - Migrate legacy content to lessons
@@ -23,11 +23,19 @@ export async function POST(request: NextRequest) {
 
     console.log(`[POST /api/admin/migrate-content] Starting migration (dryRun=${dryRun})`);
 
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
 
     // Step 1: Fetch all content documents
-    const contentSnapshot = await firestore.collection('content').get();
-    const contentDocs = contentSnapshot.docs;
+    const { data: contentRows, error: contentError } = await supabase
+      .from('content')
+      .select('*');
+
+    if (contentError) {
+      console.error('[migrate-content] Error fetching content:', contentError);
+      return apiError('Failed to fetch content documents', 500);
+    }
+
+    const contentDocs = contentRows || [];
 
     console.log(`[migrate-content] Found ${contentDocs.length} content documents`);
 
@@ -40,20 +48,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 2: Convert to lesson format
-    const lessonsToCreate: Array<{ id: string; data: any }> = [];
+    const lessonsToCreate: Array<{ id: string; data: Record<string, unknown> }> = [];
     const errors: Array<{ id: string; error: string }> = [];
 
     for (const doc of contentDocs) {
       try {
-        const contentData = doc.data();
-        const lessonData = mapContentToLesson(doc.id, contentData, user.uid);
+        const lessonData = mapContentToLesson(doc.id, doc, user.uid);
 
         lessonsToCreate.push({
           id: doc.id,
           data: lessonData
         });
-      } catch (error: any) {
-        errors.push({ id: doc.id, error: error.message });
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        errors.push({ id: doc.id, error: message });
         console.error(`[migrate-content] Error mapping ${doc.id}:`, error);
       }
     }
@@ -69,49 +77,52 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Step 3: Write to lessons collection
-    const batch = firestore.batch();
+    // Step 3: Write to lessons table
     let written = 0;
 
-    for (const lesson of lessonsToCreate) {
-      const lessonRef = firestore.collection('lessons').doc(lesson.id);
-      batch.set(lessonRef, lesson.data);
-      written++;
+    // Supabase supports bulk inserts, batch by 500
+    for (let i = 0; i < lessonsToCreate.length; i += 500) {
+      const batch = lessonsToCreate.slice(i, i + 500);
+      const insertRows = batch.map(lesson => ({
+        id: lesson.id,
+        ...lesson.data,
+      }));
 
-      // Firestore batch limit is 500
-      if (written >= 500) {
-        await batch.commit();
-        console.log(`[migrate-content] Committed batch of ${written} lessons`);
-        written = 0;
+      const { error: insertError } = await supabase
+        .from('lessons')
+        .upsert(insertRows);
+
+      if (insertError) {
+        console.error(`[migrate-content] Batch insert error at offset ${i}:`, insertError);
+        errors.push({ id: `batch-${i}`, error: insertError.message });
+      } else {
+        written += batch.length;
+        console.log(`[migrate-content] Inserted batch of ${batch.length} lessons`);
       }
     }
 
-    if (written > 0) {
-      await batch.commit();
-      console.log(`[migrate-content] Committed final batch of ${written} lessons`);
-    }
-
-    console.log(`[migrate-content] Migration complete - ${lessonsToCreate.length} lessons created`);
+    console.log(`[migrate-content] Migration complete - ${written} lessons created`);
 
     return apiSuccess({
       message: 'Migration complete',
-      migrated: lessonsToCreate.length,
+      migrated: written,
       errors
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('POST /api/admin/migrate-content error:', error);
-    return apiError(error.message || 'Migration failed', 500);
+    const message = error instanceof Error ? error.message : 'Migration failed';
+    return apiError(message, 500);
   }
 }
 
 /**
- * Maps legacy content document to new LessonDocument format
+ * Maps legacy content document to new lesson format
  */
-function mapContentToLesson(contentId: string, contentData: any, authorId: string) {
+function mapContentToLesson(contentId: string, contentData: Record<string, unknown>, authorId: string) {
   const now = new Date().toISOString();
 
   // Extract category from content
-  const category = contentData.category || 'wellness';
+  const category = (contentData.category as string) || 'wellness';
 
   // Determine lesson type based on media URLs
   const hasVideo = !!contentData.videoUrl;
@@ -121,7 +132,7 @@ function mapContentToLesson(contentId: string, contentData: any, authorId: strin
   // Build tags from existing data
   const tags = [
     category.toLowerCase(),
-    ...(contentData.tags || [])
+    ...((contentData.tags as string[]) || [])
   ];
 
   // Add instructor tag if present
@@ -129,8 +140,8 @@ function mapContentToLesson(contentId: string, contentData: any, authorId: strin
     tags.push(`instructor:${contentData.instructor}`);
   }
 
-  // Convert duration (minutes → seconds)
-  const durationMinutes = contentData.durationMinutes || contentData.duration || 0;
+  // Convert duration (minutes to seconds)
+  const durationMinutes = (contentData.durationMinutes as number) || (contentData.duration as number) || 0;
   const duration_sec = durationMinutes * 60;
 
   // Build renditions from videoUrl (if available)
@@ -157,16 +168,16 @@ function mapContentToLesson(contentId: string, contentData: any, authorId: strin
     };
   }
 
-  // Map to LessonDocument schema (snake_case)
+  // Map to lesson schema (snake_case)
   return {
     // Basic Information
-    title: contentData.title || 'Untitled Lesson',
-    description: contentData.description || null,
+    title: (contentData.title as string) || 'Untitled Lesson',
+    description: (contentData.description as string) || null,
     type: type,
 
     // Program Association (default to first program if not specified)
-    program_id: contentData.programId || 'default-program',
-    order: contentData.order || 0,
+    program_id: (contentData.programId as string) || 'default-program',
+    order: (contentData.order as number) || 0,
 
     // Media Details
     duration_sec: duration_sec > 0 ? duration_sec : null,
@@ -174,7 +185,7 @@ function mapContentToLesson(contentId: string, contentData: any, authorId: strin
     transcript: null,
 
     // Storage & Processing
-    status: contentData.isActive === false ? 'draft' : 'ready',
+    status: (contentData.isActive as boolean) === false ? 'draft' : 'ready',
     storage_path_original: null,
     renditions: renditions,
     audio_variants: audio_variants,
@@ -183,11 +194,11 @@ function mapContentToLesson(contentId: string, contentData: any, authorId: strin
     mime_type: null,
 
     // Metadata
-    thumbnail_url: contentData.thumbnailUrl || null,
+    thumbnail_url: (contentData.thumbnailUrl as string) || null,
 
     // Timestamps
-    created_at: contentData.createdAt?.toDate?.()?.toISOString() || now,
-    updated_at: contentData.updatedAt?.toDate?.()?.toISOString() || now,
+    created_at: (contentData.created_at as string) || now,
+    updated_at: (contentData.updated_at as string) || now,
 
     // Authorship (use admin who ran migration)
     author_id: authorId,

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { mapOnboardingConfigToFirestore } from '@/lib/onboarding/firestore-mappers';
 import type { OnboardingConfig, CreateOnboardingRequest } from '@/types/onboarding';
@@ -23,18 +23,29 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 
-    const db = getFirestore();
-    let query = db.collection('onboarding_configs').orderBy('createdAt', 'desc').limit(limit);
+    const supabase = createSupabaseServiceClient();
+
+    let query = supabase
+      .from('onboarding_configs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
     // Filter by status if provided
     if (status && ['draft', 'active', 'archived'].includes(status)) {
-      query = query.where('status', '==', status) as any;
+      query = query.eq('status', status);
     }
 
-    const snapshot = await query.get();
-    const configs: OnboardingConfig[] = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
+    const { data: rows, error } = await query;
+
+    if (error) {
+      console.error('GET /api/admin/onboarding Supabase error:', error);
+      return apiError('Failed to fetch onboarding configurations', 500);
+    }
+
+    const configs: OnboardingConfig[] = (rows || []).map(row => ({
+      id: row.id,
+      ...row,
     })) as OnboardingConfig[];
 
     return apiSuccess({
@@ -42,9 +53,10 @@ export async function GET(request: NextRequest) {
       total: configs.length,
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('GET /api/admin/onboarding error:', error);
-    return apiError(error.message || 'Failed to fetch onboarding configurations', 500);
+    const message = error instanceof Error ? error.message : 'Failed to fetch onboarding configurations';
+    return apiError(message, 500);
   }
 }
 
@@ -93,19 +105,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const db = getFirestore();
-    const now = new Date();
+    const supabase = createSupabaseServiceClient();
+    const now = new Date().toISOString();
 
     // Generate version ID (v1.0, v1.1, etc.)
-    const existingVersions = await db
-      .collection('onboarding_configs')
-      .orderBy('createdAt', 'desc')
-      .limit(1)
-      .get();
+    const { data: existingVersions } = await supabase
+      .from('onboarding_configs')
+      .select('version')
+      .order('created_at', { ascending: false })
+      .limit(1);
 
     let versionNumber = '1.0';
-    if (!existingVersions.empty) {
-      const lastVersion = existingVersions.docs[0].data().version || '1.0';
+    if (existingVersions && existingVersions.length > 0) {
+      const lastVersion = existingVersions[0].version || '1.0';
       const parts = lastVersion.split('.');
       const minor = parseInt(parts[1] || '0', 10) + 1;
       versionNumber = `${parts[0]}.${minor}`;
@@ -124,28 +136,41 @@ export async function POST(request: NextRequest) {
       status: 'draft',
       version: versionNumber,
       questions: questionsWithIds,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: new Date(now),
+      updatedAt: new Date(now),
       createdBy: currentUser.uid,
     };
 
     const mapped = mapOnboardingConfigToFirestore(newConfig as any);
 
-    // Ensure Android-compatible timestamps exist
-    const firestorePayload = {
-      ...mapped.value,
+    // Build Supabase insert payload
+    const insertPayload = {
+      title: newConfig.title,
+      description: newConfig.description,
+      status: 'draft',
+      version: versionNumber,
+      questions: questionsWithIds,
+      created_by: currentUser.uid,
       created_at: now,
       updated_at: now,
-      created_by: currentUser.uid,
     };
 
-    const docRef = await db.collection('onboarding_configs').add(firestorePayload);
+    const { data: created, error: insertError } = await supabase
+      .from('onboarding_configs')
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    if (insertError || !created) {
+      console.error('POST /api/admin/onboarding insert error:', insertError);
+      return apiError('Failed to create onboarding configuration', 500);
+    }
 
     // Log audit event
     logAuditEvent({
       action: 'onboarding.created',
       resourceType: 'onboarding_config',
-      resourceId: docRef.id,
+      resourceId: created.id,
       actorId: currentUser.uid,
       actorEmail: currentUser.email || 'unknown',
       changesAfter: {
@@ -156,13 +181,14 @@ export async function POST(request: NextRequest) {
     });
 
     return apiSuccess({
-      id: docRef.id,
+      id: created.id,
       ...newConfig,
       message: 'Onboarding configuration created successfully',
     }, 201);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('POST /api/admin/onboarding error:', error);
-    return apiError(error.message || 'Failed to create onboarding configuration', 500);
+    const message = error instanceof Error ? error.message : 'Failed to create onboarding configuration';
+    return apiError(message, 500);
   }
 }

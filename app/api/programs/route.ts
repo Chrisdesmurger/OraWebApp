@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { mapProgramFromFirestore, mapProgramToFirestore, type ProgramDocument, type Program } from '@/types/program';
 import { safeValidateGetProgramsQuery } from '@/lib/validators/program';
 import { logCreate } from '@/lib/audit/logger';
@@ -32,56 +32,43 @@ export async function GET(request: NextRequest) {
 
     const { category, status, search } = validation.data;
 
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
 
     console.log('[GET /api/programs] Fetching programs for user role:', user.role, 'with filters:', { category, status, search });
 
-    let snapshot;
-    try {
-      let query = firestore.collection('programs').orderBy('created_at', 'desc');
+    let query = supabase
+      .from('programs')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      // Teachers only see their own programs
-      if (user.role === 'teacher') {
-        query = query.where('author_id', '==', user.uid) as any;
-      }
-
-      // Apply category filter
-      if (category) {
-        query = query.where('category', '==', category) as any;
-      }
-
-      // Apply status filter
-      if (status) {
-        query = query.where('status', '==', status) as any;
-      }
-
-      snapshot = await query.get();
-      console.log('[GET /api/programs] With orderBy - Found', snapshot.size, 'programs');
-    } catch (orderError: any) {
-      console.warn('[GET /api/programs] orderBy failed, trying without:', orderError.message);
-      // Fallback: fetch without ordering
-      let query = firestore.collection('programs');
-
-      if (user.role === 'teacher') {
-        query = query.where('author_id', '==', user.uid) as any;
-      }
-
-      if (category) {
-        query = query.where('category', '==', category) as any;
-      }
-
-      if (status) {
-        query = query.where('status', '==', status) as any;
-      }
-
-      snapshot = await query.get();
-      console.log('[GET /api/programs] Without orderBy - Found', snapshot.size, 'programs');
+    // Teachers only see their own programs
+    if (user.role === 'teacher') {
+      query = query.eq('author_id', user.uid);
     }
 
-    // Map Firestore documents to client-side Program objects
-    let programs = snapshot.docs.map((doc) => {
-      const data = doc.data() as ProgramDocument;
-      return mapProgramFromFirestore(doc.id, data);
+    // Apply category filter
+    if (category) {
+      query = query.eq('category', category);
+    }
+
+    // Apply status filter
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data: rows, error: queryError } = await query;
+
+    if (queryError) {
+      console.error('[GET /api/programs] Supabase query error:', queryError);
+      return apiError('Failed to fetch programs', 500);
+    }
+
+    console.log('[GET /api/programs] Found', rows?.length ?? 0, 'programs');
+
+    // Map Supabase rows to client-side Program objects
+    let programs = (rows || []).map((row) => {
+      const data = row as ProgramDocument & { id: string };
+      return mapProgramFromFirestore(data.id, data as ProgramDocument);
     });
 
     // Apply search filter (client-side for now)
@@ -149,12 +136,11 @@ export async function POST(request: NextRequest) {
       autoPublishEnabled = false,
     } = validation.data;
 
-    const firestore = getFirestore();
-    const programRef = firestore.collection('programs').doc();
+    const supabase = createSupabaseServiceClient();
 
     const now = new Date().toISOString();
 
-    // Create Firestore document using mapper (handles i18n conversion)
+    // Create document using mapper (handles i18n conversion)
     const programDocument: ProgramDocument = {
       ...mapProgramToFirestore(validation.data as any),
       cover_storage_path: null,
@@ -164,15 +150,24 @@ export async function POST(request: NextRequest) {
       updated_at: now,
     };
 
-    await programRef.set(programDocument);
+    const { data: created, error: insertError } = await supabase
+      .from('programs')
+      .insert(programDocument)
+      .select()
+      .single();
+
+    if (insertError || !created) {
+      console.error('[POST /api/programs] Supabase insert error:', insertError);
+      return apiError('Failed to create program', 500);
+    }
 
     // Return camelCase response
-    const program = mapProgramFromFirestore(programRef.id, programDocument);
+    const program = mapProgramFromFirestore(created.id, created as ProgramDocument);
 
     // Log audit event (don't await - fire and forget)
     logCreate({
       resourceType: 'program',
-      resourceId: programRef.id,
+      resourceId: created.id,
       actorId: user.uid,
       actorEmail: user.email || 'unknown',
       resource: programDocument,

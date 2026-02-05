@@ -8,7 +8,7 @@
 
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { mapProgramFromFirestore, mapProgramToFirestore, type ProgramDocument, type Program } from '@/types/program';
 import { safeValidateUpdateProgram } from '@/lib/validators/program';
 import { logUpdate, logDelete, logStatusChange } from '@/lib/audit/logger';
@@ -26,15 +26,19 @@ export async function GET(
     const user = await authenticateRequest(request);
     const { id } = await params;
 
-    const firestore = getFirestore();
-    const programRef = firestore.collection('programs').doc(id);
-    const programDoc = await programRef.get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!programDoc.exists) {
+    const { data: programRow, error: fetchError } = await supabase
+      .from('programs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !programRow) {
       return apiError('Program not found', 404);
     }
 
-    const programData = programDoc.data() as ProgramDocument;
+    const programData = programRow as ProgramDocument & { id: string };
 
     // Check permissions: admin can view all, teacher can view own drafts
     if (programData.status === 'draft') {
@@ -47,26 +51,28 @@ export async function GET(
     }
 
     // Map to camelCase
-    const program = mapProgramFromFirestore(id, programData);
+    const program = mapProgramFromFirestore(id, programData as ProgramDocument);
 
     // Fetch lesson details if program has lessons
     let lessonDetails: any[] = [];
     if (program.lessons && program.lessons.length > 0) {
       try {
-        const lessonDocs = await Promise.all(
-          program.lessons.map((lessonId) =>
-            firestore.collection('lessons').doc(lessonId).get()
-          )
-        );
+        const { data: lessonRows, error: lessonError } = await supabase
+          .from('lessons')
+          .select('*')
+          .in('id', program.lessons);
 
-        lessonDetails = lessonDocs
-          .filter((doc) => doc.exists)
-          .map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
+        if (lessonError) {
+          console.warn('[GET /api/programs/[id]] Failed to fetch lesson details:', lessonError.message);
+        } else if (lessonRows) {
+          // Preserve the lesson order from the program's lessons array
+          const lessonMap = new Map(lessonRows.map((row) => [row.id, row]));
+          lessonDetails = program.lessons
+            .map((lessonId) => lessonMap.get(lessonId))
+            .filter(Boolean) as any[];
 
-        console.log('[GET /api/programs/[id]] Fetched', lessonDetails.length, 'lesson details');
+          console.log('[GET /api/programs/[id]] Fetched', lessonDetails.length, 'lesson details');
+        }
       } catch (lessonError: any) {
         console.warn('[GET /api/programs/[id]] Failed to fetch lesson details:', lessonError.message);
         // Continue without lesson details
@@ -119,15 +125,20 @@ export async function PATCH(
       return apiError(`Validation failed: ${errors}`, 400);
     }
 
-    const firestore = getFirestore();
-    const programRef = firestore.collection('programs').doc(id);
-    const programDoc = await programRef.get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!programDoc.exists) {
+    // Fetch current program
+    const { data: programRow, error: fetchError } = await supabase
+      .from('programs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !programRow) {
       return apiError('Program not found', 404);
     }
 
-    const programData = programDoc.data() as ProgramDocument;
+    const programData = programRow as ProgramDocument & { id: string };
 
     // Check permissions: admin can edit all, teacher can edit own
     if (user.role === 'teacher' && programData.author_id !== user.uid) {
@@ -140,7 +151,7 @@ export async function PATCH(
     // Build update object with snake_case fields using mapper
     const mappedData = mapProgramToFirestore(validation.data as any);
 
-    // Remove undefined values (Firestore doesn't allow undefined)
+    // Remove undefined values
     const updateData: Partial<ProgramDocument> = Object.fromEntries(
       Object.entries({
         ...mappedData,
@@ -148,12 +159,29 @@ export async function PATCH(
       }).filter(([_, value]) => value !== undefined)
     ) as Partial<ProgramDocument>;
 
-    await programRef.update(updateData);
+    const { error: updateError } = await supabase
+      .from('programs')
+      .update(updateData)
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('[PATCH /api/programs/[id]] Supabase update error:', updateError);
+      return apiError('Failed to update program', 500);
+    }
 
     // Fetch updated program
-    const updatedDoc = await programRef.get();
-    const updatedData = updatedDoc.data() as ProgramDocument;
-    const program = mapProgramFromFirestore(id, updatedData);
+    const { data: updatedRow, error: refetchError } = await supabase
+      .from('programs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (refetchError || !updatedRow) {
+      return apiError('Failed to fetch updated program', 500);
+    }
+
+    const updatedData = updatedRow as ProgramDocument & { id: string };
+    const program = mapProgramFromFirestore(id, updatedData as ProgramDocument);
 
     // Log audit event (don't await - fire and forget)
     const isStatusChange = validation.data.status !== undefined && validation.data.status !== beforeState.status;
@@ -240,15 +268,20 @@ export async function DELETE(
       return apiError('Insufficient permissions', 403);
     }
 
-    const firestore = getFirestore();
-    const programRef = firestore.collection('programs').doc(id);
-    const programDoc = await programRef.get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!programDoc.exists) {
+    // Fetch program to check ownership and save state for audit
+    const { data: programRow, error: fetchError } = await supabase
+      .from('programs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !programRow) {
       return apiError('Program not found', 404);
     }
 
-    const programData = programDoc.data() as ProgramDocument;
+    const programData = programRow as ProgramDocument & { id: string };
 
     // Check permissions: admin can delete all, teacher can delete own
     if (user.role === 'teacher' && programData.author_id !== user.uid) {
@@ -258,7 +291,15 @@ export async function DELETE(
     // Save state before deletion for audit log
     const beforeState = { ...programData };
 
-    await programRef.delete();
+    const { error: deleteError } = await supabase
+      .from('programs')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      console.error('[DELETE /api/programs/[id]] Supabase delete error:', deleteError);
+      return apiError('Failed to delete program', 500);
+    }
 
     // Log audit event (don't await - fire and forget)
     logDelete({

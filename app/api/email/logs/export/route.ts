@@ -12,7 +12,7 @@
 
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 interface EmailLogData {
   email_type: string;
@@ -43,40 +43,48 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const emailType = searchParams.get('type');
 
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
 
     // Build query
-    let query = firestore
-      .collection('email_logs')
-      .orderBy('sent_at', 'desc');
+    let query = supabase
+      .from('email_logs')
+      .select('*')
+      .order('sent_at', { ascending: false });
 
     // Apply date filters
     if (startDate) {
       const startTimestamp = new Date(startDate).getTime();
-      query = query.where('sent_at', '>=', startTimestamp);
+      query = query.gte('sent_at', startTimestamp);
     }
 
     if (endDate) {
       const endTimestamp = new Date(endDate).getTime() + 24 * 60 * 60 * 1000; // Include full day
-      query = query.where('sent_at', '<=', endTimestamp);
+      query = query.lte('sent_at', endTimestamp);
+    }
+
+    // Apply additional filters
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    if (emailType) {
+      query = query.eq('email_type', emailType);
     }
 
     // Limit to prevent memory issues
     query = query.limit(10000);
 
-    const logsSnapshot = await query.get();
+    const { data: rows, error } = await query;
 
-    // Filter in memory for additional criteria
-    const logs = logsSnapshot.docs
-      .map((doc) => ({
-        id: doc.id,
-        ...doc.data() as EmailLogData,
-      }))
-      .filter((log) => {
-        if (status && log.status !== status) return false;
-        if (emailType && log.email_type !== emailType) return false;
-        return true;
-      });
+    if (error) {
+      console.error('[Email Logs Export] Supabase error:', error);
+      return apiError('Failed to export email logs', 500);
+    }
+
+    const logs = (rows || []).map((row) => ({
+      id: row.id,
+      ...row as unknown as EmailLogData,
+    }));
 
     // Generate CSV
     const csv = generateCSV(logs);

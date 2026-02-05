@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
-import type { OnboardingAnalytics, UserOnboardingResponse, QuestionMetrics } from '@/types/onboarding';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import type { OnboardingAnalytics, QuestionMetrics } from '@/types/onboarding';
 
 /**
  * GET /api/admin/onboarding/[id]/analytics - Get analytics for onboarding configuration
@@ -31,34 +31,44 @@ export async function GET(
     const startDateParam = searchParams.get('startDate');
     const endDateParam = searchParams.get('endDate');
 
-    const db = getFirestore();
+    const supabase = createSupabaseServiceClient();
 
     // Verify config exists
-    const configDoc = await db.collection('onboarding_configs').doc(id).get();
-    if (!configDoc.exists) {
+    const { data: configRow, error: configError } = await supabase
+      .from('onboarding_configs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (configError || !configRow) {
       return apiError('Onboarding configuration not found', 404);
     }
 
-    const configData = configDoc.data();
+    const configData = configRow;
 
-    // Build query for user responses using collectionGroup (efficient)
-    // NEW: Query dedicated collection instead of nested field
-    let responsesQuery = db
-      .collectionGroup('responses')
-      .where('config_version', '==', id);
+    // Build query for user responses
+    let responsesQuery = supabase
+      .from('onboarding_responses')
+      .select('*')
+      .eq('config_version', id);
 
     // Apply date filters if provided
     if (startDateParam) {
-      const startDate = new Date(startDateParam);
-      responsesQuery = responsesQuery.where('started_at', '>=', startDate) as any;
+      responsesQuery = responsesQuery.gte('started_at', startDateParam);
     }
 
     if (endDateParam) {
-      const endDate = new Date(endDateParam);
-      responsesQuery = responsesQuery.where('started_at', '<=', endDate) as any;
+      responsesQuery = responsesQuery.lte('started_at', endDateParam);
     }
 
-    const responsesSnapshot = await responsesQuery.get();
+    const { data: responsesRows, error: responsesError } = await responsesQuery;
+
+    if (responsesError) {
+      console.error('GET /api/admin/onboarding/[id]/analytics responses error:', responsesError);
+      return apiError('Failed to fetch responses', 500);
+    }
+
+    const responses = responsesRows || [];
 
     // Calculate analytics
     let totalStarts = 0;
@@ -67,7 +77,7 @@ export async function GET(
     const questionMetrics: Record<string, QuestionMetrics> = {};
 
     // Initialize question metrics
-    if (configData?.questions) {
+    if (configData?.questions && Array.isArray(configData.questions)) {
       configData.questions.forEach((q: any) => {
         questionMetrics[q.id] = {
           questionId: q.id,
@@ -82,10 +92,8 @@ export async function GET(
       });
     }
 
-    // Process responses (NEW: using dedicated collection data structure)
-    responsesSnapshot.docs.forEach(doc => {
-      const data = doc.data();
-
+    // Process responses
+    responses.forEach(data => {
       totalStarts++;
 
       if (data.completed) {
@@ -119,7 +127,7 @@ export async function GET(
         });
 
         // Calculate drop-offs
-        if (!data.completed && configData?.questions) {
+        if (!data.completed && configData?.questions && Array.isArray(configData.questions)) {
           // Find last answered question
           const lastAnsweredIndex = configData.questions.findIndex(
             (q: any) => !answeredQuestionIds.has(q.id)
@@ -157,8 +165,9 @@ export async function GET(
 
     return apiSuccess(analytics);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('GET /api/admin/onboarding/[id]/analytics error:', error);
-    return apiError(error.message || 'Failed to fetch analytics', 500);
+    const message = error instanceof Error ? error.message : 'Failed to fetch analytics';
+    return apiError(message, 500);
   }
 }

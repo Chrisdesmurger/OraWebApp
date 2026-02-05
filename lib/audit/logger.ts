@@ -1,14 +1,39 @@
 /**
  * Audit Logger Utility
  *
- * Provides functions to log admin actions to Firestore audit_logs collection.
+ * Provides functions to log admin actions to Supabase audit_logs table.
  * Automatically extracts IP address and user agent from requests.
+ *
+ * PostgreSQL audit_logs table columns:
+ * - id (UUID, auto-generated)
+ * - action (text - uses underscores, e.g. 'onboarding_created')
+ * - resource_type (text)
+ * - resource_id (text)
+ * - actor_id (UUID)
+ * - actor_email (text)
+ * - changes (JSONB)
+ * - ip_address (text)
+ * - user_agent (text)
+ * - created_at (TIMESTAMPTZ, auto-set)
  */
 
 import { NextRequest } from 'next/server';
-import { getFirestore } from '@/lib/firebase/admin';
-import type { LogAuditEventParams, AuditAction, ResourceType } from '@/types/audit';
-import { mapAuditLogToFirestore, computeChanges } from '@/types/audit';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import type { AuditAction, ResourceType } from '@/types/audit';
+import { computeChanges } from '@/types/audit';
+
+/**
+ * Convert AuditAction dots to underscores for PostgreSQL ENUM
+ *
+ * TypeScript AuditAction uses dots (e.g. 'onboarding.created')
+ * but PostgreSQL ENUM uses underscores (e.g. 'onboarding_created').
+ *
+ * @param action - AuditAction with possible dots
+ * @returns Action string with dots replaced by underscores
+ */
+function toPostgresAction(action: AuditAction): string {
+  return action.replace(/\./g, '_');
+}
 
 /**
  * Extract IP address from NextRequest
@@ -56,7 +81,7 @@ function extractUserAgent(request: NextRequest): string {
 }
 
 /**
- * Log an audit event to Firestore
+ * Log an audit event to Supabase
  *
  * @param params - Audit event parameters
  * @param params.action - Type of action performed
@@ -101,22 +126,23 @@ export async function logAuditEvent(params: {
     // Compute changes diff
     const changes = computeChanges(changesBefore, changesAfter);
 
-    // Create audit log document
-    const auditLogData = mapAuditLogToFirestore({
-      action,
-      resourceType,
-      resourceId,
-      actorId,
-      actorEmail,
+    // Insert directly into Supabase with PostgreSQL column names
+    const supabase = createSupabaseServiceClient();
+    const { error } = await supabase.from('audit_logs').insert({
+      action: toPostgresAction(action),
+      resource_type: resourceType,
+      resource_id: resourceId,
+      actor_id: actorId,
+      actor_email: actorEmail,
       changes,
-      ipAddress,
-      userAgent,
-      timestamp: new Date().toISOString(),
+      ip_address: ipAddress,
+      user_agent: userAgent,
     });
 
-    // Write to Firestore
-    const firestore = getFirestore();
-    await firestore.collection('audit_logs').add(auditLogData);
+    if (error) {
+      console.error('[AuditLog] Supabase insert error:', error);
+      return;
+    }
 
     console.log(`[AuditLog] ${action} on ${resourceType}:${resourceId} by ${actorEmail} (${ipAddress})`);
   } catch (error) {

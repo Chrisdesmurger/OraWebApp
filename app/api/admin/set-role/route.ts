@@ -1,12 +1,14 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getAuth } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { logRoleChange } from '@/lib/audit/logger';
 
 /**
  * POST /api/admin/set-role - Set user role (admin only)
  *
  * Body: { uid: string, role: 'admin' | 'teacher' | 'viewer' | 'user' }
+ *
+ * Updates the role column in the Supabase users table.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -33,20 +35,29 @@ export async function POST(request: NextRequest) {
       return apiError('You cannot remove your own admin role', 403);
     }
 
-    const auth = getAuth();
-
-    // Get target user
-    const targetUser = await auth.getUser(uid);
+    const supabase = createSupabaseServiceClient();
 
     // Get current role for audit log
-    const currentRole = targetUser.customClaims?.role || 'user';
+    const { data: targetUser, error: fetchError } = await supabase
+      .from('users')
+      .select('id, email, role')
+      .eq('id', uid)
+      .single();
 
-    // Set custom claims
-    if (role === 'user') {
-      // Remove role claim for regular users
-      await auth.setCustomUserClaims(uid, {});
-    } else {
-      await auth.setCustomUserClaims(uid, { role });
+    if (fetchError || !targetUser) {
+      return apiError('User not found', 404);
+    }
+
+    const currentRole = targetUser.role || 'user';
+
+    // Update role in users table
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ role, updated_at: new Date().toISOString() })
+      .eq('id', uid);
+
+    if (updateError) {
+      return apiError('Failed to update role: ' + updateError.message, 500);
     }
 
     // Log audit event (don't await - fire and forget)
@@ -66,12 +77,12 @@ export async function POST(request: NextRequest) {
       uid,
       email: targetUser.email,
       role,
-      message: `Role set to ${role} successfully. User needs to refresh their ID token.`,
+      message: `Role set to ${role} successfully.`,
     });
-
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('POST /api/admin/set-role error:', error);
-    return apiError(error.message || 'Failed to set user role', 500);
+    return apiError(errorMessage || 'Failed to set user role', 500);
   }
 }
 
@@ -93,20 +104,26 @@ export async function GET(request: NextRequest) {
       return apiError('User UID is required', 400);
     }
 
-    const auth = getAuth();
-    const targetUser = await auth.getUser(uid);
+    const supabase = createSupabaseServiceClient();
 
-    const role = targetUser.customClaims?.role || 'user';
+    const { data: targetUser, error } = await supabase
+      .from('users')
+      .select('id, email, role')
+      .eq('id', uid)
+      .single();
+
+    if (error || !targetUser) {
+      return apiError('User not found', 404);
+    }
 
     return apiSuccess({
-      uid: targetUser.uid,
+      uid: targetUser.id,
       email: targetUser.email,
-      role,
-      customClaims: targetUser.customClaims || {},
+      role: targetUser.role || 'user',
     });
-
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('GET /api/admin/set-role error:', error);
-    return apiError(error.message || 'Failed to get user role', 500);
+    return apiError(errorMessage || 'Failed to get user role', 500);
   }
 }

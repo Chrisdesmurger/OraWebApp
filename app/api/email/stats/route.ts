@@ -10,7 +10,7 @@
 
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 interface DailyStats {
   date: string;
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     const breakdown = searchParams.get('breakdown') || 'daily';
     const emailType = searchParams.get('type');
 
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
     const now = Date.now();
 
     // Calculate time range
@@ -47,15 +47,21 @@ export async function GET(request: NextRequest) {
     const startTime = now - (periodMs[period] || periodMs['30d']);
 
     // Build query
-    let query = firestore
-      .collection('email_logs')
-      .orderBy('sent_at', 'desc');
+    let query = supabase
+      .from('email_logs')
+      .select('*')
+      .order('sent_at', { ascending: false });
 
     if (period !== 'all') {
-      query = query.where('sent_at', '>=', startTime);
+      query = query.gte('sent_at', startTime);
     }
 
-    const logsSnapshot = await query.get();
+    const { data: logsRows, error } = await query;
+
+    if (error) {
+      console.error('[Email Stats] Supabase error:', error);
+      return apiError('Failed to fetch email stats', 500);
+    }
 
     // Initialize counters
     let totalSent = 0;
@@ -71,8 +77,7 @@ export async function GET(request: NextRequest) {
     // Time series data
     const dailyStatsMap: Map<string, DailyStats> = new Map();
 
-    logsSnapshot.docs.forEach((doc) => {
-      const data = doc.data();
+    (logsRows || []).forEach((data) => {
       const sentAt = data.sent_at || 0;
       const type = data.email_type || 'unknown';
 

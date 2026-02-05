@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { deleteSingleFile, getAllRelatedFilePaths } from '@/lib/firebase/storage-utils';
-import { getFirestore } from '@/lib/firebase/admin';
+import { deleteSingleFile, getAllRelatedFilePaths } from '@/lib/supabase/storage-utils';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { logDelete } from '@/lib/audit/logger';
 
 /**
@@ -44,10 +44,10 @@ export async function DELETE(
       return apiError('Invalid file path. Must start with "media/"', 400);
     }
 
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
 
     // Get ALL related file paths (original + renditions)
-    const allPaths = await getAllRelatedFilePaths(firestore, filePath);
+    const allPaths = await getAllRelatedFilePaths(supabase, filePath);
 
     console.log('[DELETE /api/media/[id]] Deleting', allPaths.length, 'files:', allPaths);
 
@@ -59,9 +59,10 @@ export async function DELETE(
       try {
         await deleteSingleFile(path);
         deletedPaths.push(path);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error('[DELETE /api/media/[id]] Failed to delete:', path, error);
-        errors.push({ path, error: error.message });
+        errors.push({ path, error: errorMessage });
       }
     }
 
@@ -88,8 +89,9 @@ export async function DELETE(
       deletedPaths,
       errors: errors.length > 0 ? errors : undefined,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('DELETE /api/media/[id] error:', error);
-    return apiError(error.message || 'Failed to delete media file', 500);
+    return apiError(errorMessage || 'Failed to delete media file', 500);
   }
 }

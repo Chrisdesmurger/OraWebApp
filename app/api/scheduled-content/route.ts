@@ -19,7 +19,7 @@
 
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { mapProgramFromFirestore, type ProgramDocument } from '@/types/program';
 import { mapLessonFromFirestore, type LessonDocument } from '@/types/lesson';
 import {
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       return apiError('Invalid endDate format (must be ISO 8601 timestamp)', 400);
     }
 
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
     const allScheduledItems: ScheduledContentItem[] = [];
 
     console.log('[GET /api/scheduled-content] Fetching scheduled content with filters:', {
@@ -69,25 +69,28 @@ export async function GET(request: NextRequest) {
     // Fetch programs if not filtering by type='lesson'
     if (!type || type === 'program') {
       try {
-        let programsQuery = firestore.collection('programs');
+        let programsQuery = supabase.from('programs').select('*');
 
         // Teachers only see their own programs
         if (user.role === 'teacher' || authorId) {
           const filterAuthorId = authorId || user.uid;
-          programsQuery = programsQuery.where('author_id', '==', filterAuthorId) as any;
+          programsQuery = programsQuery.eq('author_id', filterAuthorId);
         }
 
-        const programsSnapshot = await programsQuery.get();
-        console.log('[GET /api/scheduled-content] Found', programsSnapshot.size, 'programs');
+        const { data: programs, error: programsError } = await programsQuery;
 
-        programsSnapshot.forEach((doc) => {
-          const programData = doc.data() as ProgramDocument;
-          const program = mapProgramFromFirestore(doc.id, programData);
+        if (programsError) throw programsError;
+
+        console.log('[GET /api/scheduled-content] Found', (programs ?? []).length, 'programs');
+
+        (programs ?? []).forEach((row) => {
+          const program = mapProgramFromFirestore(row.id, row as unknown as ProgramDocument);
           const scheduledItems = programToScheduledItems(program);
           allScheduledItems.push(...scheduledItems);
         });
-      } catch (error: any) {
-        console.error('[GET /api/scheduled-content] Error fetching programs:', error);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[GET /api/scheduled-content] Error fetching programs:', msg);
         // Continue to lessons even if programs fail
       }
     }
@@ -95,32 +98,35 @@ export async function GET(request: NextRequest) {
     // Fetch lessons if not filtering by type='program'
     if (!type || type === 'lesson') {
       try {
-        let lessonsQuery = firestore.collection('lessons');
+        let lessonsQuery = supabase.from('lessons').select('*');
 
         // Teachers only see their own lessons
         if (user.role === 'teacher' || authorId) {
           const filterAuthorId = authorId || user.uid;
-          lessonsQuery = lessonsQuery.where('author_id', '==', filterAuthorId) as any;
+          lessonsQuery = lessonsQuery.eq('author_id', filterAuthorId);
         }
 
-        const lessonsSnapshot = await lessonsQuery.get();
-        console.log('[GET /api/scheduled-content] Found', lessonsSnapshot.size, 'lessons');
+        const { data: lessons, error: lessonsError } = await lessonsQuery;
 
-        lessonsSnapshot.forEach((doc) => {
-          const lessonData = doc.data() as LessonDocument;
-          const lesson = mapLessonFromFirestore(doc.id, lessonData);
+        if (lessonsError) throw lessonsError;
+
+        console.log('[GET /api/scheduled-content] Found', (lessons ?? []).length, 'lessons');
+
+        (lessons ?? []).forEach((row) => {
+          const lesson = mapLessonFromFirestore(row.id, row as unknown as LessonDocument);
 
           // Skip invalid lessons (Issue #64: validation returns null for invalid data)
           if (lesson === null) {
-            console.warn(`[GET /api/scheduled-content] Skipping invalid lesson ${doc.id}`);
+            console.warn(`[GET /api/scheduled-content] Skipping invalid lesson ${row.id}`);
             return;
           }
 
           const scheduledItems = lessonToScheduledItems(lesson);
           allScheduledItems.push(...scheduledItems);
         });
-      } catch (error: any) {
-        console.error('[GET /api/scheduled-content] Error fetching lessons:', error);
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[GET /api/scheduled-content] Error fetching lessons:', msg);
         // Continue even if lessons fail
       }
     }
@@ -163,8 +169,9 @@ export async function GET(request: NextRequest) {
       items: filteredItems,
       count: filteredItems.length,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('GET /api/scheduled-content error:', error);
-    return apiError(error.message || 'Failed to fetch scheduled content', 500);
+    return apiError(errorMessage || 'Failed to fetch scheduled content', 500);
   }
 }

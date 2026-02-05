@@ -11,7 +11,7 @@
 
 import { NextRequest } from 'next/server';
 import { apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send-email';
 import type { SupportedLanguage } from '@/lib/firestore/conversions';
 
@@ -42,87 +42,84 @@ export async function POST(request: NextRequest) {
       return apiError('userId and email are required', 400);
     }
 
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
 
     // Verify user exists
-    const userDoc = await firestore.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
+    const { data: userRow, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !userRow) {
       return apiError('User not found', 404);
     }
 
-    const userData = userDoc.data();
-    const userFirstName = firstName || userData?.first_name || undefined;
-    const userLanguage = language || userData?.language || 'fr';
+    const userFirstName = firstName || userRow?.first_name || undefined;
+    const userLanguage = language || userRow?.language || 'fr';
 
     // Fetch recommended programs if IDs provided, otherwise get from user recommendations
     let recommendedPrograms: RecommendedProgram[] = [];
 
     if (recommendedProgramIds && recommendedProgramIds.length > 0) {
       // Fetch programs by IDs
-      const programPromises = recommendedProgramIds.slice(0, 3).map(async (id): Promise<RecommendedProgram | null> => {
-        const programDoc = await firestore.collection('programs').doc(id).get();
-        if (programDoc.exists) {
-          const data = programDoc.data();
-          return {
-            id: programDoc.id,
-            title: data?.title || data?.title_fr || 'Programme',
-            imageUrl: data?.thumbnail_url || data?.image_url || undefined,
-          };
-        }
-        return null;
-      });
+      const { data: programRows } = await supabase
+        .from('programs')
+        .select('id, title, title_fr, thumbnail_url, image_url')
+        .in('id', recommendedProgramIds.slice(0, 3));
 
-      const programs = await Promise.all(programPromises);
-      recommendedPrograms = programs.filter((p): p is RecommendedProgram => p !== null);
+      if (programRows) {
+        recommendedPrograms = programRows.map(row => ({
+          id: row.id,
+          title: row.title || row.title_fr || 'Programme',
+          imageUrl: row.thumbnail_url || row.image_url || undefined,
+        }));
+      }
     } else {
-      // Try to get recommendations from user's recommendation document
-      const recommendationsDoc = await firestore
-        .collection('users')
-        .doc(userId)
-        .collection('recommendations')
-        .doc('current')
-        .get();
+      // Try to get recommendations from user_recommendations table
+      const { data: recRow } = await supabase
+        .from('user_recommendations')
+        .select('recommendations')
+        .eq('user_id', userId)
+        .order('generated_at', { ascending: false })
+        .limit(1)
+        .single();
 
-      if (recommendationsDoc.exists) {
-        const recData = recommendationsDoc.data();
-        const programIds = recData?.program_ids || recData?.recommended_programs || [];
+      if (recRow?.recommendations) {
+        const programIds = recRow.recommendations.program_ids || recRow.recommendations.recommended_programs || [];
 
         if (programIds.length > 0) {
-          const programPromises = programIds.slice(0, 3).map(async (id: string): Promise<RecommendedProgram | null> => {
-            const programDoc = await firestore.collection('programs').doc(id).get();
-            if (programDoc.exists) {
-              const data = programDoc.data();
-              return {
-                id: programDoc.id,
-                title: data?.title || data?.title_fr || 'Programme',
-                imageUrl: data?.thumbnail_url || data?.image_url || undefined,
-              };
-            }
-            return null;
-          });
+          const { data: programRows } = await supabase
+            .from('programs')
+            .select('id, title, title_fr, thumbnail_url, image_url')
+            .in('id', programIds.slice(0, 3));
 
-          const programs = await Promise.all(programPromises);
-          recommendedPrograms = programs.filter((p): p is RecommendedProgram => p !== null);
+          if (programRows) {
+            recommendedPrograms = programRows.map(row => ({
+              id: row.id,
+              title: row.title || row.title_fr || 'Programme',
+              imageUrl: row.thumbnail_url || row.image_url || undefined,
+            }));
+          }
         }
       }
     }
 
     // If still no programs, fetch some popular ones
     if (recommendedPrograms.length === 0) {
-      const popularProgramsSnapshot = await firestore
-        .collection('programs')
-        .where('status', '==', 'published')
-        .limit(3)
-        .get();
+      const { data: popularRows } = await supabase
+        .from('programs')
+        .select('id, title, title_fr, thumbnail_url, image_url')
+        .eq('status', 'published')
+        .limit(3);
 
-      recommendedPrograms = popularProgramsSnapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          title: data?.title || data?.title_fr || 'Programme',
-          imageUrl: data?.thumbnail_url || data?.image_url || undefined,
-        };
-      });
+      if (popularRows) {
+        recommendedPrograms = popularRows.map(row => ({
+          id: row.id,
+          title: row.title || row.title_fr || 'Programme',
+          imageUrl: row.thumbnail_url || row.image_url || undefined,
+        }));
+      }
     }
 
     // Get base URL for email links
@@ -134,16 +131,15 @@ export async function POST(request: NextRequest) {
     if (recommendedPrograms.length > 0) {
       const firstProgramId = recommendedPrograms[0].id;
       // Try to get the first lesson of the program
-      const lessonsSnapshot = await firestore
-        .collection('lessons')
-        .where('program_id', '==', firstProgramId)
-        .orderBy('order', 'asc')
-        .limit(1)
-        .get();
+      const { data: lessonRows } = await supabase
+        .from('lessons')
+        .select('id')
+        .eq('program_id', firstProgramId)
+        .order('order', { ascending: true })
+        .limit(1);
 
-      if (!lessonsSnapshot.empty) {
-        const firstLessonId = lessonsSnapshot.docs[0].id;
-        firstLessonUrl = `${baseUrl}/lesson/${firstLessonId}`;
+      if (lessonRows && lessonRows.length > 0) {
+        firstLessonUrl = `${baseUrl}/lesson/${lessonRows[0].id}`;
       } else {
         firstLessonUrl = `${baseUrl}/program/${firstProgramId}`;
       }

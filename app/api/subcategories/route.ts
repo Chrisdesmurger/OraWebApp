@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import {
   mapSubcategoryFromFirestore,
   mapSubcategoryToFirestore,
@@ -27,35 +27,49 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || undefined;
     const includeCounts = searchParams.get('includeCounts') === 'true';
 
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
 
     console.log('[GET /api/subcategories] Fetching subcategories with filters:', { category, status, includeCounts });
 
-    let query = firestore.collection('subcategories').orderBy('display_order', 'asc');
+    let query = supabase
+      .from('subcategories')
+      .select('*')
+      .order('display_order', { ascending: true });
 
     if (category) {
-      query = query.where('category', '==', category) as typeof query;
+      query = query.eq('category', category);
     }
 
     if (status) {
-      query = query.where('status', '==', status) as typeof query;
+      query = query.eq('status', status);
     }
 
-    const snapshot = await query.get();
+    const { data: rows, error } = await query;
+
+    if (error) {
+      console.error('[GET /api/subcategories] Supabase error:', error);
+      return apiError('Failed to fetch subcategories', 500);
+    }
 
     // Map to frontend format
-    let subcategories = snapshot.docs.map((doc) => {
-      const data = doc.data() as SubcategoryDocument;
-      return mapSubcategoryFromFirestore(doc.id, data);
+    let subcategories = (rows || []).map((row) => {
+      return mapSubcategoryFromFirestore(row.id, row as unknown as SubcategoryDocument);
     });
 
     // Optionally include lessons count
     if (includeCounts) {
-      const lessonsSnapshot = await firestore.collection('lessons').get();
+      const { data: lessonRows, error: lessonsError } = await supabase
+        .from('lessons')
+        .select('subcategory_id');
+
+      if (lessonsError) {
+        console.error('[GET /api/subcategories] Error fetching lesson counts:', lessonsError);
+      }
+
       const lessonsBySubcategory = new Map<string, number>();
 
-      lessonsSnapshot.docs.forEach((doc) => {
-        const subcategoryId = doc.data().subcategory_id;
+      (lessonRows || []).forEach((row) => {
+        const subcategoryId = row.subcategory_id;
         if (subcategoryId) {
           lessonsBySubcategory.set(
             subcategoryId,
@@ -112,12 +126,11 @@ export async function POST(request: NextRequest) {
       return apiError(`Validation failed: ${errors}`, 400);
     }
 
-    const firestore = getFirestore();
-    const subcategoryRef = firestore.collection('subcategories').doc();
+    const supabase = createSupabaseServiceClient();
 
     const now = new Date().toISOString();
 
-    // Convert to Firestore format
+    // Convert to database format
     const subcategoryDocument = {
       ...mapSubcategoryToFirestore(validation.data, user.uid),
       created_at: now,
@@ -125,25 +138,40 @@ export async function POST(request: NextRequest) {
     };
 
     // Check for duplicate slug in same category
-    const existingSlug = await firestore
-      .collection('subcategories')
-      .where('category', '==', subcategoryDocument.category)
-      .where('slug', '==', subcategoryDocument.slug)
-      .get();
+    const { data: existingSlug, error: slugError } = await supabase
+      .from('subcategories')
+      .select('id')
+      .eq('category', subcategoryDocument.category)
+      .eq('slug', subcategoryDocument.slug)
+      .limit(1);
 
-    if (!existingSlug.empty) {
+    if (slugError) {
+      console.error('[POST /api/subcategories] Slug check error:', slugError);
+      return apiError('Failed to check for duplicate slug', 500);
+    }
+
+    if (existingSlug && existingSlug.length > 0) {
       return apiError(`A subcategory with slug "${subcategoryDocument.slug}" already exists in this category`, 409);
     }
 
-    await subcategoryRef.set(subcategoryDocument);
+    const { data: created, error: insertError } = await supabase
+      .from('subcategories')
+      .insert(subcategoryDocument)
+      .select()
+      .single();
+
+    if (insertError || !created) {
+      console.error('[POST /api/subcategories] Insert error:', insertError);
+      return apiError('Failed to create subcategory', 500);
+    }
 
     // Return camelCase response
-    const subcategory = mapSubcategoryFromFirestore(subcategoryRef.id, subcategoryDocument as SubcategoryDocument);
+    const subcategory = mapSubcategoryFromFirestore(created.id, created as unknown as SubcategoryDocument);
 
     // Log audit event
     logCreate({
       resourceType: 'subcategory',
-      resourceId: subcategoryRef.id,
+      resourceId: created.id,
       actorId: user.uid,
       actorEmail: user.email || 'unknown',
       resource: subcategoryDocument,

@@ -11,7 +11,7 @@
 
 import { NextRequest } from 'next/server';
 import { apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/send-email';
 import type { SupportedLanguage } from '@/lib/firestore/conversions';
 
@@ -40,17 +40,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify this is a legitimate request by checking user exists
-    const firestore = getFirestore();
-    const userDoc = await firestore.collection('users').doc(userId).get();
+    const supabase = createSupabaseServiceClient();
+    const { data: userRow, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
 
-    if (!userDoc.exists) {
+    if (userError || !userRow) {
       return apiError('User not found', 404);
     }
 
     // Get user data to enrich email
-    const userData = userDoc.data();
-    const userFirstName = firstName || userData?.first_name || undefined;
-    const userLanguage = language || userData?.language || 'fr';
+    const userFirstName = firstName || userRow?.first_name || undefined;
+    const userLanguage = language || userRow?.language || 'fr';
 
     // Get base URL for email links
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://ora-wellbeing.com';
