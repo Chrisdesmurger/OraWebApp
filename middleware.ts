@@ -19,6 +19,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(callbackUrl);
   }
 
+  // Skip session refresh for /auth/callback to preserve PKCE code verifier cookie
+  if (pathname.startsWith('/auth/callback')) {
+    return NextResponse.next();
+  }
+
   // Refresh Supabase session
   const response = await updateSession(request);
 
