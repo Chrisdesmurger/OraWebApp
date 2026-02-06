@@ -15,9 +15,9 @@ export async function middleware(request: NextRequest) {
 
   // Protect /admin routes
   if (pathname.startsWith('/admin')) {
-    // Check for Supabase auth cookies
+    // Check for Supabase auth cookies (includes chunked cookies like sb-xxx-auth-token.0)
     const hasAuthCookies = request.cookies.getAll().some(
-      (cookie) => cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token')
+      (cookie) => cookie.name.startsWith('sb-') && cookie.name.includes('-auth-token')
     );
 
     if (!hasAuthCookies) {
