@@ -33,21 +33,28 @@ export async function GET(request: NextRequest) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error) {
-      // Use x-forwarded-host for deployments behind a proxy (Vercel)
-      const forwardedHost = request.headers.get('x-forwarded-host');
-      const isLocalEnv = process.env.NODE_ENV === 'development';
-
-      if (isLocalEnv) {
-        return NextResponse.redirect(new URL(next, requestUrl.origin));
-      } else if (forwardedHost) {
-        return NextResponse.redirect(new URL(next, `https://${forwardedHost}`));
-      } else {
-        return NextResponse.redirect(new URL(next, requestUrl.origin));
+    if (error) {
+      // Code exchange failed - check if user already has a session
+      // (happens on browser retries where the first call already consumed the code)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return NextResponse.redirect(new URL('/login?error=auth_callback_error', requestUrl.origin));
       }
+    }
+
+    // Success (or session already exists from a previous exchange)
+    const forwardedHost = request.headers.get('x-forwarded-host');
+    const isLocalEnv = process.env.NODE_ENV === 'development';
+
+    if (isLocalEnv) {
+      return NextResponse.redirect(new URL(next, requestUrl.origin));
+    } else if (forwardedHost) {
+      return NextResponse.redirect(new URL(next, `https://${forwardedHost}`));
+    } else {
+      return NextResponse.redirect(new URL(next, requestUrl.origin));
     }
   }
 
-  // Auth failed - redirect to login with error
-  return NextResponse.redirect(new URL('/login?error=auth_callback_error', requestUrl.origin));
+  // No code provided - redirect to login
+  return NextResponse.redirect(new URL('/login', requestUrl.origin));
 }
