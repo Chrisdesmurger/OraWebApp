@@ -55,21 +55,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
 
-    // Get initial session
-    supabase.auth.getUser().then(async ({ data: { user: supabaseUser } }) => {
-      if (supabaseUser) {
-        const authUser = await mapToAuthUser(supabaseUser);
-        setUser(authUser);
-      }
-      setLoading(false);
-    });
-
-    // Listen for auth state changes
+    // Use onAuthStateChange as the single source of truth.
+    // It fires INITIAL_SESSION on setup, then SIGNED_IN/SIGNED_OUT/TOKEN_REFRESHED later.
+    // Removed standalone getUser() call which caused a race condition:
+    // getUser() resolved with null before cookies were readable, setting loading=false
+    // and triggering admin layout redirect before onAuthStateChange could fire.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
-          const authUser = await mapToAuthUser(session.user);
-          setUser(authUser);
+          try {
+            const authUser = await mapToAuthUser(session.user);
+            setUser(authUser);
+          } catch {
+            // If role fetch fails, still set user with basic info
+            setUser({
+              uid: session.user.id,
+              email: session.user.email,
+              displayName: session.user.user_metadata?.full_name || null,
+              photoURL: session.user.user_metadata?.avatar_url || null,
+              role: 'viewer',
+            });
+          }
         } else {
           setUser(null);
         }
