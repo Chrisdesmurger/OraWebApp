@@ -39,6 +39,7 @@
     "node_modules",
     "functions",
     "supabase/functions",
-    "cloud-run"
+    "cloud-run",
+    "scripts"
   ]
 }
