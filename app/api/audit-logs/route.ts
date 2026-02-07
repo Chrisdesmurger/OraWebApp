@@ -6,7 +6,7 @@
 
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import type { AuditLogDocument, GetAuditLogsResponse } from '@/types/audit';
 import { mapAuditLogFromFirestore, isAuditAction, isResourceType } from '@/types/audit';
 
@@ -70,40 +70,48 @@ export async function GET(request: NextRequest) {
       return apiError('Invalid limit parameter', 400);
     }
 
-    // Build Firestore query
-    const firestore = getFirestore();
-    let query = firestore.collection('audit_logs').orderBy('timestamp', 'desc');
+    // Build Supabase query
+    const supabase = createSupabaseServiceClient();
+    let query = supabase
+      .from('audit_logs')
+      .select('*')
+      .order('created_at', { ascending: false });
 
     // Apply filters
     if (resourceType) {
-      query = query.where('resource_type', '==', resourceType);
+      query = query.eq('resource_type', resourceType);
     }
 
     if (action) {
-      query = query.where('action', '==', action);
+      query = query.eq('action', action);
     }
 
     if (actorId) {
-      query = query.where('actor_id', '==', actorId);
+      query = query.eq('actor_id', actorId);
     }
 
     if (resourceId) {
-      query = query.where('resource_id', '==', resourceId);
+      query = query.eq('resource_id', resourceId);
     }
 
     if (startDate) {
-      query = query.where('timestamp', '>=', startDate);
+      query = query.gte('created_at', startDate);
     }
 
     if (endDate) {
-      query = query.where('timestamp', '<=', endDate);
+      query = query.lte('created_at', endDate);
     }
 
-    // Apply pagination
+    // Apply cursor-based pagination
     if (startAfterParam) {
-      const startAfterDoc = await firestore.collection('audit_logs').doc(startAfterParam).get();
-      if (startAfterDoc.exists) {
-        query = query.startAfter(startAfterDoc);
+      const { data: cursor } = await supabase
+        .from('audit_logs')
+        .select('created_at')
+        .eq('id', startAfterParam)
+        .single();
+
+      if (cursor) {
+        query = query.lt('created_at', cursor.created_at);
       }
     }
 
@@ -120,22 +128,38 @@ export async function GET(request: NextRequest) {
       limit,
     });
 
-    const snapshot = await query.get();
+    const { data: rows, error } = await query;
+
+    if (error) throw error;
+
+    const allRows = rows ?? [];
 
     // Check if there are more results
-    const hasMore = snapshot.size > limit;
+    const hasMore = allRows.length > limit;
 
-    // Get only the requested number of documents
-    const docs = snapshot.docs.slice(0, limit);
+    // Get only the requested number of rows
+    const limitedRows = allRows.slice(0, limit);
 
-    // Map to client-side objects
-    const logs = docs.map((doc) => {
-      const data = doc.data() as AuditLogDocument;
-      return mapAuditLogFromFirestore(doc.id, data);
+    // Map to client-side objects using the existing mapper
+    // The mapper expects AuditLogDocument with `timestamp` field,
+    // but Supabase returns `created_at`. We adapt the row to match.
+    const logs = limitedRows.map((row) => {
+      const doc: AuditLogDocument = {
+        action: row.action,
+        resource_type: row.resource_type,
+        resource_id: row.resource_id,
+        actor_id: row.actor_id,
+        actor_email: row.actor_email,
+        changes: row.changes ?? {},
+        ip_address: row.ip_address ?? '',
+        user_agent: row.user_agent ?? '',
+        timestamp: row.created_at, // Map created_at to timestamp for the mapper
+      };
+      return mapAuditLogFromFirestore(row.id, doc);
     });
 
     // Get last document ID for pagination
-    const lastDocId = docs.length > 0 ? docs[docs.length - 1].id : undefined;
+    const lastDocId = limitedRows.length > 0 ? limitedRows[limitedRows.length - 1].id : undefined;
 
     const response: GetAuditLogsResponse = {
       logs,
@@ -145,8 +169,9 @@ export async function GET(request: NextRequest) {
 
     console.log('[GET /api/audit-logs] Returning', logs.length, 'logs, hasMore:', hasMore);
     return apiSuccess(response);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('GET /api/audit-logs error:', error);
-    return apiError(error.message || 'Failed to fetch audit logs', 500);
+    return apiError(errorMessage || 'Failed to fetch audit logs', 500);
   }
 }

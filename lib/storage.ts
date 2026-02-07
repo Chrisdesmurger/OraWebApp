@@ -1,7 +1,27 @@
-import { getStorage } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 /**
- * Upload file to Firebase Cloud Storage
+ * Parse a Firebase-style storage path into Supabase bucket + relative path.
+ *
+ * Examples:
+ *   "media/lessons/{id}/original/file.mp4" -> { bucket: "media-lessons", path: "{id}/original/file.mp4" }
+ *   "media/programs/{id}/cover.jpg"        -> { bucket: "media-programs", path: "{id}/cover.jpg" }
+ *   "media/users/{id}/avatar.png"          -> { bucket: "media-users",    path: "{id}/avatar.png" }
+ */
+export function parseStoragePath(firebasePath: string): { bucket: string; path: string } {
+  const parts = firebasePath.replace(/^\/+/, '').split('/');
+  if (parts[0] === 'media' && parts.length >= 3) {
+    const type = parts[1]; // 'lessons', 'programs', 'users'
+    const bucket = `media-${type}`;
+    const path = parts.slice(2).join('/');
+    return { bucket, path };
+  }
+  // Fallback: use first part as bucket
+  return { bucket: parts[0] || 'media-lessons', path: parts.slice(1).join('/') };
+}
+
+/**
+ * Upload file to Supabase Storage
  */
 export async function uploadFile(
   file: Buffer,
@@ -12,21 +32,23 @@ export async function uploadFile(
   }
 ): Promise<string> {
   try {
-    const storage = getStorage();
-    const bucket = storage.bucket();
-    const fileRef = bucket.file(destinationPath);
+    const supabase = createSupabaseServiceClient();
+    const { bucket, path } = parseStoragePath(destinationPath);
 
-    await fileRef.save(file, {
-      metadata: {
-        contentType: metadata?.contentType || 'application/octet-stream',
-        metadata: metadata?.customMetadata,
-      },
+    const { error } = await supabase.storage.from(bucket).upload(path, file, {
+      contentType: metadata?.contentType || 'application/octet-stream',
+      upsert: true,
+      metadata: metadata?.customMetadata,
     });
 
-    console.log(`✅ File uploaded: ${destinationPath}`);
+    if (error) {
+      throw error;
+    }
+
+    console.log(`File uploaded: ${destinationPath}`);
     return destinationPath;
-  } catch (error) {
-    console.error('❌ Upload failed:', error);
+  } catch (error: unknown) {
+    console.error('Upload failed:', error);
     throw new Error('Failed to upload file');
   }
 }
@@ -36,18 +58,20 @@ export async function uploadFile(
  */
 export async function getSignedUrl(filePath: string, expiresInMinutes: number = 60): Promise<string> {
   try {
-    const storage = getStorage();
-    const bucket = storage.bucket();
-    const file = bucket.file(filePath);
+    const supabase = createSupabaseServiceClient();
+    const { bucket, path } = parseStoragePath(filePath);
 
-    const [url] = await file.getSignedUrl({
-      action: 'read',
-      expires: Date.now() + expiresInMinutes * 60 * 1000,
-    });
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(path, expiresInMinutes * 60);
 
-    return url;
-  } catch (error) {
-    console.error('❌ Failed to get signed URL:', error);
+    if (error || !data?.signedUrl) {
+      throw error || new Error('No signed URL returned');
+    }
+
+    return data.signedUrl;
+  } catch (error: unknown) {
+    console.error('Failed to get signed URL:', error);
     throw new Error('Failed to generate signed URL');
   }
 }
@@ -57,14 +81,18 @@ export async function getSignedUrl(filePath: string, expiresInMinutes: number = 
  */
 export async function deleteFile(filePath: string): Promise<void> {
   try {
-    const storage = getStorage();
-    const bucket = storage.bucket();
-    const file = bucket.file(filePath);
+    const supabase = createSupabaseServiceClient();
+    const { bucket, path } = parseStoragePath(filePath);
 
-    await file.delete();
-    console.log(`✅ File deleted: ${filePath}`);
-  } catch (error) {
-    console.error('❌ Delete failed:', error);
+    const { error } = await supabase.storage.from(bucket).remove([path]);
+
+    if (error) {
+      throw error;
+    }
+
+    console.log(`File deleted: ${filePath}`);
+  } catch (error: unknown) {
+    console.error('Delete failed:', error);
     throw new Error('Failed to delete file');
   }
 }
@@ -145,39 +173,39 @@ export function getLessonThumbnailPath(lessonId: string): string {
 }
 
 /**
- * Get resumable upload URL for lesson
+ * Get a signed upload URL for a lesson file.
+ *
+ * Supabase does not support Firebase-style resumable uploads, so this returns
+ * a signed upload URL that the client can PUT the file to directly.
  */
 export async function getResumableUploadUrl(
   lessonId: string,
   fileName: string,
-  mimeType: string
+  _mimeType: string
 ): Promise<string> {
   try {
-    const storage = getStorage();
-    const bucket = storage.bucket();
-    const path = getLessonOriginalPath(lessonId, fileName);
-    const file = bucket.file(path);
+    const supabase = createSupabaseServiceClient();
+    const fullPath = getLessonOriginalPath(lessonId, fileName);
+    const { bucket, path } = parseStoragePath(fullPath);
 
-    const [url] = await file.createResumableUpload({
-      metadata: {
-        contentType: mimeType,
-        metadata: {
-          lessonId,
-          uploadedAt: new Date().toISOString(),
-        },
-      },
-    });
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUploadUrl(path);
 
-    console.log(`✅ Generated resumable upload URL for lesson ${lessonId}`);
-    return url;
-  } catch (error: any) {
-    console.error('❌ Failed to create resumable upload URL:', {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      stack: error.stack,
+    if (error || !data?.signedUrl) {
+      throw error || new Error('No signed upload URL returned');
+    }
+
+    console.log(`Generated signed upload URL for lesson ${lessonId}`);
+    return data.signedUrl;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Failed to create signed upload URL:', {
+      message,
+      lessonId,
+      fileName,
     });
-    throw new Error(`Failed to create upload URL: ${error.message || 'Unknown error'}`);
+    throw new Error(`Failed to create upload URL: ${message}`);
   }
 }
 
@@ -186,16 +214,79 @@ export async function getResumableUploadUrl(
  */
 export async function deleteLessonMedia(lessonId: string): Promise<void> {
   try {
-    const storage = getStorage();
-    const bucket = storage.bucket();
-    const prefix = `media/lessons/${lessonId}/`;
+    const supabase = createSupabaseServiceClient();
+    const bucket = 'media-lessons';
+    const prefix = `${lessonId}/`;
 
-    await bucket.deleteFiles({ prefix });
-    console.log(`✅ Deleted all media for lesson ${lessonId}`);
-  } catch (error) {
-    console.error('❌ Failed to delete lesson media:', error);
+    // List all files under the lesson prefix
+    const { data: files, error: listError } = await supabase.storage
+      .from(bucket)
+      .list(lessonId, { limit: 1000 });
+
+    if (listError) {
+      throw listError;
+    }
+
+    if (!files || files.length === 0) {
+      console.log(`No media files found for lesson ${lessonId}`);
+      return;
+    }
+
+    // Recursively collect all file paths (Supabase list returns immediate children,
+    // so we need to handle nested folders)
+    const allPaths = await collectAllFiles(supabase, bucket, prefix);
+
+    if (allPaths.length > 0) {
+      const { error: deleteError } = await supabase.storage
+        .from(bucket)
+        .remove(allPaths);
+
+      if (deleteError) {
+        throw deleteError;
+      }
+    }
+
+    console.log(`Deleted all media for lesson ${lessonId} (${allPaths.length} files)`);
+  } catch (error: unknown) {
+    console.error('Failed to delete lesson media:', error);
     throw new Error('Failed to delete lesson media');
   }
+}
+
+/**
+ * Recursively collect all file paths under a given prefix in a Supabase Storage bucket.
+ */
+async function collectAllFiles(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  bucket: string,
+  prefix: string
+): Promise<string[]> {
+  const paths: string[] = [];
+  // Remove trailing slash for the list call's folder parameter
+  const folder = prefix.replace(/\/+$/, '');
+
+  const { data: items, error } = await supabase.storage
+    .from(bucket)
+    .list(folder, { limit: 1000 });
+
+  if (error || !items) {
+    return paths;
+  }
+
+  for (const item of items) {
+    const itemPath = folder ? `${folder}/${item.name}` : item.name;
+
+    if (item.id) {
+      // It is a file (files have an id, folders do not)
+      paths.push(itemPath);
+    } else {
+      // It is a folder -- recurse into it
+      const nested = await collectAllFiles(supabase, bucket, `${itemPath}/`);
+      paths.push(...nested);
+    }
+  }
+
+  return paths;
 }
 
 /**
@@ -203,13 +294,9 @@ export async function deleteLessonMedia(lessonId: string): Promise<void> {
  */
 export async function fileExists(filePath: string): Promise<boolean> {
   try {
-    const storage = getStorage();
-    const bucket = storage.bucket();
-    const file = bucket.file(filePath);
-    const [exists] = await file.exists();
-    return exists;
-  } catch (error) {
-    console.error('❌ Failed to check file existence:', error);
+    const metadata = await getFileMetadata(filePath);
+    return metadata !== null;
+  } catch {
     return false;
   }
 }
@@ -223,18 +310,35 @@ export async function getFileMetadata(filePath: string): Promise<{
   updated: string;
 } | null> {
   try {
-    const storage = getStorage();
-    const bucket = storage.bucket();
-    const file = bucket.file(filePath);
-    const [metadata] = await file.getMetadata();
+    const supabase = createSupabaseServiceClient();
+    const { bucket, path } = parseStoragePath(filePath);
+
+    // Supabase does not have a direct "get metadata" call for a single file.
+    // We list the parent folder and find the file by name.
+    const lastSlash = path.lastIndexOf('/');
+    const folder = lastSlash >= 0 ? path.substring(0, lastSlash) : '';
+    const fileName = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+
+    const { data: files, error } = await supabase.storage
+      .from(bucket)
+      .list(folder, { limit: 1000, search: fileName });
+
+    if (error || !files) {
+      return null;
+    }
+
+    const file = files.find((f) => f.name === fileName);
+    if (!file) {
+      return null;
+    }
 
     return {
-      size: typeof metadata.size === 'string' ? parseInt(metadata.size, 10) : (metadata.size || 0),
-      contentType: metadata.contentType || 'application/octet-stream',
-      updated: metadata.updated || new Date().toISOString(),
+      size: file.metadata?.size ?? 0,
+      contentType: file.metadata?.mimetype || 'application/octet-stream',
+      updated: file.updated_at || new Date().toISOString(),
     };
-  } catch (error) {
-    console.error('❌ Failed to get file metadata:', error);
+  } catch (error: unknown) {
+    console.error('Failed to get file metadata:', error);
     return null;
   }
 }

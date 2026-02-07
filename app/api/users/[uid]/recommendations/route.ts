@@ -2,8 +2,7 @@
  * API Route: GET /api/users/[uid]/recommendations
  * Fetches the latest recommendation for a specific user
  *
- * IMPORTANT: Reads from user_onboarding/{uid}/recommendations/latest
- * (Updated path after Firestore migration - see issue #66)
+ * Reads from user_recommendations table in Supabase
  */
 
 import { NextRequest } from 'next/server';
@@ -13,46 +12,44 @@ import {
   apiError,
   apiSuccess,
 } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import {
   Recommendation,
-  RecommendationDocument,
   RecommendedLesson,
   RecommendationWithLessons,
 } from '@/types/recommendation';
-import { Timestamp } from 'firebase-admin/firestore';
 
 /**
- * Convert Firestore RecommendationDocument to frontend Recommendation
+ * Convert Supabase row to frontend Recommendation
  */
-function mapRecommendationDocument(
-  doc: FirebaseFirestore.DocumentSnapshot
+function mapRecommendationRow(
+  row: Record<string, unknown>
 ): Recommendation | null {
-  const data = doc.data() as RecommendationDocument | undefined;
-
-  if (!data) {
+  if (!row) {
     return null;
   }
 
+  const recommendations = row.recommendations as Record<string, unknown> | undefined;
+  if (!recommendations) return null;
+
   return {
-    uid: data.uid,
-    lessonIds: data.lesson_ids,
-    scores: data.scores,
-    generatedAt:
-      data.generated_at instanceof Timestamp
-        ? data.generated_at.toDate()
-        : new Date(data.generated_at as unknown as string),
-    algorithmVersion: data.algorithm_version,
+    uid: (row.user_id as string) || '',
+    lessonIds: (recommendations.lesson_ids as string[]) || [],
+    scores: (recommendations.scores as Record<string, number>) || {},
+    generatedAt: row.generated_at
+      ? new Date(row.generated_at as string)
+      : new Date(),
+    algorithmVersion: (recommendations.algorithm_version as string) || '1.0',
     basedOn: {
-      intentions: data.based_on.intentions,
-      experienceLevels: data.based_on.experience_levels,
-      timeCommitment: data.based_on.time_commitment,
-      completedLessonIds: data.based_on.completed_lesson_ids,
+      intentions: (recommendations.based_on as any)?.intentions || [],
+      experienceLevels: (recommendations.based_on as any)?.experience_levels || [],
+      timeCommitment: (recommendations.based_on as any)?.time_commitment || 0,
+      completedLessonIds: (recommendations.based_on as any)?.completed_lesson_ids || [],
     },
     metadata: {
-      totalLessonsScored: data.metadata.total_lessons_scored,
-      avgScore: data.metadata.avg_score,
-      trigger: data.metadata.trigger,
+      totalLessonsScored: (recommendations.metadata as any)?.total_lessons_scored || 0,
+      avgScore: (recommendations.metadata as any)?.avg_score || 0,
+      trigger: (recommendations.metadata as any)?.trigger || 'manual',
     },
   };
 }
@@ -64,29 +61,35 @@ async function enrichRecommendationWithLessons(
   recommendation: Recommendation
 ): Promise<RecommendationWithLessons> {
   const lessons: RecommendedLesson[] = [];
+  const supabase = createSupabaseServiceClient();
 
-  // Fetch all recommended lessons
-  for (let i = 0; i < recommendation.lessonIds.length; i++) {
-    const lessonId = recommendation.lessonIds[i];
-    const score = recommendation.scores[lessonId] || 0;
+  // Fetch all recommended lessons in one query
+  if (recommendation.lessonIds.length > 0) {
+    const { data: lessonRows } = await supabase
+      .from('lessons')
+      .select('id, title, discipline, difficulty, duration_sec, thumbnail_url, program_id, program_title')
+      .in('id', recommendation.lessonIds);
 
-    try {
-      const lessonDoc = await getFirestore().collection('lessons').doc(lessonId).get();
+    const lessonMap = new Map<string, Record<string, unknown>>();
+    (lessonRows || []).forEach(row => lessonMap.set(row.id, row));
 
-      if (lessonDoc.exists) {
-        const lessonData = lessonDoc.data();
+    for (let i = 0; i < recommendation.lessonIds.length; i++) {
+      const lessonId = recommendation.lessonIds[i];
+      const score = recommendation.scores[lessonId] || 0;
+      const lessonData = lessonMap.get(lessonId);
 
+      if (lessonData) {
         lessons.push({
           id: lessonId,
-          title: lessonData?.title || 'Sans titre',
-          discipline: lessonData?.discipline || 'Autre',
-          difficulty: lessonData?.difficulty || 'Debutant',
-          duration: lessonData?.duration_sec || 0,
+          title: (lessonData.title as string) || 'Sans titre',
+          discipline: (lessonData.discipline as string) || 'Autre',
+          difficulty: (lessonData.difficulty as string) || 'Debutant',
+          duration: (lessonData.duration_sec as number) || 0,
           score,
-          rank: i + 1, // Rank 1-5
-          thumbnailUrl: lessonData?.thumbnail_url,
-          programId: lessonData?.program_id,
-          programTitle: lessonData?.program_title,
+          rank: i + 1,
+          thumbnailUrl: lessonData.thumbnail_url as string | undefined,
+          programId: lessonData.program_id as string | undefined,
+          programTitle: lessonData.program_title as string | undefined,
         });
       } else {
         // Lesson not found, add placeholder
@@ -100,18 +103,6 @@ async function enrichRecommendationWithLessons(
           rank: i + 1,
         });
       }
-    } catch (error) {
-      console.error(`[API] Error fetching lesson ${lessonId}:`, error);
-      // Add error placeholder
-      lessons.push({
-        id: lessonId,
-        title: `Erreur de chargement (${lessonId})`,
-        discipline: 'Erreur',
-        difficulty: 'Erreur',
-        duration: 0,
-        score,
-        rank: i + 1,
-      });
     }
   }
 
@@ -143,21 +134,23 @@ export async function GET(
 
     console.log(`[API] Fetching latest recommendation for user: ${uid}`);
 
-    // Fetch latest recommendation from NEW path: user_onboarding/{uid}/recommendations/latest
-    // (Updated after Firestore migration - see issue #66)
-    const latestDoc = await getFirestore()
-      .collection('user_onboarding')
-      .doc(uid)
-      .collection('recommendations')
-      .doc('latest')
-      .get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!latestDoc.exists) {
+    // Fetch latest recommendation
+    const { data: recRow, error: recError } = await supabase
+      .from('user_recommendations')
+      .select('*')
+      .eq('user_id', uid)
+      .order('generated_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (recError || !recRow) {
       return apiError('No recommendations found for this user', 404);
     }
 
-    // Map Firestore document to frontend model
-    const recommendation = mapRecommendationDocument(latestDoc);
+    // Map Supabase row to frontend model
+    const recommendation = mapRecommendationRow(recRow);
 
     if (!recommendation) {
       return apiError('Invalid recommendation data', 500);

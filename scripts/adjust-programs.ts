@@ -2,7 +2,17 @@
  * Script to adjust program categories and difficulties based on titles
  */
 
-import { getFirestore } from '../lib/firebase/admin';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const adjustments: Record<string, { category?: string; difficulty?: string }> = {
   'meditation-debutant-7j': { category: 'meditation', difficulty: 'beginner' },
@@ -20,9 +30,6 @@ const adjustments: Record<string, { category?: string; difficulty?: string }> = 
 async function adjustPrograms() {
   console.log('🔧 Starting programs adjustment...\n');
 
-  const firestore = getFirestore();
-  const programsRef = firestore.collection('programs');
-
   try {
     let updated = 0;
     let notFound = 0;
@@ -30,19 +37,30 @@ async function adjustPrograms() {
     for (const [docId, updates] of Object.entries(adjustments)) {
       console.log(`📝 Adjusting: ${docId}`);
 
-      const docRef = programsRef.doc(docId);
-      const doc = await docRef.get();
+      // Check if the program exists
+      const { data: existing, error: fetchError } = await supabase
+        .from('programs')
+        .select('id')
+        .eq('id', docId)
+        .single();
 
-      if (!doc.exists) {
+      if (fetchError || !existing) {
         console.log(`  ⚠️  Not found\n`);
         notFound++;
         continue;
       }
 
-      await docRef.update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      });
+      const { error: updateError } = await supabase
+        .from('programs')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', docId);
+
+      if (updateError) {
+        throw updateError;
+      }
 
       console.log(`  ✅ Updated: category=${updates.category}, difficulty=${updates.difficulty}\n`);
       updated++;

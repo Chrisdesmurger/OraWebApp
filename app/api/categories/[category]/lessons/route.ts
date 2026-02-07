@@ -9,7 +9,7 @@
 
 import { NextRequest } from 'next/server';
 import { authenticateRequest, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import {
   mapLessonFromFirestore,
   type LessonDocument,
@@ -78,39 +78,50 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const statusFilter = searchParams.get('status') || 'ready';
 
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
 
     console.log('[GET /api/categories/[category]/lessons] Fetching for category:', category, 'status:', statusFilter);
 
     // 1. Fetch all active subcategories for this category, ordered by display_order
-    const subcategoriesSnapshot = await firestore
-      .collection('subcategories')
-      .where('category', '==', category)
-      .where('status', '==', 'active')
-      .orderBy('display_order', 'asc')
-      .get();
+    const { data: subcategoryRows, error: subcatError } = await supabase
+      .from('subcategories')
+      .select('*')
+      .eq('category', category)
+      .eq('status', 'active')
+      .order('display_order', { ascending: true });
 
-    const subcategories: Subcategory[] = subcategoriesSnapshot.docs.map((doc) =>
-      mapSubcategoryFromFirestore(doc.id, doc.data() as SubcategoryDocument)
+    if (subcatError) {
+      console.error('[GET /api/categories/[category]/lessons] Subcategories error:', subcatError);
+      throw new Error(subcatError.message);
+    }
+
+    const subcategories: Subcategory[] = (subcategoryRows ?? []).map((row) =>
+      mapSubcategoryFromFirestore(row.id, row as unknown as SubcategoryDocument)
     );
 
     console.log('[GET /api/categories/[category]/lessons] Found', subcategories.length, 'subcategories');
 
     // 2. Fetch all lessons for this category
-    let lessonsQuery = firestore
-      .collection('lessons')
-      .where('category', '==', category);
+    let lessonsQuery = supabase
+      .from('lessons')
+      .select('*')
+      .eq('category', category);
 
     // Apply status filter (for Android app, usually 'ready')
     if (statusFilter !== 'all') {
-      lessonsQuery = lessonsQuery.where('status', '==', statusFilter) as typeof lessonsQuery;
+      lessonsQuery = lessonsQuery.eq('status', statusFilter);
     }
 
-    const lessonsSnapshot = await lessonsQuery.get();
+    const { data: lessonRows, error: lessonsError } = await lessonsQuery;
+
+    if (lessonsError) {
+      console.error('[GET /api/categories/[category]/lessons] Lessons error:', lessonsError);
+      throw new Error(lessonsError.message);
+    }
 
     const allLessons: Lesson[] = [];
-    lessonsSnapshot.docs.forEach((doc) => {
-      const lesson = mapLessonFromFirestore(doc.id, doc.data() as LessonDocument);
+    (lessonRows ?? []).forEach((row) => {
+      const lesson = mapLessonFromFirestore(row.id, row as unknown as LessonDocument);
       if (lesson) {
         allLessons.push(lesson);
       }

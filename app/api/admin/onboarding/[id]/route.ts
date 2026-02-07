@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { mapOnboardingConfigFromFirestore, mapOnboardingConfigToFirestore } from '@/lib/onboarding/firestore-mappers';
 import type { OnboardingConfig, UpdateOnboardingRequest } from '@/types/onboarding';
@@ -25,26 +25,30 @@ export async function GET(
       return apiError('Configuration ID is required', 400);
     }
 
-    const db = getFirestore();
-    const doc = await db.collection('onboarding_configs').doc(id).get();
+    const supabase = createSupabaseServiceClient();
+    const { data: row, error } = await supabase
+      .from('onboarding_configs')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!doc.exists) {
+    if (error || !row) {
       return apiError('Onboarding configuration not found', 404);
     }
 
-    const raw = doc.data() ?? {};
-    const mapped = mapOnboardingConfigFromFirestore<OnboardingConfig>(raw);
+    const mapped = mapOnboardingConfigFromFirestore<OnboardingConfig>(row);
 
     const config: OnboardingConfig = {
-      id: doc.id,
+      id: row.id,
       ...(mapped.value as any),
     } as OnboardingConfig;
 
     return apiSuccess(config);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('GET /api/admin/onboarding/[id] error:', error);
-    return apiError(error.message || 'Failed to fetch onboarding configuration', 500);
+    const message = error instanceof Error ? error.message : 'Failed to fetch onboarding configuration';
+    return apiError(message, 500);
   }
 }
 
@@ -71,26 +75,30 @@ export async function PUT(
     const body: UpdateOnboardingRequest = await request.json();
     const { title, description, questions, status } = body;
 
-    const db = getFirestore();
-    const docRef = db.collection('onboarding_configs').doc(id);
-    const doc = await docRef.get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!doc.exists) {
+    // Fetch existing config
+    const { data: existing, error: fetchError } = await supabase
+      .from('onboarding_configs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existing) {
       return apiError('Onboarding configuration not found', 404);
     }
 
-    const existingData = doc.data() as OnboardingConfig;
+    const existingData = existing as OnboardingConfig;
 
     // Prevent editing published/active configs
     if (existingData.status === 'active' && status !== 'active' && status !== 'archived') {
       return apiError('Cannot modify active configuration. Archive it first or create a new version.', 400);
     }
 
-    const now = new Date();
+    const now = new Date().toISOString();
 
     // Build update object
     const updates: Record<string, unknown> = {
-      updatedAt: now,
       updated_at: now,
     };
 
@@ -130,11 +138,8 @@ export async function PUT(
         }
       }
 
-      const mappedQuestions = mapOnboardingConfigToFirestore({ questions }).value;
-
-      // Store questions array with snake_case keys inside each question/option
-      // while keeping the API request/response camelCase.
-      updates.questions = (mappedQuestions as any).questions ?? questions;
+      // Store questions as JSONB
+      updates.questions = questions;
     }
 
     if (status !== undefined) {
@@ -144,7 +149,15 @@ export async function PUT(
       updates.status = status;
     }
 
-    await docRef.update(updates);
+    const { error: updateError } = await supabase
+      .from('onboarding_configs')
+      .update(updates)
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('PUT /api/admin/onboarding/[id] update error:', updateError);
+      return apiError('Failed to update onboarding configuration', 500);
+    }
 
     // Log audit event
     logAuditEvent({
@@ -160,19 +173,29 @@ export async function PUT(
       request,
     });
 
-    const updatedDoc = await docRef.get();
-    const updatedRaw = updatedDoc.data() ?? {};
-    const updatedMapped = mapOnboardingConfigFromFirestore<OnboardingConfig>(updatedRaw);
+    // Fetch updated config
+    const { data: updated, error: refetchError } = await supabase
+      .from('onboarding_configs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (refetchError || !updated) {
+      return apiError('Failed to fetch updated configuration', 500);
+    }
+
+    const updatedMapped = mapOnboardingConfigFromFirestore<OnboardingConfig>(updated);
 
     return apiSuccess({
-      id: updatedDoc.id,
+      id: updated.id,
       ...(updatedMapped.value as any),
       message: 'Onboarding configuration updated successfully',
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('PUT /api/admin/onboarding/[id] error:', error);
-    return apiError(error.message || 'Failed to update onboarding configuration', 500);
+    const message = error instanceof Error ? error.message : 'Failed to update onboarding configuration';
+    return apiError(message, 500);
   }
 }
 
@@ -196,22 +219,35 @@ export async function DELETE(
       return apiError('Configuration ID is required', 400);
     }
 
-    const db = getFirestore();
-    const docRef = db.collection('onboarding_configs').doc(id);
-    const doc = await docRef.get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!doc.exists) {
+    // Fetch existing config
+    const { data: existing, error: fetchError } = await supabase
+      .from('onboarding_configs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existing) {
       return apiError('Onboarding configuration not found', 404);
     }
 
-    const data = doc.data() as OnboardingConfig;
+    const data = existing as OnboardingConfig;
 
     // Prevent deleting active configs
     if (data.status === 'active') {
       return apiError('Cannot delete active configuration. Archive it first.', 400);
     }
 
-    await docRef.delete();
+    const { error: deleteError } = await supabase
+      .from('onboarding_configs')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      console.error('DELETE /api/admin/onboarding/[id] error:', deleteError);
+      return apiError('Failed to delete onboarding configuration', 500);
+    }
 
     // Log audit event
     logAuditEvent({
@@ -232,8 +268,9 @@ export async function DELETE(
       message: 'Onboarding configuration deleted successfully',
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('DELETE /api/admin/onboarding/[id] error:', error);
-    return apiError(error.message || 'Failed to delete onboarding configuration', 500);
+    const message = error instanceof Error ? error.message : 'Failed to delete onboarding configuration';
+    return apiError(message, 500);
   }
 }

@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/require-role';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import type { CommandName, CommandResult, CommandLog } from '@/lib/types/commands';
 import { seedFakeUsers } from '@/scripts/seed-fake-users';
 import { purgeFakeUsers } from '@/scripts/purge-fake-users';
@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
     const endTime = Date.now();
     const duration = endTime - startTime;
 
-    // Log command execution to Firestore
-    const db = getFirestore();
+    // Log command execution to Supabase
+    const supabase = createSupabaseServiceClient();
     const logData: Omit<CommandLog, 'id'> = {
       commandName,
       status: result.success ? 'success' : 'error',
@@ -81,8 +81,27 @@ export async function POST(request: NextRequest) {
       metadata: result.metadata,
     };
 
-    const logRef = await db.collection('commandLogs').add(logData);
-    console.log(`Command log saved: ${logRef.id}`);
+    const { data: logRow, error: logError } = await supabase
+      .from('command_logs')
+      .insert({
+        command_name: logData.commandName,
+        status: logData.status,
+        started_at: logData.startedAt,
+        completed_at: logData.completedAt,
+        executed_by: logData.executedBy,
+        output: logData.output,
+        error: logData.error,
+        duration_ms: logData.duration,
+        metadata: logData.metadata,
+      })
+      .select('id')
+      .single();
+
+    if (logError) {
+      console.error('Failed to save command log:', logError);
+    } else {
+      console.log(`Command log saved: ${logRow?.id}`);
+    }
 
     // Return result
     return NextResponse.json({
@@ -90,15 +109,16 @@ export async function POST(request: NextRequest) {
       output: result.output,
       error: result.error,
       metadata: result.metadata,
-      logId: logRef.id,
+      logId: logRow?.id,
       duration,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Command execution error:', error);
+    const message = error instanceof Error ? error.message : 'Command execution failed';
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Command execution failed',
+        error: message,
       },
       { status: 500 }
     );

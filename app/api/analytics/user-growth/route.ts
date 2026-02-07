@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,14 +34,16 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(now);
     startDate.setDate(startDate.getDate() - daysBack);
 
-    // Fetch users from Firestore
-    const firestore = getFirestore();
-    const usersSnapshot = await firestore
-      .collection('users')
-      .where('created_at', '>=', startDate.toISOString())
-      .orderBy('created_at', 'asc')
-      .limit(10000)  // Prevent performance issues with large datasets
-      .get();
+    // Fetch users from Supabase
+    const supabase = createSupabaseServiceClient();
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('created_at')
+      .gte('created_at', startDate.toISOString())
+      .order('created_at', { ascending: true })
+      .limit(10000);
+
+    if (error) throw error;
 
     // Group users by day
     const usersByDay = new Map<string, {
@@ -64,9 +66,8 @@ export async function GET(request: NextRequest) {
 
     // Count new users per day
     let runningTotal = 0;
-    usersSnapshot.docs.forEach((doc) => {
-      const data = doc.data();
-      const createdAt = new Date(data.created_at);
+    (users ?? []).forEach((row) => {
+      const createdAt = new Date(row.created_at);
       const dateKey = createdAt.toISOString().split('T')[0];
 
       if (usersByDay.has(dateKey)) {
@@ -78,18 +79,20 @@ export async function GET(request: NextRequest) {
     });
 
     // Calculate active users (last 7 days activity)
-    const activeUsersSnapshot = await firestore
-      .collection('users')
-      .where('last_login_at', '>=', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-      .get();
+    const { count: activeCount, error: activeError } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .gte('last_login_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
-    const activeCount = activeUsersSnapshot.size;
+    if (activeError) throw activeError;
+
+    const activeUserCount = activeCount ?? 0;
 
     // Update active users for recent days
     const recentDays = Array.from(usersByDay.keys()).slice(-7);
     recentDays.forEach(dateKey => {
       const dayData = usersByDay.get(dateKey)!;
-      dayData.activeUsers = activeCount;
+      dayData.activeUsers = activeUserCount;
     });
 
     // Convert to array format for chart

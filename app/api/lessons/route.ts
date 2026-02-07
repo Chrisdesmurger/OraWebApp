@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import {
   validateCreateLesson,
   validateLessonFilters,
@@ -41,55 +41,55 @@ export async function GET(request: NextRequest) {
     console.log('[GET /api/lessons] User:', user.uid, 'Role:', user.role);
     console.log('[GET /api/lessons] Filters:', JSON.stringify(filters));
 
-    const firestore = getFirestore();
-    let query = firestore.collection('lessons');
+    const supabase = createSupabaseServiceClient();
+    let query = supabase.from('lessons').select('*', { count: 'exact' });
 
     // Apply filters
     if (filters.programId) {
-      query = query.where('program_id', '==', filters.programId) as any;
+      query = query.eq('program_id', filters.programId);
     }
 
     if (filters.status) {
-      query = query.where('status', '==', filters.status) as any;
+      query = query.eq('status', filters.status);
     }
 
     if (filters.type) {
-      query = query.where('type', '==', filters.type) as any;
+      query = query.eq('type', filters.type);
     }
 
     // For teachers, only show their own lessons unless admin
     if (user.role === 'teacher') {
-      query = query.where('author_id', '==', user.uid) as any;
+      query = query.eq('author_id', user.uid);
       console.log('[GET /api/lessons] Filtering by author_id:', user.uid);
     }
 
     // Order by updated_at descending
-    try {
-      query = query.orderBy('updated_at', 'desc') as any;
-    } catch (orderError) {
-      console.warn('[GET /api/lessons] orderBy failed, trying without ordering');
-    }
+    query = query.order('updated_at', { ascending: false });
 
     // Apply limit and offset
-    if (filters.offset && filters.offset > 0) {
-      query = query.offset(filters.offset) as any;
-    }
-    query = query.limit(filters.limit) as any;
+    const from = filters.offset || 0;
+    const to = from + filters.limit - 1;
+    query = query.range(from, to);
 
-    const snapshot = await query.get();
-    console.log('[GET /api/lessons] Found', snapshot.size, 'lessons in Firestore');
+    const { data: rows, error, count } = await query;
+
+    if (error) {
+      console.error('[GET /api/lessons] Supabase error:', error);
+      throw new Error(error.message);
+    }
+
+    console.log('[GET /api/lessons] Found', rows?.length ?? 0, 'lessons in Supabase');
 
     // Map and filter invalid lessons
     let invalidCount = 0;
     const lessons: Lesson[] = [];
 
-    snapshot.docs.forEach((doc, index) => {
-      const data = doc.data() as LessonDocument;
-      const mapped = mapLessonFromFirestore(doc.id, data);
+    (rows ?? []).forEach((row) => {
+      const mapped = mapLessonFromFirestore(row.id, row as unknown as LessonDocument);
 
       if (mapped === null) {
         invalidCount++;
-        console.warn(`[GET /api/lessons] Skipping invalid lesson ${doc.id} (${data.title || 'no title'})`);
+        console.warn(`[GET /api/lessons] Skipping invalid lesson ${row.id} (${row.title_fr || 'no title'})`);
       } else {
         lessons.push(mapped);
       }
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
       offset: filters.offset,
       // Include debug info for admin
       _debug: user.role === 'admin' ? {
-        totalInFirestore: snapshot.size,
+        totalInSupabase: count ?? rows?.length ?? 0,
         invalidSkipped: invalidCount,
         appliedFilters: filters,
       } : undefined,
@@ -157,18 +157,22 @@ export async function POST(request: NextRequest) {
     // Validate request body
     const validatedData: CreateLessonInput = validateCreateLesson(body);
 
-    const firestore = getFirestore();
-    let programData: FirebaseFirestore.DocumentData | undefined;
+    const supabase = createSupabaseServiceClient();
+    let programData: Record<string, any> | undefined;
 
     // If programId is provided, verify program exists and user has permission
     if (validatedData.programId) {
-      const programDoc = await firestore.collection('programs').doc(validatedData.programId).get();
+      const { data: program, error: programError } = await supabase
+        .from('programs')
+        .select('*')
+        .eq('id', validatedData.programId)
+        .single();
 
-      if (!programDoc.exists) {
+      if (programError || !program) {
         return apiError('Program not found', 404);
       }
 
-      programData = programDoc.data();
+      programData = program;
 
       // Teachers can only add lessons to their own programs
       if (user.role === 'teacher' && programData?.author_id !== user.uid) {
@@ -176,8 +180,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create new lesson document
-    const lessonRef = firestore.collection('lessons').doc();
     const now = new Date().toISOString();
 
     // Map validated data to Firestore format (handles i18n conversion)
@@ -186,7 +188,7 @@ export async function POST(request: NextRequest) {
     const lessonData: LessonDocument = {
       ...mappedData,
       type: validatedData.type,
-      program_id: validatedData.programId || '',  // Empty string if no program
+      program_id: validatedData.programId || null,
       order: validatedData.order || 0,
       duration_sec: null,
       tags: validatedData.tags || [],
@@ -194,7 +196,6 @@ export async function POST(request: NextRequest) {
       // Upload & processing status
       status: 'draft', // Will become 'uploading' when file upload starts
       storage_path_original: null,
-      // Omit optional fields instead of setting to null/undefined
 
       // Metadata
       codec: null,
@@ -213,27 +214,39 @@ export async function POST(request: NextRequest) {
       updated_at: now,
     } as LessonDocument;
 
-    await lessonRef.set(lessonData);
-    console.log(`[POST /api/lessons] Created lesson ${lessonRef.id}${validatedData.programId ? ` in program ${validatedData.programId}` : ' (standalone)'}`);
+    // Insert into Supabase and get the generated id
+    const { data: insertedRow, error: insertError } = await supabase
+      .from('lessons')
+      .insert(lessonData)
+      .select('id')
+      .single();
+
+    if (insertError || !insertedRow) {
+      console.error('[POST /api/lessons] Supabase insert error:', insertError);
+      throw new Error(insertError?.message || 'Failed to insert lesson');
+    }
+
+    const lessonId = insertedRow.id;
+    console.log(`[POST /api/lessons] Created lesson ${lessonId}${validatedData.programId ? ` in program ${validatedData.programId}` : ' (standalone)'}`);
 
     // Update program media_count only if programId is provided
     if (validatedData.programId && programData) {
-      await firestore
-        .collection('programs')
-        .doc(validatedData.programId)
+      await supabase
+        .from('programs')
         .update({
           media_count: (programData.media_count || 0) + 1,
           updated_at: now,
-        });
+        })
+        .eq('id', validatedData.programId);
     }
 
     // Return mapped lesson
-    const lesson = mapLessonFromFirestore(lessonRef.id, lessonData);
+    const lesson = mapLessonFromFirestore(lessonId, lessonData);
 
     // Log audit event (don't await - fire and forget)
     logCreate({
       resourceType: 'lesson',
-      resourceId: lessonRef.id,
+      resourceId: lessonId,
       actorId: user.uid,
       actorEmail: user.email || 'unknown',
       resource: lessonData,

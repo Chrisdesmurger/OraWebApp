@@ -3,8 +3,18 @@
  * Adds sample meditation/yoga programs and lessons to the database
  */
 
-import { getFirestore } from '../lib/firebase/admin';
+import { createClient } from '@supabase/supabase-js';
 import type { CommandResult } from '../lib/types/commands';
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface Program {
   id: string;
@@ -243,14 +253,32 @@ export async function seedSampleContent(): Promise<CommandResult> {
     output.push('Starting sample content seeding process...');
     output.push(`Creating ${SAMPLE_PROGRAMS.length} programs...`);
 
-    const db = getFirestore();
-
     // Create programs
     for (const program of SAMPLE_PROGRAMS) {
       try {
         output.push(`\nCreating program: ${program.title}`);
 
-        await db.collection('programs').doc(program.id).set(program);
+        const { error: programError } = await supabase
+          .from('programs')
+          .upsert({
+            id: program.id,
+            title: program.title,
+            description: program.description,
+            category: program.category,
+            difficulty: program.difficulty,
+            duration: program.duration,
+            sessions_count: program.sessionsCount,
+            image_url: program.imageUrl || null,
+            is_premium: program.isPremium,
+            tags: program.tags,
+            created_at: program.createdAt,
+            updated_at: program.updatedAt,
+          });
+
+        if (programError) {
+          throw programError;
+        }
+
         output.push(`  - Program created successfully`);
         metadata.programsCreated++;
 
@@ -263,13 +291,27 @@ export async function seedSampleContent(): Promise<CommandResult> {
           const lessonId = `${program.id}-lesson-${i + 1}`;
 
           try {
-            const lesson: Lesson = {
-              id: lessonId,
-              programId: program.id,
-              ...lessonData,
-            };
+            const { error: lessonError } = await supabase
+              .from('lessons')
+              .upsert({
+                id: lessonId,
+                program_id: program.id,
+                title: lessonData.title,
+                description: lessonData.description,
+                order: lessonData.order,
+                duration: lessonData.duration,
+                video_url: lessonData.videoUrl || null,
+                audio_url: lessonData.audioUrl || null,
+                thumbnail_url: lessonData.thumbnailUrl || null,
+                is_premium: lessonData.isPremium,
+                created_at: lessonData.createdAt,
+                updated_at: lessonData.updatedAt,
+              });
 
-            await db.collection('lessons').doc(lessonId).set(lesson);
+            if (lessonError) {
+              throw lessonError;
+            }
+
             metadata.lessonsCreated++;
           } catch (error: any) {
             output.push(`    - Lesson ${i + 1} failed: ${error.message}`);

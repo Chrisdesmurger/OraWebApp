@@ -37,6 +37,9 @@
   ],
   "exclude": [
     "node_modules",
-    "functions"
+    "functions",
+    "supabase/functions",
+    "cloud-run",
+    "scripts"
   ]
 }

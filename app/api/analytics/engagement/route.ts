@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       return apiError('Insufficient permissions', 403);
     }
 
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
     const now = new Date();
 
     // Define time periods
@@ -20,8 +20,15 @@ export async function GET(request: NextRequest) {
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // Fetch all users
-    const allUsersSnapshot = await firestore.collection('users').limit(10000).get();
+    // Fetch all users with their last_login_at
+    const { data: allUsers, error } = await supabase
+      .from('users')
+      .select('last_login_at')
+      .limit(10000);
+
+    if (error) throw error;
+
+    const usersList = allUsers ?? [];
 
     // Categorize users by engagement
     let dailyActiveUsers = 0;
@@ -29,9 +36,8 @@ export async function GET(request: NextRequest) {
     let monthlyActiveUsers = 0;
     let inactiveUsers = 0;
 
-    allUsersSnapshot.docs.forEach((doc) => {
-      const data = doc.data();
-      const lastLogin = data.last_login_at;
+    usersList.forEach((row) => {
+      const lastLogin = row.last_login_at;
 
       if (!lastLogin) {
         inactiveUsers++;
@@ -59,16 +65,18 @@ export async function GET(request: NextRequest) {
       { name: 'Inactive', value: inactiveUsers },
     ].filter(item => item.value > 0); // Only include categories with users
 
+    const totalUsers = usersList.length;
+
     return apiSuccess({
       data: engagementData,
       summary: {
-        totalUsers: allUsersSnapshot.size,
+        totalUsers,
         dailyActiveUsers,
         weeklyActiveUsers,
         monthlyActiveUsers,
         inactiveUsers,
-        engagementRate: allUsersSnapshot.size > 0
-          ? Math.round(((dailyActiveUsers + weeklyActiveUsers + monthlyActiveUsers) / allUsersSnapshot.size) * 100)
+        engagementRate: totalUsers > 0
+          ? Math.round(((dailyActiveUsers + weeklyActiveUsers + monthlyActiveUsers) / totalUsers) * 100)
           : 0,
       },
     });

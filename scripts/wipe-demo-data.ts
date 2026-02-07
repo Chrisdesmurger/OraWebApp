@@ -4,8 +4,18 @@
  */
 
 import { purgeFakeUsers } from './purge-fake-users';
-import { getFirestore } from '../lib/firebase/admin';
+import { createClient } from '@supabase/supabase-js';
 import type { CommandResult } from '../lib/types/commands';
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function wipeDemoData(): Promise<CommandResult> {
   const output: string[] = [];
@@ -44,36 +54,30 @@ export async function wipeDemoData(): Promise<CommandResult> {
     output.push('STEP 2: Deleting sample content...');
     output.push('----------------------------------------');
 
-    const db = getFirestore();
-
     // Delete all lessons
     output.push('\nDeleting all lessons...');
-    const lessonsSnapshot = await db.collection('lessons').get();
-    output.push(`Found ${lessonsSnapshot.size} lessons`);
+    const { data: lessonsData, error: lessonsCountError } = await supabase
+      .from('lessons')
+      .select('id');
 
-    if (!lessonsSnapshot.empty) {
-      const lessonBatches: any[][] = [];
-      let currentBatch = db.batch();
-      let batchCount = 0;
+    if (lessonsCountError) {
+      throw lessonsCountError;
+    }
 
-      lessonsSnapshot.docs.forEach((doc, index) => {
-        currentBatch.delete(doc.ref);
-        batchCount++;
+    const lessonsCount = lessonsData?.length || 0;
+    output.push(`Found ${lessonsCount} lessons`);
 
-        // Firestore batch limit is 500
-        if (batchCount === 500 || index === lessonsSnapshot.size - 1) {
-          lessonBatches.push([currentBatch]);
-          currentBatch = db.batch();
-          batchCount = 0;
-        }
-      });
+    if (lessonsCount > 0) {
+      const { error: lessonsDeleteError } = await supabase
+        .from('lessons')
+        .delete()
+        .neq('id', '');  // Delete all rows (neq empty string matches all)
 
-      for (let i = 0; i < lessonBatches.length; i++) {
-        await lessonBatches[i][0].commit();
-        output.push(`  - Batch ${i + 1}/${lessonBatches.length} committed`);
+      if (lessonsDeleteError) {
+        throw lessonsDeleteError;
       }
 
-      metadata.lessonsDeleted = lessonsSnapshot.size;
+      metadata.lessonsDeleted = lessonsCount;
       metadata.totalOperations += metadata.lessonsDeleted;
       output.push(`  - ${metadata.lessonsDeleted} lessons deleted`);
     } else {
@@ -82,50 +86,59 @@ export async function wipeDemoData(): Promise<CommandResult> {
 
     // Delete all programs
     output.push('\nDeleting all programs...');
-    const programsSnapshot = await db.collection('programs').get();
-    output.push(`Found ${programsSnapshot.size} programs`);
+    const { data: programsData, error: programsCountError } = await supabase
+      .from('programs')
+      .select('id');
 
-    if (!programsSnapshot.empty) {
-      const programBatches: any[][] = [];
-      let currentBatch = db.batch();
-      let batchCount = 0;
+    if (programsCountError) {
+      throw programsCountError;
+    }
 
-      programsSnapshot.docs.forEach((doc, index) => {
-        currentBatch.delete(doc.ref);
-        batchCount++;
+    const programsCount = programsData?.length || 0;
+    output.push(`Found ${programsCount} programs`);
 
-        if (batchCount === 500 || index === programsSnapshot.size - 1) {
-          programBatches.push([currentBatch]);
-          currentBatch = db.batch();
-          batchCount = 0;
-        }
-      });
+    if (programsCount > 0) {
+      const { error: programsDeleteError } = await supabase
+        .from('programs')
+        .delete()
+        .neq('id', '');  // Delete all rows
 
-      for (let i = 0; i < programBatches.length; i++) {
-        await programBatches[i][0].commit();
-        output.push(`  - Batch ${i + 1}/${programBatches.length} committed`);
+      if (programsDeleteError) {
+        throw programsDeleteError;
       }
 
-      metadata.programsDeleted = programsSnapshot.size;
+      metadata.programsDeleted = programsCount;
       metadata.totalOperations += metadata.programsDeleted;
       output.push(`  - ${metadata.programsDeleted} programs deleted`);
     } else {
       output.push('  - No programs found');
     }
 
-    // Delete all user programs
+    // Delete all user program enrollments
     output.push('\nCleaning up user program records...');
-    const userProgramsSnapshot = await db.collection('userPrograms').get();
+    const { data: enrollmentsData, error: enrollmentsCountError } = await supabase
+      .from('user_program_enrollments')
+      .select('id');
 
-    if (!userProgramsSnapshot.empty) {
-      const batch = db.batch();
-      userProgramsSnapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
-      await batch.commit();
-      output.push(`  - ${userProgramsSnapshot.size} user program records deleted`);
-    } else {
+    if (enrollmentsCountError) {
+      // Table might not exist, that's ok
       output.push('  - No user program records found');
+    } else {
+      const enrollmentsCount = enrollmentsData?.length || 0;
+      if (enrollmentsCount > 0) {
+        const { error: enrollmentsDeleteError } = await supabase
+          .from('user_program_enrollments')
+          .delete()
+          .neq('id', '');
+
+        if (enrollmentsDeleteError) {
+          output.push(`  - Error deleting enrollments: ${enrollmentsDeleteError.message}`);
+        } else {
+          output.push(`  - ${enrollmentsCount} user program records deleted`);
+        }
+      } else {
+        output.push('  - No user program records found');
+      }
     }
 
     output.push('');

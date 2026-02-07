@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { logAuditEvent } from '@/lib/audit/logger';
 import type { OnboardingConfig } from '@/types/onboarding';
 
@@ -27,24 +27,31 @@ export async function POST(
       return apiError('Configuration ID is required', 400);
     }
 
-    const db = getFirestore();
-    const docRef = db.collection('onboarding_configs').doc(id);
-    const doc = await docRef.get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!doc.exists) {
+    // Fetch the config to publish
+    const { data: configRow, error: configError } = await supabase
+      .from('onboarding_configs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (configError || !configRow) {
       return apiError('Onboarding configuration not found', 404);
     }
 
-    const data = doc.data() as OnboardingConfig;
+    const data = configRow as unknown as OnboardingConfig;
 
     // Validate the configuration before publishing
-    if (!data.questions || data.questions.length === 0) {
+    if (!data.questions || (Array.isArray(data.questions) && data.questions.length === 0)) {
       return apiError('Cannot publish configuration without questions', 400);
     }
 
+    const questions = Array.isArray(data.questions) ? data.questions : [];
+
     // Validate all questions have required fields
-    for (let i = 0; i < data.questions.length; i++) {
-      const q = data.questions[i];
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
       if (!q.title || !q.category || !q.type) {
         return apiError(`Question at index ${i} is incomplete`, 400);
       }
@@ -59,31 +66,37 @@ export async function POST(
       }
     }
 
-    const now = new Date();
+    const now = new Date().toISOString();
 
-    // Use a transaction to ensure atomicity
-    await db.runTransaction(async (transaction) => {
-      // 1. Deactivate all currently active configs
-      const activeConfigs = await db
-        .collection('onboarding_configs')
-        .where('status', '==', 'active')
-        .get();
+    // 1. Deactivate all currently active configs
+    const { error: deactivateError } = await supabase
+      .from('onboarding_configs')
+      .update({
+        status: 'archived',
+        updated_at: now,
+      })
+      .eq('status', 'active');
 
-      activeConfigs.docs.forEach(activeDoc => {
-        transaction.update(activeDoc.ref, {
-          status: 'archived',
-          updatedAt: now,
-        });
-      });
+    if (deactivateError) {
+      console.error('POST /api/admin/onboarding/[id]/publish deactivate error:', deactivateError);
+      return apiError('Failed to deactivate existing configs', 500);
+    }
 
-      // 2. Activate this config
-      transaction.update(docRef, {
+    // 2. Activate this config
+    const { error: activateError } = await supabase
+      .from('onboarding_configs')
+      .update({
         status: 'active',
-        publishedAt: now,
-        publishedBy: currentUser.uid,
-        updatedAt: now,
-      });
-    });
+        published_at: now,
+        published_by: currentUser.uid,
+        updated_at: now,
+      })
+      .eq('id', id);
+
+    if (activateError) {
+      console.error('POST /api/admin/onboarding/[id]/publish activate error:', activateError);
+      return apiError('Failed to activate configuration', 500);
+    }
 
     // Log audit event
     logAuditEvent({
@@ -94,21 +107,27 @@ export async function POST(
       actorEmail: currentUser.email || 'unknown',
       changesAfter: {
         version: data.version,
-        questionCount: data.questions.length,
+        questionCount: questions.length,
       },
       request,
     });
 
-    const updatedDoc = await docRef.get();
+    // Fetch updated config
+    const { data: updatedRow } = await supabase
+      .from('onboarding_configs')
+      .select('*')
+      .eq('id', id)
+      .single();
 
     return apiSuccess({
-      id: updatedDoc.id,
-      ...updatedDoc.data(),
+      id,
+      ...updatedRow,
       message: 'Onboarding configuration published successfully. It is now active.',
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('POST /api/admin/onboarding/[id]/publish error:', error);
-    return apiError(error.message || 'Failed to publish onboarding configuration', 500);
+    const message = error instanceof Error ? error.message : 'Failed to publish onboarding configuration';
+    return apiError(message, 500);
   }
 }

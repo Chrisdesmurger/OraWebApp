@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,44 +12,35 @@ export async function GET(request: NextRequest) {
       return apiError('Insufficient permissions', 403);
     }
 
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
 
-    // Fetch programs
-    const programsSnapshot = await firestore
-      .collection('programs')
-      .where('status', '==', 'published')
-      .limit(100)  // Limit to top 100 programs
-      .get();
+    // Fetch published programs
+    const { data: programs, error: programsError } = await supabase
+      .from('programs')
+      .select('id, title, category, lessons')
+      .eq('status', 'published')
+      .limit(100);
 
-    // Count lessons per program
-    const programPerformance = await Promise.all(
-      programsSnapshot.docs.map(async (doc) => {
-        const programData = doc.data();
-        const programId = doc.id;
+    if (programsError) throw programsError;
 
-        // Count lessons in this program
-        const lessonsSnapshot = await firestore
-          .collection('lessons')
-          .where('program_id', '==', programId)
-          .get();
+    // Count lessons per program using the lessons UUID[] column
+    const programPerformance = (programs ?? []).map((program) => {
+      const lessonCount = Array.isArray(program.lessons) ? program.lessons.length : 0;
 
-        const lessonCount = lessonsSnapshot.size;
+      // Calculate mock enrollment and completion rates
+      // TODO: Replace with real enrollment/completion data when tracking is implemented
+      const mockEnrollment = Math.floor(Math.random() * 100) + 10;
+      const mockCompletionRate = Math.floor(Math.random() * 40) + 40; // 40-80%
 
-        // Calculate mock enrollment and completion rates
-        // TODO: Replace with real enrollment/completion data when tracking is implemented
-        const mockEnrollment = Math.floor(Math.random() * 100) + 10;
-        const mockCompletionRate = Math.floor(Math.random() * 40) + 40; // 40-80%
-
-        return {
-          id: programId,
-          title: programData.title || 'Untitled Program',
-          category: programData.category || 'uncategorized',
-          lessonCount,
-          enrollment: mockEnrollment,
-          completionRate: mockCompletionRate,
-        };
-      })
-    );
+      return {
+        id: program.id,
+        title: program.title || 'Untitled Program',
+        category: program.category || 'uncategorized',
+        lessonCount,
+        enrollment: mockEnrollment,
+        completionRate: mockCompletionRate,
+      };
+    });
 
     // Sort by enrollment (top performers first)
     programPerformance.sort((a, b) => b.enrollment - a.enrollment);

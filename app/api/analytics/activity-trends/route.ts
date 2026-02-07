@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,17 +53,18 @@ export async function GET(request: NextRequest) {
 
     // Since we don't have session data yet, generate mock data based on user activity
     // TODO: Replace with real session/activity data when tracking is implemented
-    const firestore = getFirestore();
-    const activeUsersSnapshot = await firestore
-      .collection('users')
-      .where('last_login_at', '>=', startDate.toISOString())
-      .limit(5000)  // Prevent performance issues
-      .get();
+    const supabase = createSupabaseServiceClient();
+    const { data: activeUsers, error } = await supabase
+      .from('users')
+      .select('last_login_at')
+      .gte('last_login_at', startDate.toISOString())
+      .limit(5000);
+
+    if (error) throw error;
 
     // Distribute active users across days (mock distribution)
-    activeUsersSnapshot.docs.forEach((doc) => {
-      const data = doc.data();
-      const lastLogin = data.last_login_at;
+    (activeUsers ?? []).forEach((row) => {
+      const lastLogin = row.last_login_at;
       if (lastLogin) {
         const loginDate = new Date(lastLogin);
         const dateKey = loginDate.toISOString().split('T')[0];

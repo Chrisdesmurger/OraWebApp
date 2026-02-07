@@ -7,7 +7,8 @@
 
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore, getStorage } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import { uploadFile, deleteFile, getSignedUrl } from '@/lib/storage';
 import type { LessonDocument } from '@/types/lesson';
 
 /**
@@ -25,15 +26,18 @@ export async function POST(
       return apiError('Insufficient permissions', 403);
     }
 
-    const firestore = getFirestore();
-    const lessonRef = firestore.collection('lessons').doc(lessonId);
-    const lessonDoc = await lessonRef.get();
+    const supabase = createSupabaseServiceClient();
+    const { data: row, error: fetchError } = await supabase
+      .from('lessons')
+      .select('*')
+      .eq('id', lessonId)
+      .single();
 
-    if (!lessonDoc.exists) {
+    if (fetchError || !row) {
       return apiError('Lesson not found', 404);
     }
 
-    const lessonData = lessonDoc.data() as LessonDocument;
+    const lessonData = row as unknown as LessonDocument;
 
     if (user.role === 'teacher' && lessonData.author_id !== user.uid) {
       return apiError('You can only upload preview images for your own lessons', 403);
@@ -59,10 +63,7 @@ export async function POST(
     // Delete old preview image if exists
     if (lessonData.preview_storage_path) {
       try {
-        const storage = getStorage();
-        const bucket = storage.bucket();
-        const oldFile = bucket.file(lessonData.preview_storage_path);
-        await oldFile.delete();
+        await deleteFile(lessonData.preview_storage_path);
       } catch (deleteError: any) {
         console.warn('[POST /api/lessons/[id]/preview-image] Failed to delete old preview:', deleteError.message);
       }
@@ -70,34 +71,37 @@ export async function POST(
 
     const timestamp = Date.now();
     const fileExtension = file.name.split('.').pop() || 'jpg';
-    const storagePath = `lessons/${lessonId}/preview_${timestamp}.${fileExtension}`;
-
-    const storage = getStorage();
-    const bucket = storage.bucket();
-    const fileUpload = bucket.file(storagePath);
+    const storagePath = `media/lessons/${lessonId}/preview_${timestamp}.${fileExtension}`;
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    await fileUpload.save(buffer, {
-      metadata: {
-        contentType: file.type,
-        metadata: {
-          uploadedBy: user.uid,
-          uploadedAt: new Date().toISOString(),
-          originalName: file.name,
-        },
+    await uploadFile(buffer, storagePath, {
+      contentType: file.type,
+      customMetadata: {
+        uploadedBy: user.uid,
+        uploadedAt: new Date().toISOString(),
+        originalName: file.name,
       },
     });
 
-    await fileUpload.makePublic();
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+    // Get a public/signed URL for the uploaded file
+    const publicUrl = await getSignedUrl(storagePath, 60 * 24 * 365); // 1 year expiry
 
-    await lessonRef.update({
-      preview_image_url: publicUrl,
-      preview_storage_path: storagePath,
-      updated_at: new Date().toISOString(),
-    });
+    // Update the lesson record in Supabase
+    const { error: updateError } = await supabase
+      .from('lessons')
+      .update({
+        preview_image_url: publicUrl,
+        preview_storage_path: storagePath,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', lessonId);
+
+    if (updateError) {
+      console.error('[POST /api/lessons/[id]/preview-image] Supabase update error:', updateError);
+      throw new Error(updateError.message);
+    }
 
     return apiSuccess({ previewImageUrl: publicUrl, storagePath });
   } catch (error: any) {
@@ -121,15 +125,18 @@ export async function DELETE(
       return apiError('Insufficient permissions', 403);
     }
 
-    const firestore = getFirestore();
-    const lessonRef = firestore.collection('lessons').doc(lessonId);
-    const lessonDoc = await lessonRef.get();
+    const supabase = createSupabaseServiceClient();
+    const { data: row, error: fetchError } = await supabase
+      .from('lessons')
+      .select('*')
+      .eq('id', lessonId)
+      .single();
 
-    if (!lessonDoc.exists) {
+    if (fetchError || !row) {
       return apiError('Lesson not found', 404);
     }
 
-    const lessonData = lessonDoc.data() as LessonDocument;
+    const lessonData = row as unknown as LessonDocument;
 
     if (user.role === 'teacher' && lessonData.author_id !== user.uid) {
       return apiError('You can only delete preview images for your own lessons', 403);
@@ -137,20 +144,25 @@ export async function DELETE(
 
     if (lessonData.preview_storage_path) {
       try {
-        const storage = getStorage();
-        const bucket = storage.bucket();
-        const file = bucket.file(lessonData.preview_storage_path);
-        await file.delete();
+        await deleteFile(lessonData.preview_storage_path);
       } catch (deleteError: any) {
         console.warn('[DELETE /api/lessons/[id]/preview-image] Failed to delete file:', deleteError.message);
       }
     }
 
-    await lessonRef.update({
-      preview_image_url: null,
-      preview_storage_path: null,
-      updated_at: new Date().toISOString(),
-    });
+    const { error: updateError } = await supabase
+      .from('lessons')
+      .update({
+        preview_image_url: null,
+        preview_storage_path: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', lessonId);
+
+    if (updateError) {
+      console.error('[DELETE /api/lessons/[id]/preview-image] Supabase update error:', updateError);
+      throw new Error(updateError.message);
+    }
 
     return apiSuccess({ message: 'Preview image deleted successfully' });
   } catch (error: any) {

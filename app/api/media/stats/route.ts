@@ -1,12 +1,11 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import {
   listStorageFiles,
   getReferencedFilePaths,
   convertToMediaFile,
-  findLessonsUsingFile,
-} from '@/lib/firebase/storage-utils';
+} from '@/lib/supabase/storage-utils';
 import type { MediaStats, MediaFile } from '@/types/media';
 import { formatBytes } from '@/types/media';
 
@@ -30,19 +29,19 @@ export async function GET(request: NextRequest) {
 
     console.log('[GET /api/media/stats] Calculating storage statistics...');
 
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
 
     // Step 1: List all files in storage
     const storageFiles = await listStorageFiles('media/');
 
     // Step 2: Get all referenced file paths from lessons
-    const referencedPaths = await getReferencedFilePaths(firestore);
+    const referencedPaths = await getReferencedFilePaths(supabase);
 
     // Step 3: Convert storage files to MediaFile objects
     const mediaFiles: MediaFile[] = [];
 
     for (const fileMetadata of storageFiles) {
-      const mediaFile = await convertToMediaFile(fileMetadata, referencedPaths, firestore);
+      const mediaFile = await convertToMediaFile(fileMetadata, referencedPaths, supabase);
 
       if (mediaFile) {
         mediaFiles.push(mediaFile);
@@ -112,8 +111,9 @@ export async function GET(request: NextRequest) {
     });
 
     return apiSuccess(stats);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('GET /api/media/stats error:', error);
-    return apiError(error.message || 'Failed to calculate media statistics', 500);
+    return apiError(errorMessage || 'Failed to calculate media statistics', 500);
   }
 }

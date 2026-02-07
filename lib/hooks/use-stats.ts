@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getCurrentUserIdToken } from '@/lib/firebase/client';
+import { fetchWithAuth } from '@/lib/api/fetch-with-auth';
 import { useAuth } from '@/lib/auth/auth-context';
 
 export interface DashboardStats {
@@ -36,15 +36,7 @@ export function useStats() {
       setIsLoading(true);
       setError(null);
 
-      // Get Firebase ID token first
-      const idToken = await getCurrentUserIdToken();
-      console.log('[useStats] ID Token:', idToken ? 'Present' : 'Missing');
-
-      if (!idToken) {
-        throw new Error('User not authenticated');
-      }
-
-      // Check cache first (but only if we have a token)
+      // Check cache first
       if (useCache && typeof window !== 'undefined') {
         const cached = localStorage.getItem(CACHE_KEY);
         if (cached) {
@@ -60,15 +52,9 @@ export function useStats() {
         }
       }
 
-      // Fetch fresh data with auth token
-      console.log('[useStats] Fetching fresh data from API with token');
-      const response = await fetch('/api/stats', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-        },
-      });
+      // Fetch fresh data - cookies are sent automatically with fetchWithAuth
+      console.log('[useStats] Fetching fresh data from API');
+      const response = await fetchWithAuth('/api/stats');
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: response.statusText }));
@@ -87,8 +73,9 @@ export function useStats() {
       }
 
       setStats(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch stats');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch stats';
+      setError(errorMessage);
       console.error('useStats error:', err);
     } finally {
       setIsLoading(false);

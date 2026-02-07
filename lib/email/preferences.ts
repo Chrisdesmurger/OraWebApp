@@ -5,14 +5,11 @@
  */
 
 import * as crypto from 'crypto';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import type { SupportedLanguage } from '@/lib/firestore/conversions';
 import type {
   EmailPreferences,
   EmailPreferencesDocument,
-  mapEmailPreferencesFromFirestore,
-  mapEmailPreferencesToFirestore,
-  getDefaultEmailPreferences,
 } from '@/types/email';
 
 // ============================================================================
@@ -88,22 +85,20 @@ export function verifyUnsubscribeToken(
 export async function getUserEmailPreferences(
   userId: string
 ): Promise<EmailPreferences> {
-  const firestore = getFirestore();
+  const supabase = createSupabaseServiceClient();
 
-  const doc = await firestore
-    .collection('users')
-    .doc(userId)
-    .collection('email_preferences')
-    .doc('preferences')
-    .get();
+  const { data: row, error } = await supabase
+    .from('email_preferences')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
 
-  if (!doc.exists) {
+  if (error || !row) {
     // Return default preferences
     return getDefaultPreferences();
   }
 
-  const data = doc.data() as EmailPreferencesDocument;
-  return mapPreferencesFromFirestore(data);
+  return mapPreferencesFromRow(row);
 }
 
 /**
@@ -113,7 +108,7 @@ export async function updateUserEmailPreferences(
   userId: string,
   preferences: Partial<EmailPreferences>
 ): Promise<EmailPreferences> {
-  const firestore = getFirestore();
+  const supabase = createSupabaseServiceClient();
 
   // Get current preferences
   const current = await getUserEmailPreferences(userId);
@@ -128,16 +123,25 @@ export async function updateUserEmailPreferences(
     updatedAt: Date.now(),
   };
 
-  // Convert to Firestore format
-  const firestoreData = mapPreferencesToFirestore(updated);
+  // Convert to database format
+  const dbData = mapPreferencesToRow(updated);
 
-  // Save to Firestore
-  await firestore
-    .collection('users')
-    .doc(userId)
-    .collection('email_preferences')
-    .doc('preferences')
-    .set(firestoreData, { merge: true });
+  // Upsert to Supabase
+  const { error } = await supabase
+    .from('email_preferences')
+    .upsert(
+      {
+        user_id: userId,
+        ...dbData,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    );
+
+  if (error) {
+    console.error('[Email Preferences] Upsert error:', error);
+    throw new Error('Failed to update email preferences');
+  }
 
   return updated;
 }
@@ -149,28 +153,32 @@ export async function unsubscribeFromAll(
   userId: string,
   reason?: string
 ): Promise<void> {
-  const firestore = getFirestore();
+  const supabase = createSupabaseServiceClient();
 
-  const preferences: Partial<EmailPreferencesDocument> = {
-    marketing_emails: false,
-    engagement_emails: false,
-    weekly_digest: false,
-    new_content_notifications: false,
-    streak_reminders: false,
-    inactivity_reminders: false,
-    program_recommendations: false,
-    unsubscribed_all: true,
-    unsubscribed_at: Date.now(),
-    unsubscribe_reason: reason,
-    updated_at: Date.now(),
-  };
+  const { error } = await supabase
+    .from('email_preferences')
+    .upsert(
+      {
+        user_id: userId,
+        marketing_emails: false,
+        engagement_emails: false,
+        weekly_digest: false,
+        new_content_notifications: false,
+        streak_reminders: false,
+        inactivity_reminders: false,
+        program_recommendations: false,
+        unsubscribed_all: true,
+        unsubscribed_at: Date.now(),
+        unsubscribe_reason: reason,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    );
 
-  await firestore
-    .collection('users')
-    .doc(userId)
-    .collection('email_preferences')
-    .doc('preferences')
-    .set(preferences, { merge: true });
+  if (error) {
+    console.error('[Email Preferences] Unsubscribe error:', error);
+    throw new Error('Failed to unsubscribe');
+  }
 }
 
 /**
@@ -227,28 +235,28 @@ function getDefaultPreferences(): EmailPreferences {
   };
 }
 
-function mapPreferencesFromFirestore(doc: EmailPreferencesDocument): EmailPreferences {
+function mapPreferencesFromRow(row: Record<string, unknown>): EmailPreferences {
   return {
-    authenticationEmails: doc.authentication_emails ?? true,
-    welcomeEmails: doc.welcome_emails ?? true,
-    engagementEmails: doc.engagement_emails ?? true,
-    marketingEmails: doc.marketing_emails ?? true,
-    transactionalEmails: doc.transactional_emails ?? true,
-    weeklyDigest: doc.weekly_digest ?? true,
-    newContentNotifications: doc.new_content_notifications ?? true,
-    streakReminders: doc.streak_reminders ?? true,
-    inactivityReminders: doc.inactivity_reminders ?? true,
-    programRecommendations: doc.program_recommendations ?? true,
-    digestFrequency: doc.digest_frequency ?? 'weekly',
-    preferredLanguage: doc.preferred_language ?? 'fr',
-    unsubscribedAll: doc.unsubscribed_all ?? false,
-    unsubscribedAt: doc.unsubscribed_at,
-    unsubscribeReason: doc.unsubscribe_reason,
-    updatedAt: doc.updated_at ?? Date.now(),
+    authenticationEmails: (row.authentication_emails as boolean) ?? true,
+    welcomeEmails: (row.welcome_emails as boolean) ?? true,
+    engagementEmails: (row.engagement_emails as boolean) ?? true,
+    marketingEmails: (row.marketing_emails as boolean) ?? true,
+    transactionalEmails: (row.transactional_emails as boolean) ?? true,
+    weeklyDigest: (row.weekly_digest as boolean) ?? true,
+    newContentNotifications: (row.new_content_notifications as boolean) ?? true,
+    streakReminders: (row.streak_reminders as boolean) ?? true,
+    inactivityReminders: (row.inactivity_reminders as boolean) ?? true,
+    programRecommendations: (row.program_recommendations as boolean) ?? true,
+    digestFrequency: (row.digest_frequency as EmailPreferences['digestFrequency']) ?? 'weekly',
+    preferredLanguage: (row.preferred_language as EmailPreferences['preferredLanguage']) ?? 'fr',
+    unsubscribedAll: (row.unsubscribed_all as boolean) ?? false,
+    unsubscribedAt: row.unsubscribed_at as number | undefined,
+    unsubscribeReason: row.unsubscribe_reason as string | undefined,
+    updatedAt: (row.updated_at as number) ?? Date.now(),
   };
 }
 
-function mapPreferencesToFirestore(prefs: EmailPreferences): EmailPreferencesDocument {
+function mapPreferencesToRow(prefs: EmailPreferences): Record<string, unknown> {
   return {
     authentication_emails: prefs.authenticationEmails,
     welcome_emails: prefs.welcomeEmails,
@@ -265,6 +273,5 @@ function mapPreferencesToFirestore(prefs: EmailPreferences): EmailPreferencesDoc
     unsubscribed_all: prefs.unsubscribedAll,
     unsubscribed_at: prefs.unsubscribedAt,
     unsubscribe_reason: prefs.unsubscribeReason,
-    updated_at: prefs.updatedAt,
   };
 }

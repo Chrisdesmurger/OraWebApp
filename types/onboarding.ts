@@ -7,9 +7,10 @@
  * - French (fr) is the primary language and always required
  * - English (en) and Spanish (es) are optional
  * - Fields follow the pattern: title, titleFr, titleEn, titleEs
+ *
+ * NOTE: Timestamp fields use string (ISO format) or Date instead of
+ * Firebase Timestamp, as the backend now uses PostgreSQL via Supabase.
  */
-
-import { Timestamp } from 'firebase/firestore';
 
 // ============================================================================
 // Question Types & Options
@@ -170,10 +171,10 @@ export interface OnboardingConfig {
   status: OnboardingStatus;
   version: string; // Semantic version (1.0.0)
   questions: OnboardingQuestion[];
-  createdAt: Timestamp | Date;
-  updatedAt: Timestamp | Date;
+  createdAt: string | Date;
+  updatedAt: string | Date;
   createdBy: string; // Admin UID
-  publishedAt?: Timestamp | Date;
+  publishedAt?: string | Date;
   publishedBy?: string; // Admin UID
 }
 
@@ -185,15 +186,15 @@ export interface UserOnboardingAnswer {
   questionId: string;
   selectedOptions: string[]; // Option IDs
   textAnswer?: string; // For text_input questions
-  answeredAt: Timestamp | Date;
+  answeredAt: string | Date;
 }
 
 export interface UserOnboardingResponse {
   uid: string;
   configVersion: string; // Which version they completed
   completed: boolean;
-  completedAt?: Timestamp | Date;
-  startedAt: Timestamp | Date;
+  completedAt?: string | Date;
+  startedAt: string | Date;
   answers: UserOnboardingAnswer[];
   metadata: {
     deviceType?: string;
@@ -235,7 +236,7 @@ export interface OnboardingAnalytics {
   completionRate: number; // Percentage
   averageTimeSeconds: number;
   questionMetrics: Record<string, QuestionMetrics>; // questionId -> metrics
-  updatedAt: Timestamp | Date;
+  updatedAt: string | Date;
 }
 
 // ============================================================================
@@ -408,8 +409,8 @@ export interface InformationScreen {
   backgroundColor?: string; // Hex color
   displayConditions?: DisplayConditions;
   order: number; // Order if multiple screens at same position
-  createdAt: Timestamp | Date;
-  updatedAt: Timestamp | Date;
+  createdAt: string | Date;
+  updatedAt: string | Date;
 }
 
 // ============================================================================
@@ -439,8 +440,8 @@ export interface RecommendationRule {
   priority: number; // Display order (1 = highest priority)
   active: boolean; // Can be disabled without deletion
   description?: string; // Admin notes
-  createdAt: Timestamp | Date;
-  updatedAt: Timestamp | Date;
+  createdAt: string | Date;
+  updatedAt: string | Date;
   createdBy: string; // Admin UID
 }
 

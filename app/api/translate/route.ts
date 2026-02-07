@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyIdToken } from '@/lib/firebase/admin';
+import { authenticateRequest } from '@/lib/api/auth-middleware';
 
 // Google Cloud Translation API endpoint
 const GOOGLE_TRANSLATE_API = 'https://translation.googleapis.com/language/translate/v2';
@@ -47,17 +47,8 @@ export interface TranslateResponse {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify Firebase authentication
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.split('Bearer ')[1];
-    await verifyIdToken(token);
+    // Verify authentication via auth-middleware (works with both Firebase and Supabase tokens)
+    await authenticateRequest(request);
 
     // Parse request body
     const body: TranslateRequest = await request.json();
@@ -72,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Check API key
     if (!GOOGLE_TRANSLATE_API_KEY) {
-      console.error('❌ GOOGLE_TRANSLATE_API_KEY not configured');
+      console.error('GOOGLE_TRANSLATE_API_KEY not configured');
       return NextResponse.json(
         { error: 'Translation service not configured. Please contact administrator.' },
         { status: 500 }
@@ -99,7 +90,7 @@ export async function POST(request: NextRequest) {
 
         if (!response.ok) {
           const errorData = await response.json();
-          console.error(`❌ Google Translate API error for ${targetLang}:`, errorData);
+          console.error(`Google Translate API error for ${targetLang}:`, errorData);
           throw new Error(`Translation failed for ${targetLang}: ${response.statusText}`);
         }
 
@@ -112,7 +103,7 @@ export async function POST(request: NextRequest) {
 
         translations[targetLang] = translatedText;
       } catch (error) {
-        console.error(`❌ Translation error for ${targetLang}:`, error);
+        console.error(`Translation error for ${targetLang}:`, error);
         translations[targetLang] = `[Translation failed]`;
       }
     }
@@ -121,11 +112,12 @@ export async function POST(request: NextRequest) {
       translations,
     });
 
-  } catch (error: any) {
-    console.error('❌ /api/translate error:', error);
+  } catch (error: unknown) {
+    console.error('/api/translate error:', error);
+    const message = error instanceof Error ? error.message : 'Translation failed';
 
     return NextResponse.json(
-      { error: error.message || 'Translation failed' },
+      { error: message },
       { status: 500 }
     );
   }

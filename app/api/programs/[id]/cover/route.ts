@@ -7,7 +7,8 @@
 
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore, getStorage } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
+import { uploadFile, getSignedUrl, deleteFile } from '@/lib/storage';
 import type { ProgramDocument } from '@/types/program';
 
 /**
@@ -25,15 +26,19 @@ export async function POST(
       return apiError('Insufficient permissions', 403);
     }
 
-    const firestore = getFirestore();
-    const programRef = firestore.collection('programs').doc(programId);
-    const programDoc = await programRef.get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!programDoc.exists) {
+    const { data: programRow, error: fetchError } = await supabase
+      .from('programs')
+      .select('*')
+      .eq('id', programId)
+      .single();
+
+    if (fetchError || !programRow) {
       return apiError('Program not found', 404);
     }
 
-    const programData = programDoc.data() as ProgramDocument;
+    const programData = programRow as ProgramDocument & { id: string };
 
     if (user.role === 'teacher' && programData.author_id !== user.uid) {
       return apiError('You can only upload covers for your own programs', 403);
@@ -59,10 +64,7 @@ export async function POST(
     // Delete old cover if exists
     if (programData.cover_storage_path) {
       try {
-        const storage = getStorage();
-        const bucket = storage.bucket();
-        const oldFile = bucket.file(programData.cover_storage_path);
-        await oldFile.delete();
+        await deleteFile(programData.cover_storage_path);
       } catch (deleteError: any) {
         console.warn('[POST /api/programs/[id]/cover] Failed to delete old cover:', deleteError.message);
       }
@@ -70,34 +72,36 @@ export async function POST(
 
     const timestamp = Date.now();
     const fileExtension = file.name.split('.').pop() || 'jpg';
-    const storagePath = `programs/${programId}/cover_${timestamp}.${fileExtension}`;
-
-    const storage = getStorage();
-    const bucket = storage.bucket();
-    const fileUpload = bucket.file(storagePath);
+    const storagePath = `media/programs/${programId}/cover_${timestamp}.${fileExtension}`;
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    await fileUpload.save(buffer, {
-      metadata: {
-        contentType: file.type,
-        metadata: {
-          uploadedBy: user.uid,
-          uploadedAt: new Date().toISOString(),
-          originalName: file.name,
-        },
+    await uploadFile(buffer, storagePath, {
+      contentType: file.type,
+      customMetadata: {
+        uploadedBy: user.uid,
+        uploadedAt: new Date().toISOString(),
+        originalName: file.name,
       },
     });
 
-    await fileUpload.makePublic();
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+    // Get a signed URL for the uploaded cover image
+    const publicUrl = await getSignedUrl(storagePath, 60 * 24 * 365); // 1 year expiry
 
-    await programRef.update({
-      cover_image_url: publicUrl,
-      cover_storage_path: storagePath,
-      updated_at: new Date().toISOString(),
-    });
+    const { error: updateError } = await supabase
+      .from('programs')
+      .update({
+        cover_image_url: publicUrl,
+        cover_storage_path: storagePath,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', programId);
+
+    if (updateError) {
+      console.error('[POST /api/programs/[id]/cover] Supabase update error:', updateError);
+      return apiError('Failed to update program cover', 500);
+    }
 
     return apiSuccess({ coverUrl: publicUrl, storagePath });
   } catch (error: any) {
@@ -121,15 +125,19 @@ export async function DELETE(
       return apiError('Insufficient permissions', 403);
     }
 
-    const firestore = getFirestore();
-    const programRef = firestore.collection('programs').doc(programId);
-    const programDoc = await programRef.get();
+    const supabase = createSupabaseServiceClient();
 
-    if (!programDoc.exists) {
+    const { data: programRow, error: fetchError } = await supabase
+      .from('programs')
+      .select('*')
+      .eq('id', programId)
+      .single();
+
+    if (fetchError || !programRow) {
       return apiError('Program not found', 404);
     }
 
-    const programData = programDoc.data() as ProgramDocument;
+    const programData = programRow as ProgramDocument & { id: string };
 
     if (user.role === 'teacher' && programData.author_id !== user.uid) {
       return apiError('You can only delete covers for your own programs', 403);
@@ -137,20 +145,25 @@ export async function DELETE(
 
     if (programData.cover_storage_path) {
       try {
-        const storage = getStorage();
-        const bucket = storage.bucket();
-        const file = bucket.file(programData.cover_storage_path);
-        await file.delete();
+        await deleteFile(programData.cover_storage_path);
       } catch (deleteError: any) {
         console.warn('[DELETE /api/programs/[id]/cover] Failed to delete file:', deleteError.message);
       }
     }
 
-    await programRef.update({
-      cover_image_url: null,
-      cover_storage_path: null,
-      updated_at: new Date().toISOString(),
-    });
+    const { error: updateError } = await supabase
+      .from('programs')
+      .update({
+        cover_image_url: null,
+        cover_storage_path: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', programId);
+
+    if (updateError) {
+      console.error('[DELETE /api/programs/[id]/cover] Supabase update error:', updateError);
+      return apiError('Failed to update program cover', 500);
+    }
 
     return apiSuccess({ message: 'Cover image deleted successfully' });
   } catch (error: any) {

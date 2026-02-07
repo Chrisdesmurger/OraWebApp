@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import type { UserOnboardingResponse } from '@/types/onboarding';
 
 /**
@@ -33,66 +33,46 @@ export async function GET(
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10)));
     const completedFilter = searchParams.get('completed');
 
-    const db = getFirestore();
+    const supabase = createSupabaseServiceClient();
 
     // Verify config exists
-    const configDoc = await db.collection('onboarding_configs').doc(id).get();
-    if (!configDoc.exists) {
+    const { data: configRow, error: configError } = await supabase
+      .from('onboarding_configs')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (configError || !configRow) {
       return apiError('Onboarding configuration not found', 404);
     }
 
-    // Build query for user responses using collectionGroup (efficient)
-    // NEW: Query dedicated collection instead of nested field
-    let responsesQuery = db
-      .collectionGroup('responses')
-      .where('config_version', '==', id)
-      .orderBy('started_at', 'desc');
+    // Build query for user responses
+    let responsesQuery = supabase
+      .from('onboarding_responses')
+      .select('*', { count: 'exact' })
+      .eq('config_version', id)
+      .order('started_at', { ascending: false });
 
     // Filter by completion status if provided
     if (completedFilter === 'true') {
-      responsesQuery = responsesQuery.where('completed', '==', true) as any;
+      responsesQuery = responsesQuery.eq('completed', true);
     } else if (completedFilter === 'false') {
-      responsesQuery = responsesQuery.where('completed', '==', false) as any;
+      responsesQuery = responsesQuery.eq('completed', false);
     }
 
     // Apply pagination
     const offset = (page - 1) * limit;
-    responsesQuery = responsesQuery.limit(limit);
+    responsesQuery = responsesQuery.range(offset, offset + limit - 1);
 
-    if (offset > 0) {
-      // Cursor-based pagination for better performance
-      const skipSnapshot = await db
-        .collectionGroup('responses')
-        .where('config_version', '==', id)
-        .orderBy('started_at', 'desc')
-        .limit(offset)
-        .get();
+    const { data: responsesRows, error: responsesError, count: totalCount } = await responsesQuery;
 
-      if (!skipSnapshot.empty) {
-        const lastDoc = skipSnapshot.docs[skipSnapshot.docs.length - 1];
-        responsesQuery = responsesQuery.startAfter(lastDoc) as any;
-      }
+    if (responsesError) {
+      console.error('GET /api/admin/onboarding/[id]/responses error:', responsesError);
+      return apiError('Failed to fetch user responses', 500);
     }
 
-    const responsesSnapshot = await responsesQuery.get();
-
-    // Get total count (for pagination metadata)
-    let countQuery = db
-      .collectionGroup('responses')
-      .where('config_version', '==', id);
-
-    if (completedFilter === 'true') {
-      countQuery = countQuery.where('completed', '==', true) as any;
-    } else if (completedFilter === 'false') {
-      countQuery = countQuery.where('completed', '==', false) as any;
-    }
-
-    const countSnapshot = await countQuery.count().get();
-    const totalCount = countSnapshot.data().count;
-
-    // Map responses (data already in camelCase format from Firestore)
-    const responses: UserOnboardingResponse[] = responsesSnapshot.docs.map(doc => {
-      const data = doc.data();
+    // Map responses
+    const responses: UserOnboardingResponse[] = (responsesRows || []).map(data => {
       return {
         uid: data.uid,
         configVersion: data.config_version,
@@ -113,22 +93,24 @@ export async function GET(
       } as UserOnboardingResponse;
     });
 
-    const totalPages = Math.ceil(totalCount / limit);
+    const total = totalCount || 0;
+    const totalPages = Math.ceil(total / limit);
 
     return apiSuccess({
       responses,
       pagination: {
         page,
         limit,
-        total: totalCount,
+        total,
         totalPages,
         hasNext: page < totalPages,
         hasPrev: page > 1,
       },
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('GET /api/admin/onboarding/[id]/responses error:', error);
-    return apiError(error.message || 'Failed to fetch user responses', 500);
+    const message = error instanceof Error ? error.message : 'Failed to fetch user responses';
+    return apiError(message, 500);
   }
 }

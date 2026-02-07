@@ -7,7 +7,7 @@
 
 import { render } from '@react-email/components';
 import { createElement } from 'react';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import type { SupportedLanguage } from '@/lib/firestore/conversions';
 import type {
   EmailType,
@@ -271,11 +271,11 @@ interface LogEmailParams {
 }
 
 /**
- * Log email send attempt to Firestore
+ * Log email send attempt to Supabase
  */
 async function logEmailSent(params: LogEmailParams): Promise<void> {
   try {
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
     const now = Date.now();
 
     const logDoc: EmailLogDocument = {
@@ -294,7 +294,10 @@ async function logEmailSent(params: LogEmailParams): Promise<void> {
       variables_used: params.variables,
     };
 
-    await firestore.collection('email_logs').add(logDoc);
+    const { error } = await supabase.from('email_logs').insert(logDoc);
+    if (error) {
+      console.error('[Email] Failed to log email send:', error);
+    }
   } catch (error) {
     // Don't throw - logging failure shouldn't break email sending
     console.error('[Email] Failed to log email send:', error);
@@ -314,22 +317,27 @@ export async function updateEmailStatus(
   timestamp?: number
 ): Promise<void> {
   try {
-    const firestore = getFirestore();
+    const supabase = createSupabaseServiceClient();
     const now = timestamp || Date.now();
 
     // Find the email log by resend_id
-    const snapshot = await firestore
-      .collection('email_logs')
-      .where('resend_id', '==', resendId)
-      .limit(1)
-      .get();
+    const { data: rows, error: selectError } = await supabase
+      .from('email_logs')
+      .select('id')
+      .eq('resend_id', resendId)
+      .limit(1);
 
-    if (snapshot.empty) {
+    if (selectError) {
+      console.error('[Email] Failed to query email log:', selectError);
+      return;
+    }
+
+    if (!rows || rows.length === 0) {
       console.warn(`[Email] No log found for resend_id: ${resendId}`);
       return;
     }
 
-    const docRef = snapshot.docs[0].ref;
+    const row = rows[0];
     const updateData: Record<string, unknown> = {
       status,
     };
@@ -353,7 +361,16 @@ export async function updateEmailStatus(
         break;
     }
 
-    await docRef.update(updateData);
+    const { error: updateError } = await supabase
+      .from('email_logs')
+      .update(updateData)
+      .eq('id', row.id);
+
+    if (updateError) {
+      console.error('[Email] Failed to update email status:', updateError);
+      return;
+    }
+
     console.log(`[Email] Updated status for ${resendId}: ${status}`);
   } catch (error) {
     console.error('[Email] Failed to update email status:', error);

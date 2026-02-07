@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth/require-role';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import type { CommandLog } from '@/lib/types/commands';
 
 /**
@@ -21,35 +21,55 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50', 10);
     const commandName = searchParams.get('commandName');
 
-    // Fetch logs from Firestore
-    const db = getFirestore();
-    let query = db
-      .collection('commandLogs')
-      .orderBy('startedAt', 'desc')
+    // Fetch logs from Supabase
+    const supabase = createSupabaseServiceClient();
+
+    let query = supabase
+      .from('command_logs')
+      .select('*')
+      .order('started_at', { ascending: false })
       .limit(limit);
 
     if (commandName) {
-      query = query.where('commandName', '==', commandName) as any;
+      query = query.eq('command_name', commandName);
     }
 
-    const snapshot = await query.get();
+    const { data: rows, error } = await query;
 
-    const logs: CommandLog[] = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as CommandLog[];
+    if (error) {
+      console.error('Failed to fetch command logs:', error);
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch logs' },
+        { status: 500 }
+      );
+    }
+
+    // Map rows to CommandLog format for frontend compatibility
+    const logs: CommandLog[] = (rows || []).map((row) => ({
+      id: row.id,
+      commandName: row.command_name,
+      status: row.status,
+      startedAt: row.started_at,
+      completedAt: row.completed_at,
+      executedBy: row.executed_by,
+      output: row.output,
+      error: row.error,
+      duration: row.duration_ms,
+      metadata: row.metadata,
+    }));
 
     return NextResponse.json({
       success: true,
       logs,
       total: logs.length,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch command logs:', error);
+    const message = error instanceof Error ? error.message : 'Failed to fetch logs';
     return NextResponse.json(
       {
         success: false,
-        error: error.message || 'Failed to fetch logs',
+        error: message,
       },
       { status: 500 }
     );

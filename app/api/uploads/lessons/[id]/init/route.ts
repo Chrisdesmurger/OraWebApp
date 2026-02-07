@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { getResumableUploadUrl, getLessonOriginalPath } from '@/lib/storage';
 import { validateFileUpload, validateFileType } from '@/lib/validators/lesson';
-import type { LessonDocument } from '@/types/lesson';
+import { ZodError } from 'zod';
 
 /**
  * POST /api/uploads/lessons/[id]/init - Initialize resumable upload
@@ -15,7 +15,7 @@ import type { LessonDocument } from '@/types/lesson';
  * - lessonType: 'video'|'audio' (required) - For validation
  *
  * Returns:
- * - uploadUrl: string - Resumable upload URL
+ * - uploadUrl: string - Signed upload URL
  * - lessonId: string - Lesson ID
  * - storagePath: string - Storage path where file will be uploaded
  */
@@ -44,15 +44,16 @@ export async function POST(
     console.log('[Upload Init] Validating upload for lesson:', lessonId, validatedData);
 
     // Verify lesson exists and user has permission
-    const firestore = getFirestore();
-    const lessonRef = firestore.collection('lessons').doc(lessonId);
-    const lessonDoc = await lessonRef.get();
+    const supabase = createSupabaseServiceClient();
+    const { data: lessonData, error: lessonError } = await supabase
+      .from('lessons')
+      .select('*')
+      .eq('id', lessonId)
+      .single();
 
-    if (!lessonDoc.exists) {
+    if (lessonError || !lessonData) {
       return apiError('Lesson not found', 404);
     }
-
-    const lessonData = lessonDoc.data() as LessonDocument;
 
     // Verify lesson type matches file type
     if (lessonData.type !== validatedData.lessonType) {
@@ -76,7 +77,7 @@ export async function POST(
       );
     }
 
-    // Generate resumable upload URL
+    // Generate signed upload URL
     const uploadUrl = await getResumableUploadUrl(
       lessonId,
       validatedData.fileName,
@@ -86,28 +87,37 @@ export async function POST(
     const storagePath = getLessonOriginalPath(lessonId, validatedData.fileName);
 
     // Update lesson status to 'uploading' and store file metadata
-    await lessonRef.update({
-      status: 'uploading',
-      storage_path_original: storagePath,
-      mime_type: validatedData.mimeType,
-      size_bytes: validatedData.fileSize,
-      updated_at: new Date().toISOString(),
-    });
+    const { error: updateError } = await supabase
+      .from('lessons')
+      .update({
+        status: 'uploading',
+        storage_path_original: storagePath,
+        mime_type: validatedData.mimeType,
+        size_bytes: validatedData.fileSize,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', lessonId);
 
-    console.log(`✅ Generated upload URL for lesson ${lessonId}`);
+    if (updateError) {
+      console.error(`[Upload Init] Failed to update lesson ${lessonId}:`, updateError);
+      return apiError('Failed to update lesson status', 500);
+    }
+
+    console.log(`Generated upload URL for lesson ${lessonId}`);
 
     return apiSuccess({
       uploadUrl,
       lessonId,
       storagePath,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error(`POST /api/uploads/lessons/[id]/init error:`, error);
 
-    if (error.name === 'ZodError') {
-      return apiError(`Validation failed: ${error.errors.map((e: any) => e.message).join(', ')}`, 400);
+    if (error instanceof ZodError) {
+      return apiError(`Validation failed: ${error.errors.map((e) => e.message).join(', ')}`, 400);
     }
 
-    return apiError(error.message || 'Failed to initialize upload', 500);
+    return apiError(errorMessage || 'Failed to initialize upload', 500);
   }
 }

@@ -6,7 +6,7 @@
 
 import { NextRequest } from 'next/server';
 import { authenticateRequest, requireRole, apiError, apiSuccess } from '@/lib/api/auth-middleware';
-import { getFirestore } from '@/lib/firebase/admin';
+import { createSupabaseServiceClient } from '@/lib/supabase/server';
 import { mapEmailLogFromFirestore } from '@/types/email';
 import type { EmailLogDocument } from '@/types/email';
 
@@ -25,54 +25,45 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const recipientEmail = searchParams.get('recipientEmail');
 
-    const firestore = getFirestore();
-    let query = firestore
-      .collection('email_logs')
-      .orderBy('sent_at', 'desc');
+    const supabase = createSupabaseServiceClient();
+
+    let query = supabase
+      .from('email_logs')
+      .select('*', { count: 'exact' })
+      .order('sent_at', { ascending: false });
 
     // Apply filters
     if (emailType) {
-      query = query.where('email_type', '==', emailType);
+      query = query.eq('email_type', emailType);
     }
     if (status) {
-      query = query.where('status', '==', status);
+      query = query.eq('status', status);
     }
     if (recipientEmail) {
-      query = query.where('recipient_email', '==', recipientEmail);
+      query = query.eq('recipient_email', recipientEmail);
     }
 
     // Apply pagination
-    if (offset > 0) {
-      const offsetSnapshot = await firestore
-        .collection('email_logs')
-        .orderBy('sent_at', 'desc')
-        .limit(offset)
-        .get();
+    query = query.range(offset, offset + limit - 1);
 
-      if (!offsetSnapshot.empty) {
-        const lastDoc = offsetSnapshot.docs[offsetSnapshot.docs.length - 1];
-        query = query.startAfter(lastDoc);
-      }
+    const { data: rows, error, count: total } = await query;
+
+    if (error) {
+      console.error('[Email Logs] Supabase error:', error);
+      return apiError('Failed to fetch email logs', 500);
     }
 
-    const snapshot = await query.limit(limit).get();
-
-    const logs = snapshot.docs.map((doc) => {
-      const data = doc.data() as EmailLogDocument;
-      return mapEmailLogFromFirestore(doc.id, data);
+    const logs = (rows || []).map((row) => {
+      return mapEmailLogFromFirestore(row.id, row as unknown as EmailLogDocument);
     });
-
-    // Get total count for pagination
-    const countSnapshot = await firestore.collection('email_logs').count().get();
-    const total = countSnapshot.data().count;
 
     return apiSuccess({
       logs,
       pagination: {
-        total,
+        total: total || 0,
         limit,
         offset,
-        hasMore: offset + logs.length < total,
+        hasMore: offset + logs.length < (total || 0),
       },
     });
   } catch (error: unknown) {
