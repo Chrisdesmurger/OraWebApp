@@ -247,20 +247,18 @@ export function CreateLessonDialog({
         xhr.send(file);
       });
 
-      // Verify upload was successful by checking lesson status after a short delay
-      // The Cloud Function should update the status to 'processing' or 'ready'
-      console.log('Verifying upload status...');
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds for Cloud Function
+      // Mark upload as complete (sets status to 'ready' without transcoding)
+      console.log('Marking upload as complete...');
+      const completeResponse = await fetchWithAuth(`/api/uploads/lessons/${lessonId}/complete`, {
+        method: 'POST',
+      });
 
-      const verifyResponse = await fetchWithAuth(`/api/lessons/${lessonId}`);
-      if (verifyResponse.ok) {
-        const { lesson: updatedLesson } = await verifyResponse.json();
-        if (updatedLesson.status === 'uploading' && !updatedLesson.storagePathOriginal) {
-          // Upload didn't actually complete - file never arrived
-          throw new Error('Upload verification failed - file did not arrive on server');
-        }
-        console.log('✅ Upload verified, lesson status:', updatedLesson.status);
+      if (!completeResponse.ok) {
+        const errorData = await completeResponse.json();
+        throw new Error(errorData.error || 'Failed to complete upload');
       }
+
+      console.log('✅ Upload complete, lesson marked as ready');
     } catch (error) {
       console.error('Upload error:', error);
       throw error;

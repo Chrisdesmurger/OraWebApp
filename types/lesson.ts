@@ -491,7 +491,7 @@ export function mapLessonFromFirestore(id: string, doc: LessonDocument): Lesson 
     };
     return categoryMap[cat.toLowerCase()] || (cat as LessonCategory);
   };
-  const category = normalizeCategory(doc.category);
+  const category = normalizeCategory(doc.category_fr || doc.category);
 
   // Build multilingual transcript
   const transcript: MultilingualText | null = doc.transcript_fr || doc.transcript_en || doc.transcript_es || doc.transcript
@@ -638,9 +638,9 @@ export function mapLessonToFirestore(lesson: Partial<Lesson>): Partial<LessonDoc
     }
   }
 
-  // Map category (simple enum)
+  // Map category (stored in category_fr column in PostgreSQL)
   if (lesson.category !== undefined) {
-    doc.category = lesson.category;
+    doc.category_fr = lesson.category;
   }
 
   // Map multilingual transcript

@@ -10,10 +10,11 @@ import { updateSession } from '@/lib/supabase/middleware';
 export async function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
+  console.log(`[MW] ${request.method} ${pathname}${searchParams.toString() ? '?' + searchParams.toString() : ''}`);
+
   // If an auth code lands on a non-callback route, redirect to /auth/callback
-  // This happens when Supabase redirects to the Site URL (root) instead of /auth/callback
-  // because the preview/deploy URL isn't in the allowed redirect URLs list
   if (searchParams.get('code') && !pathname.startsWith('/auth/callback')) {
+    console.log('[MW] Stray code detected, redirecting to /auth/callback');
     const callbackUrl = new URL('/auth/callback', request.url);
     callbackUrl.search = request.nextUrl.search;
     return NextResponse.redirect(callbackUrl);
@@ -21,6 +22,7 @@ export async function middleware(request: NextRequest) {
 
   // Skip session refresh for /auth/callback to preserve PKCE code verifier cookie
   if (pathname.startsWith('/auth/callback')) {
+    console.log('[MW] /auth/callback - skipping updateSession');
     return NextResponse.next();
   }
 
@@ -29,12 +31,14 @@ export async function middleware(request: NextRequest) {
 
   // Protect /admin routes
   if (pathname.startsWith('/admin')) {
-    // Check for Supabase auth cookies (includes chunked cookies like sb-xxx-auth-token.0)
-    const hasAuthCookies = request.cookies.getAll().some(
+    const allCookies = request.cookies.getAll();
+    const authCookies = allCookies.filter(
       (cookie) => cookie.name.startsWith('sb-') && cookie.name.includes('-auth-token')
     );
+    console.log(`[MW] /admin - auth cookies found: ${authCookies.length} (${authCookies.map(c => c.name).join(', ')})`);
 
-    if (!hasAuthCookies) {
+    if (authCookies.length === 0) {
+      console.log('[MW] No auth cookies → redirecting to /login');
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);

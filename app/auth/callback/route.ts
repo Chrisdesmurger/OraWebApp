@@ -12,8 +12,16 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code');
   const next = requestUrl.searchParams.get('next') ?? '/admin';
 
+  console.log(`[CALLBACK] code=${code ? code.substring(0, 8) + '...' : 'null'}, next=${next}`);
+
   if (code) {
     const cookieStore = await cookies();
+
+    // Log existing cookies before exchange
+    const existingCookies = cookieStore.getAll();
+    const pkceVerifier = existingCookies.find(c => c.name.includes('code-verifier'));
+    console.log(`[CALLBACK] Cookies before exchange: ${existingCookies.length} total, PKCE verifier: ${pkceVerifier ? 'PRESENT' : 'MISSING'}`);
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -23,6 +31,7 @@ export async function GET(request: NextRequest) {
             return cookieStore.getAll();
           },
           setAll(cookiesToSet) {
+            console.log(`[CALLBACK] setAll called with ${cookiesToSet.length} cookies: ${cookiesToSet.map(c => c.name).join(', ')}`);
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
@@ -32,29 +41,29 @@ export async function GET(request: NextRequest) {
     );
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
+    console.log(`[CALLBACK] exchangeCodeForSession: ${error ? 'ERROR: ' + error.message : 'SUCCESS'}`);
 
     if (error) {
-      // Code exchange failed - check if user already has a session
-      // (happens on browser retries where the first call already consumed the code)
       const { data: { user } } = await supabase.auth.getUser();
+      console.log(`[CALLBACK] Fallback getUser: ${user ? 'user found (' + user.email + ')' : 'NO USER'}`);
       if (!user) {
+        console.log('[CALLBACK] → Redirecting to /login?error=auth_callback_error');
         return NextResponse.redirect(new URL('/login?error=auth_callback_error', requestUrl.origin));
       }
     }
 
-    // Success (or session already exists from a previous exchange)
     const forwardedHost = request.headers.get('x-forwarded-host');
     const isLocalEnv = process.env.NODE_ENV === 'development';
+    const redirectUrl = isLocalEnv
+      ? new URL(next, requestUrl.origin)
+      : forwardedHost
+        ? new URL(next, `https://${forwardedHost}`)
+        : new URL(next, requestUrl.origin);
 
-    if (isLocalEnv) {
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
-    } else if (forwardedHost) {
-      return NextResponse.redirect(new URL(next, `https://${forwardedHost}`));
-    } else {
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
-    }
+    console.log(`[CALLBACK] → Redirecting to ${redirectUrl.toString()}`);
+    return NextResponse.redirect(redirectUrl);
   }
 
-  // No code provided - redirect to login
+  console.log('[CALLBACK] No code → redirecting to /login');
   return NextResponse.redirect(new URL('/login', requestUrl.origin));
 }

@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
     const lessonData: LessonDocument = {
       ...mappedData,
       type: validatedData.type,
-      program_id: validatedData.programId || '',  // Empty string if no program
+      program_id: validatedData.programId || null,
       order: validatedData.order || 0,
       duration_sec: null,
       tags: validatedData.tags || [],
