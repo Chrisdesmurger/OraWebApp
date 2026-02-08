@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/recommendations/weekly-refresh",
+      "schedule": "0 3 * * 1"
+    }
+  ]
+}

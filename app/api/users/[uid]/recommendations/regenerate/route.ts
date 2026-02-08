@@ -1,11 +1,9 @@
 /**
  * API Route: POST /api/users/[uid]/recommendations/regenerate
- * Manually triggers recommendation regeneration via Cloud Function HTTP endpoint
+ * Manually triggers recommendation regeneration using the local engine.
  *
- * This route calls the Firebase Cloud Function `regenerateUserRecommendationsHttp`
- * which is an HTTP endpoint (onRequest), NOT a callable function (onCall).
- *
- * @see https://github.com/Chrisdesmurger/OraWebApp/issues/66
+ * Replaced the former Firebase Cloud Function `regenerateUserRecommendationsHttp`
+ * with a Supabase-native recommendation engine.
  */
 
 import { NextRequest } from 'next/server';
@@ -16,13 +14,7 @@ import {
   apiSuccess,
 } from '@/lib/api/auth-middleware';
 import { createSupabaseServiceClient } from '@/lib/supabase/server';
-
-/**
- * Firebase Cloud Function HTTP endpoint URL
- * Uses onRequest (HTTP) instead of onCall (Callable) for direct fetch() access
- */
-const REGENERATE_FUNCTION_URL =
-  'https://us-central1-ora-wellbeing.cloudfunctions.net/regenerateUserRecommendationsHttp';
+import { generateRecommendations } from '@/lib/recommendations/engine';
 
 /**
  * POST /api/users/[uid]/recommendations/regenerate
@@ -58,30 +50,8 @@ export async function POST(
       return apiError('User not found', 404);
     }
 
-    console.log(`[API] Calling Cloud Function: ${REGENERATE_FUNCTION_URL}`);
-
-    // Call the HTTP Cloud Function endpoint
-    const response = await fetch(REGENERATE_FUNCTION_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ uid }),
-    });
-
-    // Parse response
-    const result = await response.json();
-
-    if (!response.ok) {
-      console.error('[API] Cloud Function error:', result);
-
-      // Return error from Cloud Function with details
-      const errorMessage = result.details
-        ? `${result.error}: ${result.details}`
-        : result.error || 'Failed to regenerate recommendations';
-
-      return apiError(errorMessage, response.status);
-    }
+    // Generate recommendations using the local engine
+    const result = await generateRecommendations(uid, 'manual');
 
     console.log('[API] Recommendations regenerated successfully:', result);
 
@@ -93,15 +63,6 @@ export async function POST(
   } catch (error: unknown) {
     console.error('[API] Error regenerating recommendations:', error);
 
-    // Handle network errors
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      return apiError(
-        'Cloud Function not reachable. Make sure the function is deployed.',
-        503
-      );
-    }
-
-    // Handle other errors
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error occurred';
 
